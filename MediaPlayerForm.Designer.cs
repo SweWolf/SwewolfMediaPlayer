@@ -32,6 +32,7 @@
             pnlControls = new Panel();
             btnPlayPause = new Button();
             btnStop = new Button();
+            btnSaveFrame = new Button();
             trkSeek = new TrackBar();
             lblTime = new Label();
             btnMute = new Button();
@@ -46,6 +47,7 @@
             //
             pnlControls.Controls.Add(btnPlayPause);
             pnlControls.Controls.Add(btnStop);
+            pnlControls.Controls.Add(btnSaveFrame);
             pnlControls.Controls.Add(trkSeek);
             pnlControls.Controls.Add(lblTime);
             pnlControls.Controls.Add(btnMute);
@@ -76,15 +78,25 @@
             btnStop.UseVisualStyleBackColor = true;
             btnStop.Click += btnStop_Click;
             //
+            // btnSaveFrame
+            //
+            btnSaveFrame.Location = new Point(174, 12);
+            btnSaveFrame.Name = "btnSaveFrame";
+            btnSaveFrame.Size = new Size(96, 32);
+            btnSaveFrame.TabIndex = 2;
+            btnSaveFrame.Text = "Save Frame";
+            btnSaveFrame.UseVisualStyleBackColor = true;
+            btnSaveFrame.Click += btnSaveFrame_Click;
+            //
             // trkSeek
             //
             trkSeek.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
             trkSeek.AutoSize = false;
-            trkSeek.Location = new Point(176, 12);
+            trkSeek.Location = new Point(278, 12);
             trkSeek.Maximum = 1000;
             trkSeek.Name = "trkSeek";
-            trkSeek.Size = new Size(632, 32);
-            trkSeek.TabIndex = 2;
+            trkSeek.Size = new Size(530, 32);
+            trkSeek.TabIndex = 3;
             trkSeek.TickStyle = TickStyle.None;
             trkSeek.Scroll += trkSeek_Scroll;
             trkSeek.MouseDown += trkSeek_MouseDown;
@@ -96,7 +108,7 @@
             lblTime.Location = new Point(814, 12);
             lblTime.Name = "lblTime";
             lblTime.Size = new Size(160, 32);
-            lblTime.TabIndex = 3;
+            lblTime.TabIndex = 4;
             lblTime.Text = "0:00 / 0:00";
             lblTime.TextAlign = ContentAlignment.MiddleRight;            //
             // btnMute
@@ -105,7 +117,7 @@
             btnMute.Location = new Point(980, 12);
             btnMute.Name = "btnMute";
             btnMute.Size = new Size(70, 32);
-            btnMute.TabIndex = 4;
+            btnMute.TabIndex = 5;
             btnMute.Text = "Mute";
             btnMute.UseVisualStyleBackColor = true;
             btnMute.Click += btnMute_Click;
@@ -120,7 +132,7 @@
             trkVolume.Name = "trkVolume";
             trkVolume.Size = new Size(110, 32);
             trkVolume.SmallChange = 5;
-            trkVolume.TabIndex = 5;
+            trkVolume.TabIndex = 6;
             trkVolume.TickStyle = TickStyle.None;
             trkVolume.Value = 100;
             trkVolume.Scroll += trkVolume_Scroll;
@@ -157,6 +169,7 @@
         private Panel pnlControls;
         private Button btnPlayPause;
         private Button btnStop;
+        private Button btnSaveFrame;
         private TrackBar trkSeek;
         private Label lblTime;
         private Button btnMute;

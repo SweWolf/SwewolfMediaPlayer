@@ -15,6 +15,7 @@
 //               and fractions of a second in the time label while paused.
 //   2026-10-07  Frame stepping with the wheel works anywhere in the window (not over the
 //               sliders), wheel up = forward; removed the time label tooltip.
+//   2026-10-07  Added Save Frame (button and S key): saves the frame on screen as a PNG.
 
 using LibVLCSharp.Shared;
 
@@ -22,6 +23,9 @@ namespace SwewolfMediaPlayer
 {
     public partial class MediaPlayerForm : Form, IMessageFilter
     {
+        // Caption for message boxes. Change it when copying the form to another project.
+        private const string AppName = "SweWolf Media Player";
+
         // LibVLC is loaded once per process and shared by all player windows.
         private static LibVLC? _libVlc;
 
@@ -30,6 +34,7 @@ namespace SwewolfMediaPlayer
         private Media? _media;
         private long _lengthMs;
         private bool _seeking;
+        private string? _lastSaveFolder;
         private bool _paused;
         private long _stepTimeMs = -1;   // tracked position while stepping frames, -1 = not stepping
         private double _frameMs;         // length of one frame, 0 = not known yet
@@ -49,7 +54,7 @@ namespace SwewolfMediaPlayer
             base.OnLoad(e);
             // The window may be made much smaller than the designer size, but not so small
             // that the control bar no longer fits.
-            MinimumSize = SizeFromClientSize(new Size(LogicalToDeviceUnits(560), LogicalToDeviceUnits(200)));
+            MinimumSize = SizeFromClientSize(new Size(LogicalToDeviceUnits(800), LogicalToDeviceUnits(200)));
         }
 
         protected override void OnShown(EventArgs e)
@@ -135,6 +140,11 @@ namespace SwewolfMediaPlayer
             if (keyData is Keys.Left or Keys.Right && _paused)
             {
                 StepFrame(keyData == Keys.Right ? 1 : -1);
+                return true;
+            }
+            if (keyData == Keys.S)
+            {
+                SaveFrame();
                 return true;
             }
             if (keyData == Keys.F)
@@ -304,6 +314,47 @@ namespace SwewolfMediaPlayer
         private void btnPlayPause_Click(object? sender, EventArgs e)
         {
             TogglePlayPause();
+        }
+
+        private void btnSaveFrame_Click(object? sender, EventArgs e)
+        {
+            SaveFrame();
+        }
+
+        // Saves the frame on screen as a PNG, at the video's own resolution. The file name
+        // suggested contains the (approximate) time of the frame.
+        private void SaveFrame()
+        {
+            if (_player == null)
+            {
+                return;
+            }
+
+            long timeMs = _paused && _stepTimeMs >= 0 ? _stepTimeMs : _player.Time;
+            TimeSpan t = TimeSpan.FromMilliseconds(Math.Max(timeMs, 0));
+            string stamp = $"{(int)t.TotalHours}-{t.Minutes:00}-{t.Seconds:00}-{t.Milliseconds:000}";
+
+            using var dialog = new SaveFileDialog
+            {
+                Title = "Save Frame as PNG",
+                Filter = "PNG Image|*.png",
+                DefaultExt = "png",
+                FileName = $"{Path.GetFileNameWithoutExtension(_filePath)}_{stamp}.png",
+                InitialDirectory = _lastSaveFolder ?? Path.GetDirectoryName(Path.GetFullPath(_filePath)),
+                OverwritePrompt = true
+            };
+
+            if (dialog.ShowDialog(this) != DialogResult.OK)
+            {
+                return;
+            }
+
+            _lastSaveFolder = Path.GetDirectoryName(dialog.FileName);
+            if (!_player.TakeSnapshot(0, dialog.FileName, 0, 0))
+            {
+                MessageBox.Show(this, "The frame could not be saved.", AppName,
+                    MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            }
         }
 
         private void btnStop_Click(object? sender, EventArgs e)
