@@ -16,6 +16,8 @@
 //   2026-10-07  Frame stepping with the wheel works anywhere in the window (not over the
 //               sliders), wheel up = forward; removed the time label tooltip.
 //   2026-10-07  Added Save Frame (button and S key): saves the frame on screen as a PNG.
+//   2026-10-07  Clicking the seek bar or volume slider jumps to that position (JumpTrackBar,
+//               at the end of this file); C toggles the subtitles.
 
 using LibVLCSharp.Shared;
 
@@ -35,6 +37,7 @@ namespace SwewolfMediaPlayer
         private long _lengthMs;
         private bool _seeking;
         private string? _lastSaveFolder;
+        private int _lastSubtitleTrack = -1;
         private bool _paused;
         private long _stepTimeMs = -1;   // tracked position while stepping frames, -1 = not stepping
         private double _frameMs;         // length of one frame, 0 = not known yet
@@ -140,6 +143,11 @@ namespace SwewolfMediaPlayer
             if (keyData is Keys.Left or Keys.Right && _paused)
             {
                 StepFrame(keyData == Keys.Right ? 1 : -1);
+                return true;
+            }
+            if (keyData == Keys.C)
+            {
+                ToggleSubtitles();
                 return true;
             }
             if (keyData == Keys.S)
@@ -357,6 +365,37 @@ namespace SwewolfMediaPlayer
             }
         }
 
+        // Switches the subtitles off, or back on (the track that was on, or else the first one).
+        private void ToggleSubtitles()
+        {
+            if (_player == null)
+            {
+                return;
+            }
+
+            if (_player.Spu >= 0)
+            {
+                _lastSubtitleTrack = _player.Spu;
+                _player.SetSpu(-1);
+                return;
+            }
+
+            var tracks = _player.SpuDescription;
+            if (_lastSubtitleTrack >= 0 && tracks.Any(t => t.Id == _lastSubtitleTrack))
+            {
+                _player.SetSpu(_lastSubtitleTrack);
+            }
+            else
+            {
+                // Track id -1 is the "disabled" entry in the list.
+                var first = tracks.FirstOrDefault(t => t.Id >= 0);
+                if (first.Id >= 0)
+                {
+                    _player.SetSpu(first.Id);
+                }
+            }
+        }
+
         private void btnStop_Click(object? sender, EventArgs e)
         {
             MediaPlayer? player = _player;
@@ -406,6 +445,33 @@ namespace SwewolfMediaPlayer
             {
                 _player.Volume = trkVolume.Value;
             }
+        }
+    }
+
+    // A TrackBar where a click on the bar jumps straight to that position (as in most media
+    // players) and the drag continues from there. A standard TrackBar only moves one page step.
+    internal sealed class JumpTrackBar : TrackBar
+    {
+        private const int WM_LBUTTONDOWN = 0x0201;
+
+        protected override void WndProc(ref Message m)
+        {
+            if (m.Msg == WM_LBUTTONDOWN && Orientation == Orientation.Horizontal)
+            {
+                int x = (short)((long)m.LParam & 0xFFFF);
+                int pad = LogicalToDeviceUnits(8);   // about half the width of the thumb
+                int channel = Math.Max(Width - 2 * pad, 1);
+                double thumbX = pad + (double)(Value - Minimum) / Math.Max(Maximum - Minimum, 1) * channel;
+
+                // A click on the thumb itself starts a normal drag.
+                if (Math.Abs(x - thumbX) > pad)
+                {
+                    double ratio = Math.Clamp((x - pad) / (double)channel, 0, 1);
+                    Value = Minimum + (int)Math.Round(ratio * (Maximum - Minimum));
+                    OnScroll(EventArgs.Empty);
+                }
+            }
+            base.WndProc(ref m);
         }
     }
 }

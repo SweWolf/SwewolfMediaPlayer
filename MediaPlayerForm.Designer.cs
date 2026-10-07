@@ -1,4 +1,4 @@
-﻿namespace SwewolfMediaPlayer
+namespace SwewolfMediaPlayer
 {
     partial class MediaPlayerForm
     {
@@ -33,10 +33,10 @@
             btnPlayPause = new Button();
             btnStop = new Button();
             btnSaveFrame = new Button();
-            trkSeek = new TrackBar();
+            trkSeek = new JumpTrackBar();
             lblTime = new Label();
             btnMute = new Button();
-            trkVolume = new TrackBar();
+            trkVolume = new JumpTrackBar();
             ((System.ComponentModel.ISupportInitialize)videoView).BeginInit();
             pnlControls.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)trkSeek).BeginInit();
@@ -170,9 +170,9 @@
         private Button btnPlayPause;
         private Button btnStop;
         private Button btnSaveFrame;
-        private TrackBar trkSeek;
+        private JumpTrackBar trkSeek;
         private Label lblTime;
         private Button btnMute;
-        private TrackBar trkVolume;
+        private JumpTrackBar trkVolume;
     }
 }
