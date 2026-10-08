@@ -40,6 +40,7 @@
             txtFile.Name = "txtFile";
             txtFile.Size = new Size(627, 29);
             txtFile.TabIndex = 0;
+            txtFile.TextChanged += txtFile_TextChanged;
             // 
             // btnBrowse
             // 

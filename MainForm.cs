@@ -7,6 +7,17 @@ namespace SwewolfMediaPlayer
         public MainForm()
         {
             InitializeComponent();
+            UpdateOpenButton();
+        }
+
+        private void txtFile_TextChanged(object? sender, EventArgs e)
+        {
+            UpdateOpenButton();
+        }
+
+        private void UpdateOpenButton()
+        {
+            btnOpen.Enabled = txtFile.Text.Trim().Length > 0;
         }
 
         private void btnBrowse_Click(object? sender, EventArgs e)
