@@ -18,8 +18,17 @@
 //   2026-10-07  Added Save Frame (button and S key): saves the frame on screen as a PNG.
 //   2026-10-07  Clicking the seek bar or volume slider jumps to that position (JumpTrackBar,
 //               at the end of this file); C toggles the subtitles.
+//   2026-10-08  The buttons show icons (drawn by IconButton, at the end of this file) instead of
+//               text; the text is in tooltips. Dark colors. Right-click menu with the audio
+//               and subtitle track. LibVLC's video window does not pass mouse clicks on, so a
+//               timer watches the right button (CheckRightClick). The play/pause icon shows
+//               the pause bars show while playing.
+//   2026-10-08  Mute and the volume slider work together (see SetMuted).
 
+using System.ComponentModel;
+using System.Drawing.Drawing2D;
 using LibVLCSharp.Shared;
+using LibVLCSharp.Shared.Structures;
 
 namespace SwewolfMediaPlayer
 {
@@ -42,12 +51,16 @@ namespace SwewolfMediaPlayer
         private long _stepTimeMs = -1;   // tracked position while stepping frames, -1 = not stepping
         private double _frameMs;         // length of one frame, 0 = not known yet
         private bool _muted;
+        private System.Windows.Forms.Timer? _rightClickTimer;
+        private bool _rightButtonWasDown;
+        private bool _shownPlaying;
         private bool _fullScreen;
         private FormWindowState _windowStateBeforeFullScreen;
 
         public MediaPlayerForm(string filePath)
         {
             InitializeComponent();
+            StyleMenu(menuVideo);
             _filePath = filePath;
             Text = Path.GetFileName(filePath);
         }
@@ -71,16 +84,18 @@ namespace SwewolfMediaPlayer
             }
 
             _player = new MediaPlayer(_libVlc);
+            // Without this the native video window swallows the mouse, and no right-click menu opens.
+            _player.EnableMouseInput = false;
             _player.Playing += (s, a) => Post(() =>
             {
                 _paused = false;
                 _stepTimeMs = -1;
-                btnPlayPause.Text = "Pause";
+                ShowPlayPause(true);
             });
             _player.Paused += (s, a) => Post(() =>
             {
                 _paused = true;
-                btnPlayPause.Text = "Play";
+                ShowPlayPause(false);
                 if (_player != null)
                 {
                     UpdateTime(_player.Time);
@@ -104,6 +119,16 @@ namespace SwewolfMediaPlayer
             videoView.MediaPlayer = _player;
             Application.AddMessageFilter(this);
 
+            // The video window of LibVLC does not pass mouse clicks on to the form, so watch the
+            // right mouse button ourselves and open the menu when it is released over the video.
+            _rightClickTimer = new System.Windows.Forms.Timer { Interval = 30 };
+            _rightClickTimer.Tick += (s, a) =>
+            {
+                CheckRightClick();
+                CheckPlayerState();
+            };
+            _rightClickTimer.Start();
+
             _player.Volume = trkVolume.Value;
             _media = new Media(_libVlc, _filePath, FromType.FromPath);
             _player.Play(_media);
@@ -114,6 +139,8 @@ namespace SwewolfMediaPlayer
             base.OnFormClosing(e);
 
             Application.RemoveMessageFilter(this);
+            _rightClickTimer?.Dispose();
+            _rightClickTimer = null;
 
             // Detach and release the player on a worker thread: stopping LibVLC from the
             // UI thread can deadlock.
@@ -274,11 +301,25 @@ namespace SwewolfMediaPlayer
             }
         }
 
+        // The play/pause button shows what a click will do: pause bars while playing, a play
+        // triangle otherwise. It follows the real state of the player (see CheckPlayerState).
+        private void ShowPlayPause(bool playing)
+        {
+            if (playing == _shownPlaying)
+            {
+                return;
+            }
+
+            _shownPlaying = playing;
+            btnPlayPause.Icon = playing ? IconKind.Pause : IconKind.Play;
+            toolTip.SetToolTip(btnPlayPause, playing ? "Pause (Space)" : "Play (Space)");
+        }
+
         private void ShowStopped()
         {
             _paused = false;
             _stepTimeMs = -1;
-            btnPlayPause.Text = "Play";
+            ShowPlayPause(false);
             if (!_seeking)
             {
                 trkSeek.Value = 0;
@@ -365,6 +406,111 @@ namespace SwewolfMediaPlayer
             }
         }
 
+        // Makes sure the play/pause icon matches what the player is really doing, also when an
+        // event was missed or arrived in another order.
+        private void CheckPlayerState()
+        {
+            if (_player != null)
+            {
+                ShowPlayPause(_player.IsPlaying);
+            }
+        }
+
+        // ---- Right-click menu: audio track and subtitle track, as in VLC ----
+
+        [System.Runtime.InteropServices.DllImport("user32.dll")]
+        private static extern short GetAsyncKeyState(int virtualKey);
+
+        private void CheckRightClick()
+        {
+            const int VK_LBUTTON = 0x01;
+            const int VK_RBUTTON = 0x02;
+            // The menu button is the right one, or the left one when the buttons are swapped.
+            int key = SystemInformation.MouseButtonsSwapped ? VK_LBUTTON : VK_RBUTTON;
+            bool down = (GetAsyncKeyState(key) & 0x8000) != 0;
+            bool released = _rightButtonWasDown && !down;
+            _rightButtonWasDown = down;
+
+            if (released && ActiveForm == this && !menuVideo.Visible && IsOver(videoView, Cursor.Position))
+            {
+                menuVideo.Show(videoView, videoView.PointToClient(Cursor.Position));
+            }
+        }
+
+        private void menuVideo_Opening(object? sender, CancelEventArgs e)
+        {
+            MediaPlayer? player = _player;
+            if (player == null)
+            {
+                e.Cancel = true;
+                return;
+            }
+
+            menuVideo.Items.Clear();
+
+            ToolStripMenuItem audio = new("Audio Track");
+            int currentAudio = player.AudioTrack;
+            foreach (TrackDescription track in player.AudioTrackDescription.Where(t => t.Id >= 0))
+            {
+                int id = track.Id;
+                audio.DropDownItems.Add(TrackItem(track.Name, id == currentAudio, () => player.SetAudioTrack(id)));
+            }
+            audio.Enabled = audio.DropDownItems.Count > 0;
+            menuVideo.Items.Add(audio);
+
+            ToolStripMenuItem subtitles = new("Subtitle Track");
+            int currentSpu = player.Spu;
+            subtitles.DropDownItems.Add(TrackItem("Disable", currentSpu < 0, () =>
+            {
+                if (player.Spu >= 0)
+                {
+                    _lastSubtitleTrack = player.Spu;
+                }
+                player.SetSpu(-1);
+            }));
+            foreach (TrackDescription track in player.SpuDescription.Where(t => t.Id >= 0))
+            {
+                int id = track.Id;
+                subtitles.DropDownItems.Add(TrackItem(track.Name, id == currentSpu, () => player.SetSpu(id)));
+            }
+            subtitles.Enabled = subtitles.DropDownItems.Count > 1;
+            menuVideo.Items.Add(subtitles);
+
+            // WinForms sets Cancel when the menu has no items yet, which is the case here.
+            e.Cancel = false;
+
+            // The menu itself is styled once in the constructor; the submenus are new each time.
+            foreach (ToolStripItem item in menuVideo.Items)
+            {
+                if (item is ToolStripDropDownItem dropDownItem)
+                {
+                    StyleMenu(dropDownItem.DropDown);
+                }
+            }
+        }
+
+        private static ToolStripMenuItem TrackItem(string text, bool isCurrent, Action select)
+        {
+            ToolStripMenuItem item = new(text) { Checked = isCurrent };
+            item.Click += (s, a) => select();
+            return item;
+        }
+
+        // Dark colors for the menu and its submenus.
+        private static void StyleMenu(ToolStrip menu)
+        {
+            menu.Renderer = new ToolStripProfessionalRenderer(new DarkColorTable()) { RoundedEdges = false };
+            menu.BackColor = Color.FromArgb(43, 43, 43);
+            menu.ForeColor = Color.FromArgb(230, 230, 230);
+            foreach (ToolStripItem item in menu.Items)
+            {
+                if (item is ToolStripDropDownItem dropDownItem)
+                {
+                    StyleMenu(dropDownItem.DropDown);
+                }
+            }
+        }
+
         // Switches the subtitles off, or back on (the track that was on, or else the first one).
         private void ToggleSubtitles()
         {
@@ -427,24 +573,58 @@ namespace SwewolfMediaPlayer
             }
         }
 
+        // Mute and the volume slider work together:
+        //  - Moving the slider while muted unmutes, at the new volume.
+        //  - Dragging the slider down to 0 is the same as muting; Unmute then goes to full
+        //    volume (there is no earlier volume worth going back to).
+        //  - Mute and Unmute with the button keep the slider where it was.
         private void btnMute_Click(object? sender, EventArgs e)
         {
-            if (_player != null)
+            if (_player == null)
             {
-                // Keep our own flag: LibVLC applies the mute asynchronously, so reading
-                // _player.Mute right after setting it still returns the old value.
-                _muted = !_muted;
-                _player.Mute = _muted;
-                btnMute.Text = _muted ? "Unmute" : "Mute";
+                return;
+            }
+
+            if (!_muted)
+            {
+                SetMuted(true);
+            }
+            else if (trkVolume.Value == 0)
+            {
+                trkVolume.Value = trkVolume.Maximum;
+                _player.Volume = trkVolume.Value;
+                SetMuted(false);
+            }
+            else
+            {
+                SetMuted(false);
             }
         }
 
         private void trkVolume_Scroll(object? sender, EventArgs e)
         {
-            if (_player != null)
+            if (_player == null)
             {
-                _player.Volume = trkVolume.Value;
+                return;
             }
+
+            _player.Volume = trkVolume.Value;
+            SetMuted(trkVolume.Value == 0);
+        }
+
+        private void SetMuted(bool muted)
+        {
+            if (_player == null)
+            {
+                return;
+            }
+
+            // Keep our own flag: LibVLC applies the mute asynchronously, so reading
+            // _player.Mute right after setting it still returns the old value.
+            _muted = muted;
+            _player.Mute = muted;
+            btnMute.Icon = muted ? IconKind.Muted : IconKind.Volume;
+            toolTip.SetToolTip(btnMute, muted ? "Unmute" : "Mute");
         }
     }
 
@@ -473,5 +653,129 @@ namespace SwewolfMediaPlayer
             }
             base.WndProc(ref m);
         }
+    }
+
+    // A button that draws its own icon, so it can be filled and take the colors of the dark theme.
+    // BackColor is the button color, ForeColor the icon color.
+    internal enum IconKind { Play, Pause, Stop, Camera, Volume, Muted }
+
+    internal sealed class IconButton : Button
+    {
+        private IconKind _icon;
+        private bool _hot;
+        private bool _down;
+
+        public IconButton()
+        {
+            FlatStyle = FlatStyle.Flat;
+            FlatAppearance.BorderSize = 0;
+            SetStyle(ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer, true);
+        }
+
+        [DesignerSerializationVisibility(DesignerSerializationVisibility.Visible)]
+        public IconKind Icon
+        {
+            get => _icon;
+            set { _icon = value; Invalidate(); }
+        }
+
+        protected override void OnMouseEnter(EventArgs e) { _hot = true; Invalidate(); base.OnMouseEnter(e); }
+        protected override void OnMouseLeave(EventArgs e) { _hot = false; _down = false; Invalidate(); base.OnMouseLeave(e); }
+        protected override void OnMouseDown(MouseEventArgs e) { _down = true; Invalidate(); base.OnMouseDown(e); }
+        protected override void OnMouseUp(MouseEventArgs e) { _down = false; Invalidate(); base.OnMouseUp(e); }
+        protected override void OnEnabledChanged(EventArgs e) { Invalidate(); base.OnEnabledChanged(e); }
+
+        protected override void OnPaint(PaintEventArgs e)
+        {
+            Graphics g = e.Graphics;
+            g.SmoothingMode = SmoothingMode.AntiAlias;
+
+            Color back = !Enabled ? BackColor : _down ? Lighten(BackColor, 0.25f) : _hot ? Lighten(BackColor, 0.12f) : BackColor;
+            Color fore = Enabled ? ForeColor : Color.FromArgb(110, 110, 110);
+            g.Clear(back);
+
+            // The icon is drawn in a square box of about half the button height.
+            float size = Math.Min(Width, Height) * 0.5f;
+            RectangleF box = new((Width - size) / 2, (Height - size) / 2, size, size);
+            using SolidBrush brush = new(fore);
+            using Pen pen = new(fore, Math.Max(1.5f, size * 0.09f)) { StartCap = LineCap.Round, EndCap = LineCap.Round };
+
+            PointF P(float x, float y) => new(box.X + x * box.Width, box.Y + y * box.Height);
+            RectangleF R(float x, float y, float w, float h) => new(box.X + x * box.Width, box.Y + y * box.Height, w * box.Width, h * box.Height);
+
+            switch (_icon)
+            {
+                case IconKind.Play:
+                    g.FillPolygon(brush, new[] { P(0.18f, 0f), P(0.18f, 1f), P(0.96f, 0.5f) });
+                    break;
+                case IconKind.Pause:
+                    g.FillRectangle(brush, R(0.10f, 0f, 0.32f, 1f));
+                    g.FillRectangle(brush, R(0.58f, 0f, 0.32f, 1f));
+                    break;
+                case IconKind.Stop:
+                    g.FillRectangle(brush, R(0.08f, 0.08f, 0.84f, 0.84f));
+                    break;
+                case IconKind.Camera:
+                    g.FillRectangle(brush, R(0.30f, 0.05f, 0.40f, 0.25f));
+                    g.FillRectangle(brush, R(0f, 0.22f, 1f, 0.70f));
+                    using (SolidBrush hole = new(back))
+                    {
+                        g.FillEllipse(hole, R(0.30f, 0.34f, 0.40f, 0.40f));
+                    }
+                    g.FillEllipse(brush, R(0.38f, 0.42f, 0.24f, 0.24f));
+                    break;
+                case IconKind.Volume:
+                case IconKind.Muted:
+                    g.FillPolygon(brush, new[] { P(0f, 0.34f), P(0.22f, 0.34f), P(0.52f, 0.08f), P(0.52f, 0.92f), P(0.22f, 0.66f), P(0f, 0.66f) });
+                    if (_icon == IconKind.Volume)
+                    {
+                        g.DrawArc(pen, R(0.40f, 0.30f, 0.40f, 0.40f), -50, 100);
+                        g.DrawArc(pen, R(0.30f, 0.12f, 0.70f, 0.76f), -50, 100);
+                    }
+                    else
+                    {
+                        g.DrawLine(pen, P(0.68f, 0.34f), P(1f, 0.66f));
+                        g.DrawLine(pen, P(1f, 0.34f), P(0.68f, 0.66f));
+                    }
+                    break;
+            }
+
+            if (Focused && ShowFocusCues)
+            {
+                using Pen focus = new(Color.FromArgb(120, fore)) { DashStyle = DashStyle.Dot };
+                g.DrawRectangle(focus, 2, 2, Width - 5, Height - 5);
+            }
+        }
+
+        private static Color Lighten(Color c, float amount)
+        {
+            return Color.FromArgb(c.R + (int)((255 - c.R) * amount), c.G + (int)((255 - c.G) * amount), c.B + (int)((255 - c.B) * amount));
+        }
+    }
+
+    // Colors for the right-click menu in the dark theme.
+    internal sealed class DarkColorTable : ProfessionalColorTable
+    {
+        private static readonly Color Back = Color.FromArgb(43, 43, 43);
+        private static readonly Color Hover = Color.FromArgb(70, 70, 70);
+        private static readonly Color Line = Color.FromArgb(80, 80, 80);
+
+        public override Color ToolStripDropDownBackground => Back;
+        public override Color ImageMarginGradientBegin => Back;
+        public override Color ImageMarginGradientMiddle => Back;
+        public override Color ImageMarginGradientEnd => Back;
+        public override Color MenuBorder => Line;
+        public override Color MenuItemBorder => Hover;
+        public override Color MenuItemSelected => Hover;
+        public override Color MenuItemSelectedGradientBegin => Hover;
+        public override Color MenuItemSelectedGradientEnd => Hover;
+        public override Color MenuItemPressedGradientBegin => Hover;
+        public override Color MenuItemPressedGradientMiddle => Hover;
+        public override Color MenuItemPressedGradientEnd => Hover;
+        public override Color SeparatorDark => Line;
+        public override Color SeparatorLight => Line;
+        public override Color CheckBackground => Hover;
+        public override Color CheckSelectedBackground => Hover;
+        public override Color CheckPressedBackground => Hover;
     }
 }

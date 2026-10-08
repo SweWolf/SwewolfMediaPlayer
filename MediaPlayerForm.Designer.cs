@@ -28,14 +28,17 @@ namespace SwewolfMediaPlayer
         /// </summary>
         private void InitializeComponent()
         {
+            components = new System.ComponentModel.Container();
+            toolTip = new ToolTip(components);
+            menuVideo = new ContextMenuStrip(components);
             videoView = new LibVLCSharp.WinForms.VideoView();
             pnlControls = new Panel();
-            btnPlayPause = new Button();
-            btnStop = new Button();
-            btnSaveFrame = new Button();
+            btnPlayPause = new IconButton();
+            btnStop = new IconButton();
+            btnSaveFrame = new IconButton();
             trkSeek = new JumpTrackBar();
             lblTime = new Label();
-            btnMute = new Button();
+            btnMute = new IconButton();
             trkVolume = new JumpTrackBar();
             ((System.ComponentModel.ISupportInitialize)videoView).BeginInit();
             pnlControls.SuspendLayout();
@@ -43,8 +46,14 @@ namespace SwewolfMediaPlayer
             ((System.ComponentModel.ISupportInitialize)trkVolume).BeginInit();
             SuspendLayout();
             //
+            // menuVideo
+            //
+            menuVideo.Name = "menuVideo";
+            menuVideo.Opening += menuVideo_Opening;
+            //
             // pnlControls
             //
+            pnlControls.BackColor = Color.FromArgb(32, 32, 32);
             pnlControls.Controls.Add(btnPlayPause);
             pnlControls.Controls.Add(btnStop);
             pnlControls.Controls.Add(btnSaveFrame);
@@ -60,42 +69,46 @@ namespace SwewolfMediaPlayer
             //
             // btnPlayPause
             //
+            btnPlayPause.BackColor = Color.FromArgb(48, 48, 48);
+            btnPlayPause.ForeColor = Color.FromArgb(230, 230, 230);
+            btnPlayPause.Icon = IconKind.Play;
             btnPlayPause.Location = new Point(12, 12);
             btnPlayPause.Name = "btnPlayPause";
-            btnPlayPause.Size = new Size(80, 32);
+            btnPlayPause.Size = new Size(40, 32);
             btnPlayPause.TabIndex = 0;
-            btnPlayPause.Text = "Pause";
-            btnPlayPause.UseVisualStyleBackColor = true;
             btnPlayPause.Click += btnPlayPause_Click;
             //
             // btnStop
             //
-            btnStop.Location = new Point(98, 12);
+            btnStop.BackColor = Color.FromArgb(48, 48, 48);
+            btnStop.ForeColor = Color.FromArgb(230, 230, 230);
+            btnStop.Icon = IconKind.Stop;
+            btnStop.Location = new Point(58, 12);
             btnStop.Name = "btnStop";
-            btnStop.Size = new Size(70, 32);
+            btnStop.Size = new Size(40, 32);
             btnStop.TabIndex = 1;
-            btnStop.Text = "Stop";
-            btnStop.UseVisualStyleBackColor = true;
             btnStop.Click += btnStop_Click;
             //
             // btnSaveFrame
             //
-            btnSaveFrame.Location = new Point(174, 12);
+            btnSaveFrame.BackColor = Color.FromArgb(48, 48, 48);
+            btnSaveFrame.ForeColor = Color.FromArgb(230, 230, 230);
+            btnSaveFrame.Icon = IconKind.Camera;
+            btnSaveFrame.Location = new Point(104, 12);
             btnSaveFrame.Name = "btnSaveFrame";
-            btnSaveFrame.Size = new Size(96, 32);
+            btnSaveFrame.Size = new Size(40, 32);
             btnSaveFrame.TabIndex = 2;
-            btnSaveFrame.Text = "Save Frame";
-            btnSaveFrame.UseVisualStyleBackColor = true;
             btnSaveFrame.Click += btnSaveFrame_Click;
             //
             // trkSeek
             //
             trkSeek.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
             trkSeek.AutoSize = false;
-            trkSeek.Location = new Point(278, 12);
+            trkSeek.BackColor = Color.FromArgb(32, 32, 32);
+            trkSeek.Location = new Point(152, 12);
             trkSeek.Maximum = 1000;
             trkSeek.Name = "trkSeek";
-            trkSeek.Size = new Size(530, 32);
+            trkSeek.Size = new Size(684, 32);
             trkSeek.TabIndex = 3;
             trkSeek.TickStyle = TickStyle.None;
             trkSeek.Scroll += trkSeek_Scroll;
@@ -105,27 +118,38 @@ namespace SwewolfMediaPlayer
             // lblTime
             //
             lblTime.Anchor = AnchorStyles.Top | AnchorStyles.Right;
-            lblTime.Location = new Point(814, 12);
+            lblTime.ForeColor = Color.FromArgb(230, 230, 230);
+            lblTime.Location = new Point(844, 12);
             lblTime.Name = "lblTime";
             lblTime.Size = new Size(160, 32);
             lblTime.TabIndex = 4;
             lblTime.Text = "0:00 / 0:00";
-            lblTime.TextAlign = ContentAlignment.MiddleRight;            //
+            lblTime.TextAlign = ContentAlignment.MiddleRight;
+            //
             // btnMute
             //
             btnMute.Anchor = AnchorStyles.Top | AnchorStyles.Right;
-            btnMute.Location = new Point(980, 12);
+            btnMute.BackColor = Color.FromArgb(48, 48, 48);
+            btnMute.ForeColor = Color.FromArgb(230, 230, 230);
+            btnMute.Icon = IconKind.Volume;
+            btnMute.Location = new Point(1010, 12);
             btnMute.Name = "btnMute";
-            btnMute.Size = new Size(70, 32);
+            btnMute.Size = new Size(40, 32);
             btnMute.TabIndex = 5;
-            btnMute.Text = "Mute";
-            btnMute.UseVisualStyleBackColor = true;
             btnMute.Click += btnMute_Click;
+            //
+            // toolTip
+            //
+            toolTip.SetToolTip(btnPlayPause, "Play (Space)");
+            toolTip.SetToolTip(btnStop, "Stop");
+            toolTip.SetToolTip(btnSaveFrame, "Save Frame as PNG (S)");
+            toolTip.SetToolTip(btnMute, "Mute");
             //
             // trkVolume
             //
             trkVolume.Anchor = AnchorStyles.Top | AnchorStyles.Right;
             trkVolume.AutoSize = false;
+            trkVolume.BackColor = Color.FromArgb(32, 32, 32);
             trkVolume.LargeChange = 10;
             trkVolume.Location = new Point(1056, 12);
             trkVolume.Maximum = 100;
@@ -151,9 +175,11 @@ namespace SwewolfMediaPlayer
             //
             AutoScaleDimensions = new SizeF(7F, 15F);
             AutoScaleMode = AutoScaleMode.Font;
+            BackColor = Color.FromArgb(32, 32, 32);
             ClientSize = new Size(1178, 698);
             Controls.Add(videoView);
             Controls.Add(pnlControls);
+            ForeColor = Color.FromArgb(230, 230, 230);
             Name = "MediaPlayerForm";
             Text = "Media Player";
             ((System.ComponentModel.ISupportInitialize)videoView).EndInit();
@@ -166,13 +192,15 @@ namespace SwewolfMediaPlayer
         #endregion
 
         private LibVLCSharp.WinForms.VideoView videoView;
+        private ToolTip toolTip;
+        private ContextMenuStrip menuVideo;
         private Panel pnlControls;
-        private Button btnPlayPause;
-        private Button btnStop;
-        private Button btnSaveFrame;
+        private IconButton btnPlayPause;
+        private IconButton btnStop;
+        private IconButton btnSaveFrame;
         private JumpTrackBar trkSeek;
         private Label lblTime;
-        private Button btnMute;
+        private IconButton btnMute;
         private JumpTrackBar trkVolume;
     }
 }
