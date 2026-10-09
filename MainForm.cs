@@ -7,6 +7,12 @@ namespace SwewolfMediaPlayer
         public MainForm()
         {
             InitializeComponent();
+            // The icon is built into the program, so it also works when only the EXE is shipped.
+            using Stream? iconStream = typeof(MainForm).Assembly.GetManifestResourceStream("SwewolfMediaPlayer.ico");
+            if (iconStream != null)
+            {
+                Icon = new Icon(iconStream);
+            }
             UpdateOpenButton();
         }
 
@@ -53,7 +59,7 @@ namespace SwewolfMediaPlayer
                 return;
             }
 
-            new MediaPlayerForm(path).Show(this);
+            new MediaPlayerForm(path) { Icon = Icon }.Show(this);
         }
     }
 }

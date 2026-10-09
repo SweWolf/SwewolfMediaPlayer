@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
@@ -6,7 +6,12 @@
     <Nullable>enable</Nullable>
     <UseWindowsForms>true</UseWindowsForms>
     <ImplicitUsings>enable</ImplicitUsings>
+    <ApplicationIcon>Resources\SwewolfMediaPlayer.ico</ApplicationIcon>
   </PropertyGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="Resources\SwewolfMediaPlayer.ico" LogicalName="SwewolfMediaPlayer.ico" />
+  </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="LibVLCSharp.WinForms" Version="3.10.1" />
