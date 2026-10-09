@@ -144,6 +144,7 @@ namespace SwewolfMediaPlayer
             toolTip.SetToolTip(btnStop, "Stop");
             toolTip.SetToolTip(btnSaveFrame, "Save Frame as PNG (S)");
             toolTip.SetToolTip(btnMute, "Mute");
+            toolTip.SetToolTip(trkVolume, "Volume: 100%");
             //
             // trkVolume
             //

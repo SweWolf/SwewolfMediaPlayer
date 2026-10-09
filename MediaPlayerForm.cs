@@ -24,12 +24,15 @@
 //               timer watches the right button (CheckRightClick). The play/pause icon shows
 //               the pause bars show while playing.
 //   2026-10-08  Mute and the volume slider work together (see SetMuted).
-//   2026-10-08  Double-clicking the video toggles full screen (CheckDoubleClick).
+//   2026-10-08  Double-clicking the video toggles full screen.
 //   2026-10-09  Plays streams: a web address (http, https, rtsp, rtmp, mms) can be given
 //               instead of a file path. HLS streams that start with a black picture (video
 //               group without an address) are fixed automatically (EnsureVideoTrack).
+//   2026-10-09  Clicking the video toggles play/pause (CheckVideoClick); a double click undoes
+//               that and toggles full screen.
+//   2026-10-09  The volume slider shows the volume in percent in a tooltip.
 //   2026-10-09  Streams: the time label shows only the elapsed time, the seek bar and frame
-//               stepping are off.
+//               stepping are off. The muted icon is red.
 
 using System.ComponentModel;
 using System.Drawing.Drawing2D;
@@ -61,14 +64,21 @@ namespace SwewolfMediaPlayer
         private System.Windows.Forms.Timer? _rightClickTimer;
         private bool _rightButtonWasDown;
         private bool _shownPlaying;
+        // The muted symbol is red. There is no setting for it yet: a setting would only have to
+        // change this value.
+        private bool _mutedSymbolIsRed = true;
         private bool _videoCheckDone;
         private long _playingSinceTicks;
         private bool _leftButtonWasDown;
         private long _lastClickTicks;
         private Point _lastClickPosition;
 
-        // Double-clicking the video toggles full screen. There is no setting for it yet.
+        // Clicking the video toggles play/pause, and double-clicking it toggles full screen.
+        // There are no settings for these yet: a setting would only have to change these values.
+        private bool _clickTogglesPlayPause = true;
         private bool _doubleClickTogglesFullScreen = true;
+        private bool _menuWasOpen;
+        private bool? _lastClickPauseValue;   // what the last click did, so that a double click can undo it
         private bool _fullScreen;
         private FormWindowState _windowStateBeforeFullScreen;
 
@@ -156,7 +166,7 @@ namespace SwewolfMediaPlayer
             _rightClickTimer.Tick += (s, a) =>
             {
                 CheckRightClick();
-                CheckDoubleClick();
+                CheckVideoClick();
                 CheckPlayerState();
             };
             _rightClickTimer.Start();
@@ -378,21 +388,23 @@ namespace SwewolfMediaPlayer
             return withFraction ? $"{text}.{t.Milliseconds:000}" : text;
         }
 
-        private void TogglePlayPause()
+        // Returns the value passed to SetPause, or null when playback was (re)started instead.
+        private bool? TogglePlayPause()
         {
             if (_player == null)
             {
-                return;
+                return null;
             }
 
             if (_player.State is VLCState.Stopped or VLCState.Ended or VLCState.Error or VLCState.NothingSpecial)
             {
                 _player.Play();
+                return null;
             }
-            else
-            {
-                _player.SetPause(_player.IsPlaying);
-            }
+
+            bool pause = _player.IsPlaying;
+            _player.SetPause(pause);
+            return pause;
         }
 
         private void btnPlayPause_Click(object? sender, EventArgs e)
@@ -441,9 +453,11 @@ namespace SwewolfMediaPlayer
             }
         }
 
-        // The video window does not pass mouse clicks on either, so a double click is detected
-        // here: two presses of the main mouse button over the video, close in time and place.
-        private void CheckDoubleClick()
+        // The video window does not pass mouse clicks on either, so clicks are detected here: a
+        // press of the main mouse button over the video. A click toggles play/pause at once. A
+        // second press close in time and place is a double click: it undoes that pause/play and
+        // toggles full screen instead.
+        private void CheckVideoClick()
         {
             const int VK_LBUTTON = 0x01;
             const int VK_RBUTTON = 0x02;
@@ -452,8 +466,13 @@ namespace SwewolfMediaPlayer
             bool pressed = down && !_leftButtonWasDown;
             _leftButtonWasDown = down;
 
+            // A click that closes the right-click menu, or hits it, is not a click on the video.
+            bool menuOpen = menuVideo.Visible;
+            bool ignore = menuOpen || _menuWasOpen;
+            _menuWasOpen = menuOpen;
+
             Point cursor = Cursor.Position;
-            if (!pressed || ActiveForm != this || !IsOver(videoView, cursor))
+            if (!pressed || ignore || ActiveForm != this || !IsOver(videoView, cursor))
             {
                 return;
             }
@@ -464,21 +483,21 @@ namespace SwewolfMediaPlayer
                 && Math.Abs(cursor.X - _lastClickPosition.X) <= area.Width / 2
                 && Math.Abs(cursor.Y - _lastClickPosition.Y) <= area.Height / 2;
 
-            if (isDoubleClick)
+            if (isDoubleClick && _doubleClickTogglesFullScreen)
             {
                 _lastClickTicks = 0;
-                if (_doubleClickTogglesFullScreen)
+                if (_lastClickPauseValue is bool pause && _player != null)
                 {
-                    SetFullScreen(!_fullScreen);
+                    _player.SetPause(!pause);   // undo what the first click did
                 }
+                SetFullScreen(!_fullScreen);
+                return;
             }
-            else
-            {
-                _lastClickTicks = now;
-                _lastClickPosition = cursor;
-            }
-        }
 
+            _lastClickTicks = now;
+            _lastClickPosition = cursor;
+            _lastClickPauseValue = _clickTogglesPlayPause ? TogglePlayPause() : null;
+        }
         // Makes sure the play/pause icon matches what the player is really doing, also when an
         // event was missed or arrived in another order.
         private void CheckPlayerState()
@@ -722,6 +741,7 @@ namespace SwewolfMediaPlayer
                 trkVolume.Value = trkVolume.Maximum;
                 _player.Volume = trkVolume.Value;
                 SetMuted(false);
+                ShowVolumeTip();
             }
             else
             {
@@ -738,6 +758,17 @@ namespace SwewolfMediaPlayer
 
             _player.Volume = trkVolume.Value;
             SetMuted(trkVolume.Value == 0);
+            ShowVolumeTip();
+        }
+
+        // Shows the volume in percent in a tooltip above the thumb while the slider is used.
+        private void ShowVolumeTip()
+        {
+            string text = $"Volume: {trkVolume.Value}%";
+            int pad = LogicalToDeviceUnits(8);   // about half the width of the thumb
+            int thumbX = pad + (int)((double)trkVolume.Value / trkVolume.Maximum * (trkVolume.Width - 2 * pad));
+            toolTip.SetToolTip(trkVolume, text);
+            toolTip.Show(text, trkVolume, thumbX - LogicalToDeviceUnits(30), -LogicalToDeviceUnits(28), 2000);
         }
 
         private void SetMuted(bool muted)
@@ -751,6 +782,7 @@ namespace SwewolfMediaPlayer
             // _player.Mute right after setting it still returns the old value.
             _muted = muted;
             _player.Mute = muted;
+            btnMute.MutedColor = _mutedSymbolIsRed ? Color.FromArgb(235, 75, 75) : null;
             btnMute.Icon = muted ? IconKind.Muted : IconKind.Volume;
             toolTip.SetToolTip(btnMute, muted ? "Unmute" : "Mute");
         }
@@ -790,6 +822,7 @@ namespace SwewolfMediaPlayer
     internal sealed class IconButton : Button
     {
         private IconKind _icon;
+        private Color? _mutedColor;
         private bool _hot;
         private bool _down;
 
@@ -798,6 +831,15 @@ namespace SwewolfMediaPlayer
             FlatStyle = FlatStyle.Flat;
             FlatAppearance.BorderSize = 0;
             SetStyle(ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer, true);
+        }
+
+        // Color of the muted icon; null = same as ForeColor.
+        [Browsable(false)]
+        [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
+        public Color? MutedColor
+        {
+            get => _mutedColor;
+            set { _mutedColor = value; Invalidate(); }
         }
 
         [DesignerSerializationVisibility(DesignerSerializationVisibility.Visible)]
@@ -819,7 +861,7 @@ namespace SwewolfMediaPlayer
             g.SmoothingMode = SmoothingMode.AntiAlias;
 
             Color back = !Enabled ? BackColor : _down ? Lighten(BackColor, 0.25f) : _hot ? Lighten(BackColor, 0.12f) : BackColor;
-            Color fore = Enabled ? ForeColor : Color.FromArgb(110, 110, 110);
+            Color fore = !Enabled ? Color.FromArgb(110, 110, 110) : _icon == IconKind.Muted && _mutedColor != null ? _mutedColor.Value : ForeColor;
             g.Clear(back);
 
             // The icon is drawn in a square box of about half the button height.
