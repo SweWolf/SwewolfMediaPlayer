@@ -25,6 +25,11 @@
 //               the pause bars show while playing.
 //   2026-10-08  Mute and the volume slider work together (see SetMuted).
 //   2026-10-08  Double-clicking the video toggles full screen (CheckDoubleClick).
+//   2026-10-09  Plays streams: a web address (http, https, rtsp, rtmp, mms) can be given
+//               instead of a file path. HLS streams that start with a black picture (video
+//               group without an address) are fixed automatically (EnsureVideoTrack).
+//   2026-10-09  Streams: the time label shows only the elapsed time, the seek bar and frame
+//               stepping are off.
 
 using System.ComponentModel;
 using System.Drawing.Drawing2D;
@@ -42,6 +47,7 @@ namespace SwewolfMediaPlayer
         private static LibVLC? _libVlc;
 
         private readonly string _filePath;
+        private readonly bool _isStream;   // a web address (e.g. an HLS stream) and not a file
         private MediaPlayer? _player;
         private Media? _media;
         private long _lengthMs;
@@ -55,6 +61,8 @@ namespace SwewolfMediaPlayer
         private System.Windows.Forms.Timer? _rightClickTimer;
         private bool _rightButtonWasDown;
         private bool _shownPlaying;
+        private bool _videoCheckDone;
+        private long _playingSinceTicks;
         private bool _leftButtonWasDown;
         private long _lastClickTicks;
         private Point _lastClickPosition;
@@ -64,12 +72,28 @@ namespace SwewolfMediaPlayer
         private bool _fullScreen;
         private FormWindowState _windowStateBeforeFullScreen;
 
+        // True for a web address or other stream location that LibVLC can open, as opposed to a
+        // file on disk. A path such as C:\video.mp4 is not a stream.
+        public static bool TryGetStreamUri(string text, out Uri? uri)
+        {
+            string[] schemes = { "http", "https", "rtsp", "rtmp", "mms" };
+            if (Uri.TryCreate(text.Trim(), UriKind.Absolute, out uri) && schemes.Contains(uri.Scheme))
+            {
+                return true;
+            }
+            uri = null;
+            return false;
+        }
+
         public MediaPlayerForm(string filePath)
         {
             InitializeComponent();
             StyleMenu(menuVideo);
             _filePath = filePath;
-            Text = Path.GetFileName(filePath);
+            _isStream = TryGetStreamUri(filePath, out Uri? uri);
+            Text = _isStream ? uri!.Host : Path.GetFileName(filePath);
+            // A stream cannot be seeked or stepped back: the seek bar is of no use.
+            trkSeek.Enabled = !_isStream;
         }
 
         protected override void OnLoad(EventArgs e)
@@ -138,7 +162,7 @@ namespace SwewolfMediaPlayer
             _rightClickTimer.Start();
 
             _player.Volume = trkVolume.Value;
-            _media = new Media(_libVlc, _filePath, FromType.FromPath);
+            _media = new Media(_libVlc, _filePath, _isStream ? FromType.FromLocation : FromType.FromPath);
             _player.Play(_media);
         }
 
@@ -175,7 +199,7 @@ namespace SwewolfMediaPlayer
                 TogglePlayPause();
                 return true;
             }
-            if (keyData is Keys.Left or Keys.Right && _paused)
+            if (keyData is Keys.Left or Keys.Right && _paused && !_isStream)
             {
                 StepFrame(keyData == Keys.Right ? 1 : -1);
                 return true;
@@ -209,7 +233,7 @@ namespace SwewolfMediaPlayer
         public bool PreFilterMessage(ref Message m)
         {
             const int WM_MOUSEWHEEL = 0x020A;
-            if (m.Msg != WM_MOUSEWHEEL || !_paused || ActiveForm != this)
+            if (m.Msg != WM_MOUSEWHEEL || !_paused || _isStream || ActiveForm != this)
             {
                 return false;
             }
@@ -237,7 +261,7 @@ namespace SwewolfMediaPlayer
         // step forward natively, and this way both directions behave the same.
         private void StepFrame(int direction)
         {
-            if (_player == null)
+            if (_player == null || _isStream)
             {
                 return;
             }
@@ -337,8 +361,11 @@ namespace SwewolfMediaPlayer
 
         private void UpdateTime(long timeMs)
         {
-            lblTime.Text = $"{FormatTime(timeMs, _paused)} / {FormatTime(_lengthMs, false)}";
-            if (!_seeking && _lengthMs > 0)
+            // A stream has no real length (a live stream reports a fixed window): show only the time.
+            lblTime.Text = _isStream || _lengthMs <= 0
+                ? FormatTime(timeMs, _paused)
+                : $"{FormatTime(timeMs, _paused)} / {FormatTime(_lengthMs, false)}";
+            if (!_seeking && !_isStream && _lengthMs > 0)
             {
                 trkSeek.Value = (int)Math.Clamp(timeMs * trkSeek.Maximum / _lengthMs, 0, trkSeek.Maximum);
             }
@@ -396,8 +423,8 @@ namespace SwewolfMediaPlayer
                 Title = "Save Frame as PNG",
                 Filter = "PNG Image|*.png",
                 DefaultExt = "png",
-                FileName = $"{Path.GetFileNameWithoutExtension(_filePath)}_{stamp}.png",
-                InitialDirectory = _lastSaveFolder ?? Path.GetDirectoryName(Path.GetFullPath(_filePath)),
+                FileName = $"{(_isStream ? "stream" : Path.GetFileNameWithoutExtension(_filePath))}_{stamp}.png",
+                InitialDirectory = _lastSaveFolder ?? (_isStream ? null : Path.GetDirectoryName(Path.GetFullPath(_filePath))),
                 OverwritePrompt = true
             };
 
@@ -456,12 +483,67 @@ namespace SwewolfMediaPlayer
         // event was missed or arrived in another order.
         private void CheckPlayerState()
         {
-            if (_player != null)
+            if (_player == null)
             {
-                ShowPlayPause(_player.IsPlaying);
+                return;
+            }
+
+            ShowPlayPause(_player.IsPlaying);
+            if (_isStream && !_videoCheckDone && _player.IsPlaying)
+            {
+                if (_playingSinceTicks == 0)
+                {
+                    _playingSinceTicks = Environment.TickCount64;
+                }
+                else if (Environment.TickCount64 - _playingSinceTicks > 1500)
+                {
+                    EnsureVideoTrack();
+                }
             }
         }
 
+        // Some HLS streams start with the sound only and a black picture. Their playlist has a
+        // video group without an address (EXT-X-MEDIA TYPE=VIDEO), which LibVLC shows as an extra
+        // entry named "video Video" in the audio track list instead of as a video track. Picking
+        // that entry, then pausing and resuming briefly, makes the picture appear.
+        private async void EnsureVideoTrack()
+        {
+            MediaPlayer? player = _player;
+            if (player == null)
+            {
+                return;
+            }
+
+            if (player.VideoTrackDescription.Any(t => t.Id >= 0) || player.VideoTrack >= 0)
+            {
+                _videoCheckDone = true;   // there is a normal video track
+                return;
+            }
+
+            // The track ids change while the stream starts, so look the entry up by name now.
+            var videoEntries = player.AudioTrackDescription
+                .Where(t => t.Id >= 0 && t.Name.StartsWith("video", StringComparison.OrdinalIgnoreCase))
+                .ToArray();
+            if (videoEntries.Length == 0)
+            {
+                // The tracks may not be known yet: look again for a while.
+                _videoCheckDone = Environment.TickCount64 - _playingSinceTicks > 15000;
+                return;
+            }
+
+            _videoCheckDone = true;
+            player.SetAudioTrack(videoEntries[0].Id);
+            await Task.Delay(500);
+            if (_player == player)
+            {
+                player.SetPause(true);
+                await Task.Delay(300);
+            }
+            if (_player == player)
+            {
+                player.SetPause(false);
+            }
+        }
         // ---- Right-click menu: audio track and subtitle track, as in VLC ----
 
         [System.Runtime.InteropServices.DllImport("user32.dll")]

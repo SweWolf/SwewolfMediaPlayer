@@ -44,7 +44,8 @@ namespace SwewolfMediaPlayer
         {
             string path = txtFile.Text.Trim().Trim('"');
 
-            if (!File.Exists(path))
+            // A web address (a stream) is not checked: only files must exist.
+            if (!MediaPlayerForm.TryGetStreamUri(path, out _) && !File.Exists(path))
             {
                 MessageBox.Show(this, $"The file \"{path}\" does not exist.", AppName,
                     MessageBoxButtons.OK, MessageBoxIcon.Warning);
