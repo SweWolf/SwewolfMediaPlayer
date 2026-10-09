@@ -14,11 +14,17 @@ namespace SwewolfMediaPlayer
                 Icon = new Icon(iconStream);
             }
             UpdateOpenButton();
+
+            // Start loading the video engine now, so the first video opens without a wait.
+            _ = MediaPlayerForm.PreloadAsync();
         }
 
         private void txtFile_TextChanged(object? sender, EventArgs e)
         {
             UpdateOpenButton();
+
+            // Start loading the video engine now, so the first video opens without a wait.
+            _ = MediaPlayerForm.PreloadAsync();
         }
 
         private void UpdateOpenButton()

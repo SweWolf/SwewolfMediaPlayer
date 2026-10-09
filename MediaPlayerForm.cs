@@ -28,8 +28,10 @@
 //   2026-10-09  Plays streams: a web address (http, https, rtsp, rtmp, mms) can be given
 //               instead of a file path. HLS streams that start with a black picture (video
 //               group without an address) are fixed automatically (EnsureVideoTrack).
-//   2026-10-09  Clicking the video toggles play/pause (CheckVideoClick); a double click undoes
-//               that and toggles full screen.
+//   2026-10-09  LibVLC is loaded on a worker thread (PreloadAsync), so the window does not freeze.
+//               Alt+Enter toggles full screen like F.
+//   2026-10-09  Clicking the video toggled play/pause for a while; removed again. The right-click
+//               menu moves to the place of a new right click and closes on a left click elsewhere.
 //   2026-10-09  The volume slider shows the volume in percent in a tooltip.
 //   2026-10-09  Streams: the time label shows only the elapsed time, the seek bar and frame
 //               stepping are off. The muted icon is red.
@@ -48,6 +50,19 @@ namespace SwewolfMediaPlayer
 
         // LibVLC is loaded once per process and shared by all player windows.
         private static LibVLC? _libVlc;
+        private static Task? _loadTask;
+
+        // Loads LibVLC on a worker thread: it takes several seconds, and on the UI thread the
+        // window would freeze meanwhile. Safe to call more than once; call it early (the main
+        // window does) and the first player window opens without any wait.
+        public static Task PreloadAsync()
+        {
+            return _loadTask ??= Task.Run(() =>
+            {
+                Core.Initialize();
+                _libVlc = new LibVLC();
+            });
+        }
 
         private readonly string _filePath;
         private readonly bool _isStream;   // a web address (e.g. an HLS stream) and not a file
@@ -73,12 +88,9 @@ namespace SwewolfMediaPlayer
         private long _lastClickTicks;
         private Point _lastClickPosition;
 
-        // Clicking the video toggles play/pause, and double-clicking it toggles full screen.
-        // There are no settings for these yet: a setting would only have to change these values.
-        private bool _clickTogglesPlayPause = true;
+        // Double-clicking the video toggles full screen. There is no setting for it yet.
         private bool _doubleClickTogglesFullScreen = true;
         private bool _menuWasOpen;
-        private bool? _lastClickPauseValue;   // what the last click did, so that a double click can undo it
         private bool _fullScreen;
         private FormWindowState _windowStateBeforeFullScreen;
 
@@ -114,14 +126,30 @@ namespace SwewolfMediaPlayer
             MinimumSize = SizeFromClientSize(new Size(LogicalToDeviceUnits(800), LogicalToDeviceUnits(200)));
         }
 
-        protected override void OnShown(EventArgs e)
+        protected override async void OnShown(EventArgs e)
         {
             base.OnShown(e);
 
-            if (_libVlc == null)
+            try
             {
-                Core.Initialize();
-                _libVlc = new LibVLC();
+                await PreloadAsync();
+            }
+            catch (Exception ex)
+            {
+                _loadTask = null;   // allow a new try the next time
+                if (!IsDisposed)
+                {
+                    MessageBox.Show(this, $"The video engine (LibVLC) could not be loaded.\n\n{ex.Message}", AppName,
+                        MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    Close();
+                }
+                return;
+            }
+
+            // The window may have been closed while LibVLC was loading.
+            if (IsDisposed || _libVlc == null)
+            {
+                return;
             }
 
             _player = new MediaPlayer(_libVlc);
@@ -166,7 +194,7 @@ namespace SwewolfMediaPlayer
             _rightClickTimer.Tick += (s, a) =>
             {
                 CheckRightClick();
-                CheckVideoClick();
+                CheckLeftClick();
                 CheckPlayerState();
             };
             _rightClickTimer.Start();
@@ -224,7 +252,7 @@ namespace SwewolfMediaPlayer
                 SaveFrame();
                 return true;
             }
-            if (keyData == Keys.F)
+            if (keyData == Keys.F || keyData == (Keys.Alt | Keys.Enter))
             {
                 SetFullScreen(!_fullScreen);
                 return true;
@@ -388,23 +416,21 @@ namespace SwewolfMediaPlayer
             return withFraction ? $"{text}.{t.Milliseconds:000}" : text;
         }
 
-        // Returns the value passed to SetPause, or null when playback was (re)started instead.
-        private bool? TogglePlayPause()
+        private void TogglePlayPause()
         {
             if (_player == null)
             {
-                return null;
+                return;
             }
 
             if (_player.State is VLCState.Stopped or VLCState.Ended or VLCState.Error or VLCState.NothingSpecial)
             {
                 _player.Play();
-                return null;
             }
-
-            bool pause = _player.IsPlaying;
-            _player.SetPause(pause);
-            return pause;
+            else
+            {
+                _player.SetPause(_player.IsPlaying);
+            }
         }
 
         private void btnPlayPause_Click(object? sender, EventArgs e)
@@ -453,11 +479,10 @@ namespace SwewolfMediaPlayer
             }
         }
 
-        // The video window does not pass mouse clicks on either, so clicks are detected here: a
-        // press of the main mouse button over the video. A click toggles play/pause at once. A
-        // second press close in time and place is a double click: it undoes that pause/play and
-        // toggles full screen instead.
-        private void CheckVideoClick()
+        // The video window does not pass mouse clicks on either, so left clicks are detected here:
+        // a press of the main mouse button. While the right-click menu is open, a press outside
+        // it closes it. Two presses over the video, close in time and place, are a double click.
+        private void CheckLeftClick()
         {
             const int VK_LBUTTON = 0x01;
             const int VK_RBUTTON = 0x02;
@@ -466,13 +491,26 @@ namespace SwewolfMediaPlayer
             bool pressed = down && !_leftButtonWasDown;
             _leftButtonWasDown = down;
 
-            // A click that closes the right-click menu, or hits it, is not a click on the video.
             bool menuOpen = menuVideo.Visible;
-            bool ignore = menuOpen || _menuWasOpen;
+            bool menuWasOpen = _menuWasOpen;
             _menuWasOpen = menuOpen;
+            if (!pressed)
+            {
+                return;
+            }
 
             Point cursor = Cursor.Position;
-            if (!pressed || ignore || ActiveForm != this || !IsOver(videoView, cursor))
+            if (menuOpen)
+            {
+                if (!IsOverMenu(cursor))
+                {
+                    menuVideo.Close();
+                }
+                return;
+            }
+
+            // The press that just closed the menu is not a click on the video.
+            if (menuWasOpen || ActiveForm != this || !IsOver(videoView, cursor))
             {
                 return;
             }
@@ -483,20 +521,30 @@ namespace SwewolfMediaPlayer
                 && Math.Abs(cursor.X - _lastClickPosition.X) <= area.Width / 2
                 && Math.Abs(cursor.Y - _lastClickPosition.Y) <= area.Height / 2;
 
-            if (isDoubleClick && _doubleClickTogglesFullScreen)
+            if (isDoubleClick)
             {
                 _lastClickTicks = 0;
-                if (_lastClickPauseValue is bool pause && _player != null)
+                if (_doubleClickTogglesFullScreen)
                 {
-                    _player.SetPause(!pause);   // undo what the first click did
+                    SetFullScreen(!_fullScreen);
                 }
-                SetFullScreen(!_fullScreen);
-                return;
             }
+            else
+            {
+                _lastClickTicks = now;
+                _lastClickPosition = cursor;
+            }
+        }
 
-            _lastClickTicks = now;
-            _lastClickPosition = cursor;
-            _lastClickPauseValue = _clickTogglesPlayPause ? TogglePlayPause() : null;
+        // True when the point is on the right-click menu or one of its open submenus.
+        private bool IsOverMenu(Point screenPoint)
+        {
+            if (menuVideo.Visible && menuVideo.Bounds.Contains(screenPoint))
+            {
+                return true;
+            }
+            return menuVideo.Items.OfType<ToolStripDropDownItem>()
+                .Any(item => item.DropDown.Visible && item.DropDown.Bounds.Contains(screenPoint));
         }
         // Makes sure the play/pause icon matches what the player is really doing, also when an
         // event was missed or arrived in another order.
@@ -578,9 +626,15 @@ namespace SwewolfMediaPlayer
             bool released = _rightButtonWasDown && !down;
             _rightButtonWasDown = down;
 
-            if (released && ActiveForm == this && !menuVideo.Visible && IsOver(videoView, Cursor.Position))
+            Point cursor = Cursor.Position;
+            if (released && (ActiveForm == this || menuVideo.Visible) && IsOver(videoView, cursor) && !IsOverMenu(cursor))
             {
-                menuVideo.Show(videoView, videoView.PointToClient(Cursor.Position));
+                // A right click somewhere else moves the menu there.
+                if (menuVideo.Visible)
+                {
+                    menuVideo.Close();
+                }
+                menuVideo.Show(videoView, videoView.PointToClient(cursor));
             }
         }
 
