@@ -24,6 +24,7 @@
 //               timer watches the right button (CheckRightClick). The play/pause icon shows
 //               the pause bars show while playing.
 //   2026-10-08  Mute and the volume slider work together (see SetMuted).
+//   2026-10-08  Double-clicking the video toggles full screen (CheckDoubleClick).
 
 using System.ComponentModel;
 using System.Drawing.Drawing2D;
@@ -54,6 +55,12 @@ namespace SwewolfMediaPlayer
         private System.Windows.Forms.Timer? _rightClickTimer;
         private bool _rightButtonWasDown;
         private bool _shownPlaying;
+        private bool _leftButtonWasDown;
+        private long _lastClickTicks;
+        private Point _lastClickPosition;
+
+        // Double-clicking the video toggles full screen. There is no setting for it yet.
+        private bool _doubleClickTogglesFullScreen = true;
         private bool _fullScreen;
         private FormWindowState _windowStateBeforeFullScreen;
 
@@ -125,6 +132,7 @@ namespace SwewolfMediaPlayer
             _rightClickTimer.Tick += (s, a) =>
             {
                 CheckRightClick();
+                CheckDoubleClick();
                 CheckPlayerState();
             };
             _rightClickTimer.Start();
@@ -403,6 +411,44 @@ namespace SwewolfMediaPlayer
             {
                 MessageBox.Show(this, "The frame could not be saved.", AppName,
                     MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            }
+        }
+
+        // The video window does not pass mouse clicks on either, so a double click is detected
+        // here: two presses of the main mouse button over the video, close in time and place.
+        private void CheckDoubleClick()
+        {
+            const int VK_LBUTTON = 0x01;
+            const int VK_RBUTTON = 0x02;
+            int key = SystemInformation.MouseButtonsSwapped ? VK_RBUTTON : VK_LBUTTON;
+            bool down = (GetAsyncKeyState(key) & 0x8000) != 0;
+            bool pressed = down && !_leftButtonWasDown;
+            _leftButtonWasDown = down;
+
+            Point cursor = Cursor.Position;
+            if (!pressed || ActiveForm != this || !IsOver(videoView, cursor))
+            {
+                return;
+            }
+
+            long now = Environment.TickCount64;
+            Size area = SystemInformation.DoubleClickSize;
+            bool isDoubleClick = now - _lastClickTicks <= SystemInformation.DoubleClickTime
+                && Math.Abs(cursor.X - _lastClickPosition.X) <= area.Width / 2
+                && Math.Abs(cursor.Y - _lastClickPosition.Y) <= area.Height / 2;
+
+            if (isDoubleClick)
+            {
+                _lastClickTicks = 0;
+                if (_doubleClickTogglesFullScreen)
+                {
+                    SetFullScreen(!_fullScreen);
+                }
+            }
+            else
+            {
+                _lastClickTicks = now;
+                _lastClickPosition = cursor;
             }
         }
 
