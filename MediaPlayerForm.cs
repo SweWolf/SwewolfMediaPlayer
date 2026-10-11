@@ -28,6 +28,12 @@
 //   2026-10-09  Plays streams: a web address (http, https, rtsp, rtmp, mms) can be given
 //               instead of a file path. HLS streams that start with a black picture (video
 //               group without an address) are fixed automatically (EnsureVideoTrack).
+//   2026-10-11  The progress bar stays at the end when a video ends. Save Frame at the end takes the
+//               very last frame with FFmpeg (SaveLastFrameWithFfmpegAsync), if it is available.
+//   2026-10-11  A video that has played to its end stays paused on its last frame (OnEndReached),
+//               so Save Frame works and Play starts again from the beginning. Save Frame on a
+//               stopped player says so. LibVLC cannot show the last 1-2 frames of a file.
+//   2026-10-09  The pointer is hidden over the video after 3 seconds without movement or clicks.
 //   2026-10-09  LibVLC is loaded on a worker thread (PreloadAsync), so the window does not freeze.
 //               Alt+Enter toggles full screen like F.
 //   2026-10-09  Clicking the video toggled play/pause for a while; removed again. The right-click
@@ -73,6 +79,7 @@ namespace SwewolfMediaPlayer
         private string? _lastSaveFolder;
         private int _lastSubtitleTrack = -1;
         private bool _paused;
+        private bool _restoringEnd;   // true while OnEndReached starts the video again to show its last frame
         private long _stepTimeMs = -1;   // tracked position while stepping frames, -1 = not stepping
         private double _frameMs;         // length of one frame, 0 = not known yet
         private bool _muted;
@@ -91,6 +98,15 @@ namespace SwewolfMediaPlayer
         // Double-clicking the video toggles full screen. There is no setting for it yet.
         private bool _doubleClickTogglesFullScreen = true;
         private bool _menuWasOpen;
+
+        // The mouse pointer is hidden over the video after it has been still for a while. There
+        // is no setting for it yet: a setting would only have to change these two values.
+        private bool _hideCursorWhenIdle = true;
+        private const int CursorHideDelayMs = 3000;
+        private static Cursor? _blankCursor;
+        private bool _cursorHidden;
+        private Point _lastCursorPosition;
+        private long _lastCursorActivityTicks;
         private bool _fullScreen;
         private FormWindowState _windowStateBeforeFullScreen;
 
@@ -157,12 +173,20 @@ namespace SwewolfMediaPlayer
             _player.EnableMouseInput = false;
             _player.Playing += (s, a) => Post(() =>
             {
+                if (_restoringEnd)
+                {
+                    return;
+                }
                 _paused = false;
                 _stepTimeMs = -1;
                 ShowPlayPause(true);
             });
             _player.Paused += (s, a) => Post(() =>
             {
+                if (_restoringEnd)
+                {
+                    return;
+                }
                 _paused = true;
                 ShowPlayPause(false);
                 if (_player != null)
@@ -170,12 +194,21 @@ namespace SwewolfMediaPlayer
                     UpdateTime(_player.Time);
                 }
             });
-            _player.Stopped += (s, a) => Post(ShowStopped);
-            _player.EndReached += (s, a) => Post(ShowStopped);
+            _player.Stopped += (s, a) => Post(() =>
+            {
+                if (!_restoringEnd)
+                {
+                    ShowStopped();
+                }
+            });
+            _player.EndReached += (s, a) => Post(OnEndReached);
             _player.LengthChanged += (s, a) => Post(() =>
             {
                 _lengthMs = a.Length;
-                UpdateTime(0);
+                if (!_restoringEnd)
+                {
+                    UpdateTime(0);
+                }
             });
             // While paused the label is driven by seeking and frame stepping, not by LibVLC.
             _player.TimeChanged += (s, a) => Post(() =>
@@ -195,6 +228,7 @@ namespace SwewolfMediaPlayer
             {
                 CheckRightClick();
                 CheckLeftClick();
+                CheckCursorIdle();
                 CheckPlayerState();
             };
             _rightClickTimer.Start();
@@ -385,6 +419,72 @@ namespace SwewolfMediaPlayer
             toolTip.SetToolTip(btnPlayPause, playing ? "Pause (Space)" : "Play (Space)");
         }
 
+        // When a video has played to its end, LibVLC drops the picture and the player is "Ended":
+        // nothing can be saved then, and Play does not restart it. So for a file, start it again
+        // silently and pause on the last frame it can show. Play then starts from the beginning.
+        private async void OnEndReached()
+        {
+            MediaPlayer? player = _player;
+            if (player == null || _isStream)
+            {
+                ShowStopped();
+                return;
+            }
+
+            // Show the end at once and keep it there: the player is started again behind the scenes.
+            _restoringEnd = true;
+            _paused = true;
+            _stepTimeMs = -1;
+            ShowPlayPause(false);
+            UpdateTime(player.Length > 0 ? player.Length : _lengthMs);
+
+            bool wasMuted = _muted;
+            try
+            {
+                player.Mute = true;
+                await Task.Run(() => player.Stop());
+                if (_player != player)
+                {
+                    return;
+                }
+
+                player.Play();
+                for (int i = 0; i < 60 && !player.IsPlaying; i++)
+                {
+                    await Task.Delay(50);
+                }
+                if (_player != player)
+                {
+                    return;
+                }
+
+                player.SetPause(true);
+                await Task.Delay(300);
+                if (_player != player)
+                {
+                    return;
+                }
+
+                long endMs = player.Length > 0 ? player.Length : _lengthMs;
+                player.Time = endMs;
+                await Task.Delay(300);
+                if (_player == player)
+                {
+                    UpdateTime(endMs);
+                }
+            }
+            finally
+            {
+                _restoringEnd = false;
+                if (_player == player)
+                {
+                    player.Mute = wasMuted;
+                    _paused = true;
+                    ShowPlayPause(false);
+                }
+            }
+        }
+
         private void ShowStopped()
         {
             _paused = false;
@@ -418,18 +518,40 @@ namespace SwewolfMediaPlayer
 
         private void TogglePlayPause()
         {
-            if (_player == null)
+            if (_player == null || _restoringEnd)
             {
                 return;
             }
 
             if (_player.State is VLCState.Stopped or VLCState.Ended or VLCState.Error or VLCState.NothingSpecial)
             {
-                _player.Play();
+                RestartPlayback();
+            }
+            else if (!_player.IsPlaying && _lengthMs > 0 && _player.Time >= _lengthMs - 200)
+            {
+                // Paused on the last frame: play again from the beginning.
+                _player.Time = 0;
+                _player.SetPause(false);
             }
             else
             {
                 _player.SetPause(_player.IsPlaying);
+            }
+        }
+
+        // An ended player only plays again after a Stop.
+        private async void RestartPlayback()
+        {
+            MediaPlayer? player = _player;
+            if (player == null)
+            {
+                return;
+            }
+
+            await Task.Run(() => player.Stop());
+            if (_player == player)
+            {
+                player.Play();
             }
         }
 
@@ -444,15 +566,26 @@ namespace SwewolfMediaPlayer
         }
 
         // Saves the frame on screen as a PNG, at the video's own resolution. The file name
-        // suggested contains the (approximate) time of the frame.
-        private void SaveFrame()
+        // suggested contains the (approximate) time of the frame. When the video is at its end,
+        // the very last frame is taken with FFmpeg, because LibVLC cannot show the last frames.
+        private async void SaveFrame()
         {
             if (_player == null)
             {
                 return;
             }
 
-            long timeMs = _paused && _stepTimeMs >= 0 ? _stepTimeMs : _player.Time;
+            bool atEnd = IsAtEnd();
+
+            // A stopped player has no picture: saving would fail.
+            if (!atEnd && _player.State is VLCState.Stopped or VLCState.Ended or VLCState.Error or VLCState.NothingSpecial)
+            {
+                MessageBox.Show(this, "There is no picture to save, because the video is stopped. Press Play first.", AppName,
+                    MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
+
+            long timeMs = atEnd ? _lengthMs : _paused && _stepTimeMs >= 0 ? _stepTimeMs : _player.Time;
             TimeSpan t = TimeSpan.FromMilliseconds(Math.Max(timeMs, 0));
             string stamp = $"{(int)t.TotalHours}-{t.Minutes:00}-{t.Seconds:00}-{t.Milliseconds:000}";
 
@@ -461,7 +594,7 @@ namespace SwewolfMediaPlayer
                 Title = "Save Frame as PNG",
                 Filter = "PNG Image|*.png",
                 DefaultExt = "png",
-                FileName = $"{(_isStream ? "stream" : Path.GetFileNameWithoutExtension(_filePath))}_{stamp}.png",
+                FileName = $"{(_isStream ? "stream" : Path.GetFileNameWithoutExtension(_filePath))}_{stamp}{(atEnd ? "_last" : "")}.png",
                 InitialDirectory = _lastSaveFolder ?? (_isStream ? null : Path.GetDirectoryName(Path.GetFullPath(_filePath))),
                 OverwritePrompt = true
             };
@@ -472,13 +605,125 @@ namespace SwewolfMediaPlayer
             }
 
             _lastSaveFolder = Path.GetDirectoryName(dialog.FileName);
-            if (!_player.TakeSnapshot(0, dialog.FileName, 0, 0))
+
+            if (atEnd)
             {
-                MessageBox.Show(this, "The frame could not be saved.", AppName,
-                    MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                if (await SaveLastFrameWithFfmpegAsync(dialog.FileName))
+                {
+                    return;
+                }
+                if (IsDisposed || _player == null)
+                {
+                    return;
+                }
+
+                // FFmpeg is not available, or failed: save what the player can show instead.
+                if (_player.TakeSnapshot(0, dialog.FileName, 0, 0))
+                {
+                    MessageBox.Show(this, "FFmpeg was not found or could not read the video, so the frame closest to the end that the player can show was saved instead. It may be one or two frames before the very last one.", AppName,
+                        MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    return;
+                }
+            }
+            else if (_player.TakeSnapshot(0, dialog.FileName, 0, 0))
+            {
+                return;
+            }
+
+            MessageBox.Show(this, "The frame could not be saved.", AppName,
+                MessageBoxButtons.OK, MessageBoxIcon.Warning);
+        }
+
+        // True when a file has played to its end, or the user has moved to the end.
+        private bool IsAtEnd()
+        {
+            if (_player == null || _isStream || _lengthMs <= 0)
+            {
+                return false;
+            }
+            if (_restoringEnd || _player.State == VLCState.Ended)
+            {
+                return true;
+            }
+            return _player.State == VLCState.Paused && _player.Time >= _lengthMs - 20;
+        }
+
+        // FFmpeg reads the last two seconds of the file and keeps overwriting the one picture
+        // file, so what is left is the very last frame.
+        private async Task<bool> SaveLastFrameWithFfmpegAsync(string outputPath)
+        {
+            string? ffmpeg = FindFfmpeg();
+            if (ffmpeg == null)
+            {
+                return false;
+            }
+
+            UseWaitCursor = true;
+            try
+            {
+                return await Task.Run(() =>
+                {
+                    System.Diagnostics.ProcessStartInfo info = new(ffmpeg)
+                    {
+                        UseShellExecute = false,
+                        CreateNoWindow = true,
+                        RedirectStandardError = true
+                    };
+                    foreach (string argument in new[] { "-y", "-loglevel", "error", "-sseof", "-2", "-i", _filePath, "-an", "-sn", "-update", "1", outputPath })
+                    {
+                        info.ArgumentList.Add(argument);
+                    }
+
+                    using System.Diagnostics.Process? process = System.Diagnostics.Process.Start(info);
+                    if (process == null)
+                    {
+                        return false;
+                    }
+                    process.StandardError.ReadToEnd();
+                    if (!process.WaitForExit(60000))
+                    {
+                        process.Kill();
+                        return false;
+                    }
+                    return process.ExitCode == 0 && File.Exists(outputPath) && new FileInfo(outputPath).Length > 0;
+                });
+            }
+            catch (Exception)
+            {
+                return false;
+            }
+            finally
+            {
+                UseWaitCursor = false;
             }
         }
 
+        // ffmpeg.exe next to the program, or else the first one found in the PATH.
+        private static string? FindFfmpeg()
+        {
+            string local = Path.Combine(AppContext.BaseDirectory, "ffmpeg.exe");
+            if (File.Exists(local))
+            {
+                return local;
+            }
+
+            foreach (string folder in (Environment.GetEnvironmentVariable("PATH") ?? "").Split(';', StringSplitOptions.RemoveEmptyEntries))
+            {
+                try
+                {
+                    string candidate = Path.Combine(folder.Trim().Trim('"'), "ffmpeg.exe");
+                    if (File.Exists(candidate))
+                    {
+                        return candidate;
+                    }
+                }
+                catch (ArgumentException)
+                {
+                    // A folder in the PATH with illegal characters: skip it.
+                }
+            }
+            return null;
+        }
         // The video window does not pass mouse clicks on either, so left clicks are detected here:
         // a press of the main mouse button. While the right-click menu is open, a press outside
         // it closes it. Two presses over the video, close in time and place, are a double click.
@@ -536,6 +781,52 @@ namespace SwewolfMediaPlayer
             }
         }
 
+        // Hides the pointer over the video when it has not moved or clicked for a while, and shows
+        // it again at the first movement or click. The video window is on a thread of its own, so
+        // this too is watched with the timer.
+        private void CheckCursorIdle()
+        {
+            const int VK_LBUTTON = 0x01;
+            const int VK_RBUTTON = 0x02;
+            const int VK_MBUTTON = 0x04;
+
+            Point position = Cursor.Position;
+            long now = Environment.TickCount64;
+            bool buttonDown = (GetAsyncKeyState(VK_LBUTTON) & 0x8000) != 0
+                || (GetAsyncKeyState(VK_RBUTTON) & 0x8000) != 0
+                || (GetAsyncKeyState(VK_MBUTTON) & 0x8000) != 0;
+            if (position != _lastCursorPosition || buttonDown)
+            {
+                _lastCursorPosition = position;
+                _lastCursorActivityTicks = now;
+                SetCursorHidden(false);
+                return;
+            }
+
+            bool canHide = _hideCursorWhenIdle && ActiveForm == this && !menuVideo.Visible && IsOver(videoView, position);
+            SetCursorHidden(canHide && now - _lastCursorActivityTicks >= CursorHideDelayMs);
+        }
+
+        private void SetCursorHidden(bool hidden)
+        {
+            if (hidden == _cursorHidden)
+            {
+                return;
+            }
+
+            _blankCursor ??= CreateBlankCursor();
+            videoView.Cursor = hidden ? _blankCursor : Cursors.Default;
+            _cursorHidden = hidden;
+        }
+
+        // A pointer that cannot be seen: a fully transparent picture. The Cursor does not own
+        // the icon handle, so it is kept for as long as the program runs (one small icon).
+        private static Cursor CreateBlankCursor()
+        {
+            using Bitmap bitmap = new(32, 32);
+            return new Cursor(bitmap.GetHicon());
+        }
+
         // True when the point is on the right-click menu or one of its open submenus.
         private bool IsOverMenu(Point screenPoint)
         {
@@ -555,7 +846,11 @@ namespace SwewolfMediaPlayer
                 return;
             }
 
-            ShowPlayPause(_player.IsPlaying);
+            if (!_restoringEnd)
+            {
+                ShowPlayPause(_player.IsPlaying);
+            }
+
             if (_isStream && !_videoCheckDone && _player.IsPlaying)
             {
                 if (_playingSinceTicks == 0)

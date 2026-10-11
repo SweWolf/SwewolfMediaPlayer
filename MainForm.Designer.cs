@@ -37,16 +37,16 @@
             // 
             txtFile.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
             txtFile.Font = new Font("Segoe UI", 12F);
-            txtFile.Location = new Point(31, 38);
+            txtFile.Location = new Point(12, 40);
             txtFile.Name = "txtFile";
-            txtFile.Size = new Size(627, 29);
+            txtFile.Size = new Size(673, 29);
             txtFile.TabIndex = 0;
             txtFile.TextChanged += txtFile_TextChanged;
             // 
             // btnBrowse
             // 
             btnBrowse.Anchor = AnchorStyles.Top | AnchorStyles.Right;
-            btnBrowse.Location = new Point(679, 38);
+            btnBrowse.Location = new Point(706, 40);
             btnBrowse.Name = "btnBrowse";
             btnBrowse.Size = new Size(34, 29);
             btnBrowse.TabIndex = 1;
@@ -58,7 +58,7 @@
             // 
             btnOpen.Anchor = AnchorStyles.Top | AnchorStyles.Right;
             btnOpen.Font = new Font("Segoe UI", 12F);
-            btnOpen.Location = new Point(476, 91);
+            btnOpen.Location = new Point(503, 93);
             btnOpen.Name = "btnOpen";
             btnOpen.Size = new Size(182, 45);
             btnOpen.TabIndex = 2;
@@ -71,7 +71,7 @@
             AcceptButton = btnOpen;
             AutoScaleDimensions = new SizeF(7F, 15F);
             AutoScaleMode = AutoScaleMode.Font;
-            ClientSize = new Size(800, 171);
+            ClientSize = new Size(754, 171);
             Controls.Add(btnOpen);
             Controls.Add(btnBrowse);
             Controls.Add(txtFile);
