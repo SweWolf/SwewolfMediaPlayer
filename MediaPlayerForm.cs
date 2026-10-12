@@ -2,7 +2,8 @@
 // It has play/pause, stop, a seek bar with the elapsed and total time, mute and volume.
 //
 // To reuse it in another project:
-//   - Copy MediaPlayerForm.cs, MediaPlayerForm.Designer.cs and MediaPlayerForm.resx.
+//   - Copy MediaPlayerForm.cs, MediaPlayerForm.Trim.cs, MediaPlayerForm.Designer.cs and
+//     MediaPlayerForm.resx.
 //   - Change the namespace.
 //   - Add the NuGet packages LibVLCSharp.WinForms and VideoLAN.LibVLC.Windows.
 //   - Use: new MediaPlayerForm(path).Show();
@@ -41,6 +42,12 @@
 //   2026-10-09  The volume slider shows the volume in percent in a tooltip.
 //   2026-10-09  Streams: the time label shows only the elapsed time, the seek bar and frame
 //               stepping are off. The muted icon is red.
+//   2026-10-11  Trim feature (MediaPlayerForm.Trim.cs): a group box, shown from a right-click menu on
+//               the control bar, trims the file in place with SplitMediaFiles.
+//   2026-10-12  Dragging the seek bar while the video is stopped is remembered (_pendingSeekMs): Play
+//               starts from there, and it no longer jumps back to 0.
+//   2026-10-12  The volume and mute state are set again once a file is playing (ApplyAudioState),
+//               because LibVLC could ignore them before that and leave the sound off.
 
 using System.ComponentModel;
 using System.Drawing.Drawing2D;
@@ -81,6 +88,10 @@ namespace SwewolfMediaPlayer
         private bool _paused;
         private bool _restoringEnd;   // true while OnEndReached starts the video again to show its last frame
         private long _stepTimeMs = -1;   // tracked position while stepping frames, -1 = not stepping
+        // Where the seek bar was dragged while the player was stopped, -1 = nowhere. A stopped
+        // player ignores seeks, so Play starts from here instead (see RestartPlayback).
+        private long _pendingSeekMs = -1;
+        private int _audioStateApplied;   // see ApplyAudioState
         private double _frameMs;         // length of one frame, 0 = not known yet
         private bool _muted;
         private System.Windows.Forms.Timer? _rightClickTimer;
@@ -139,7 +150,7 @@ namespace SwewolfMediaPlayer
             base.OnLoad(e);
             // The window may be made much smaller than the designer size, but not so small
             // that the control bar no longer fits.
-            MinimumSize = SizeFromClientSize(new Size(LogicalToDeviceUnits(800), LogicalToDeviceUnits(200)));
+            UpdateMinimumSize();
         }
 
         protected override async void OnShown(EventArgs e)
@@ -180,6 +191,7 @@ namespace SwewolfMediaPlayer
                 _paused = false;
                 _stepTimeMs = -1;
                 ShowPlayPause(true);
+                ApplyAudioState();
             });
             _player.Paused += (s, a) => Post(() =>
             {
@@ -217,6 +229,7 @@ namespace SwewolfMediaPlayer
                 {
                     UpdateTime(a.Time);
                 }
+                ApplyAudioState();
             });
             videoView.MediaPlayer = _player;
             Application.AddMessageFilter(this);
@@ -234,14 +247,53 @@ namespace SwewolfMediaPlayer
             _rightClickTimer.Start();
 
             _player.Volume = trkVolume.Value;
+            StartMedia();
+        }
+
+        // Opens the file (or stream) and plays it. Also used to open a file again after a trim.
+        private void StartMedia()
+        {
+            if (_player == null || _libVlc == null)
+            {
+                return;
+            }
+
+            _audioStateApplied = 0;
             _media = new Media(_libVlc, _filePath, _isStream ? FromType.FromLocation : FromType.FromPath);
             _player.Play(_media);
+        }
+
+        // LibVLC creates its audio output when playback starts and can ignore a volume or mute set
+        // before that, which left some files silent. So the volume and mute state of the controls
+        // are set once more when the file is playing, and again at its first time update.
+        private void ApplyAudioState()
+        {
+            if (_player == null || _audioStateApplied >= 2 || _restoringEnd || _previewing)
+            {
+                return;
+            }
+
+            _audioStateApplied++;
+            _player.Volume = trkVolume.Value;
+            _player.Mute = _muted;
         }
 
         protected override void OnFormClosing(FormClosingEventArgs e)
         {
             base.OnFormClosing(e);
 
+            // SplitMediaFiles is replacing the file and the player waits for it.
+            if (_trimming)
+            {
+                e.Cancel = true;
+                MessageBox.Show(this, "The file is being trimmed. Wait until SplitMediaFiles is ready, or cancel it there.", AppName,
+                    MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
+
+            EndPreview(false);
+            _previewTimer?.Dispose();
+            _previewTimer = null;
             Application.RemoveMessageFilter(this);
             _rightClickTimer?.Dispose();
             _rightClickTimer = null;
@@ -266,6 +318,10 @@ namespace SwewolfMediaPlayer
 
         protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
         {
+            if (_trimming)
+            {
+                return base.ProcessCmdKey(ref msg, keyData);
+            }
             if (keyData == Keys.Space)
             {
                 TogglePlayPause();
@@ -305,7 +361,7 @@ namespace SwewolfMediaPlayer
         public bool PreFilterMessage(ref Message m)
         {
             const int WM_MOUSEWHEEL = 0x020A;
-            if (m.Msg != WM_MOUSEWHEEL || !_paused || _isStream || ActiveForm != this)
+            if (m.Msg != WM_MOUSEWHEEL || !_paused || _isStream || _trimming || ActiveForm != this)
             {
                 return false;
             }
@@ -394,6 +450,7 @@ namespace SwewolfMediaPlayer
                 WindowState = _windowStateBeforeFullScreen;
             }
             pnlControls.Visible = !fullScreen;
+            grpTrim.Visible = _trimVisible && !fullScreen;
         }
 
         // LibVLC raises its events on its own threads: hand the work over to the UI thread.
@@ -489,6 +546,7 @@ namespace SwewolfMediaPlayer
         {
             _paused = false;
             _stepTimeMs = -1;
+            _pendingSeekMs = -1;
             ShowPlayPause(false);
             if (!_seeking)
             {
@@ -539,6 +597,11 @@ namespace SwewolfMediaPlayer
             }
         }
 
+        private static bool IsStopped(MediaPlayer player)
+        {
+            return player.State is VLCState.Stopped or VLCState.Ended or VLCState.Error or VLCState.NothingSpecial;
+        }
+
         // An ended player only plays again after a Stop.
         private async void RestartPlayback()
         {
@@ -549,9 +612,32 @@ namespace SwewolfMediaPlayer
             }
 
             await Task.Run(() => player.Stop());
-            if (_player == player)
+            if (_player != player)
+            {
+                return;
+            }
+
+            // The position the user dragged the seek bar to while the video was stopped.
+            long seekTo = _pendingSeekMs;
+            _pendingSeekMs = -1;
+            if (seekTo <= 0)
             {
                 player.Play();
+                return;
+            }
+
+            // The seek only works once the video is playing: keep the sound off until then, so
+            // the first moment of the video is not heard.
+            player.Mute = true;
+            player.Play();
+            for (int i = 0; i < 60 && !player.IsPlaying; i++)
+            {
+                await Task.Delay(50);
+            }
+            if (_player == player)
+            {
+                player.Time = seekTo;
+                player.Mute = _muted;
             }
         }
 
@@ -936,7 +1022,7 @@ namespace SwewolfMediaPlayer
         private void menuVideo_Opening(object? sender, CancelEventArgs e)
         {
             MediaPlayer? player = _player;
-            if (player == null)
+            if (player == null || _trimming)
             {
                 e.Cancel = true;
                 return;
@@ -1040,6 +1126,7 @@ namespace SwewolfMediaPlayer
 
         private void btnStop_Click(object? sender, EventArgs e)
         {
+            EndPreview(false);
             MediaPlayer? player = _player;
             if (player != null)
             {
@@ -1061,7 +1148,15 @@ namespace SwewolfMediaPlayer
         {
             if (_player != null && _lengthMs > 0)
             {
+                EndPreview(false);
                 long timeMs = _lengthMs * trkSeek.Value / trkSeek.Maximum;
+                if (IsStopped(_player))
+                {
+                    // A stopped player ignores seeks: remember the position for Play.
+                    _pendingSeekMs = timeMs;
+                    UpdateTime(timeMs);
+                    return;
+                }
                 _player.Time = timeMs;
                 _stepTimeMs = timeMs;
                 // LibVLC raises no time events while paused, so update the label ourselves.
