@@ -5,7 +5,7 @@
 //   - Copy MediaPlayerForm.cs, MediaPlayerForm.Trim.cs, MediaPlayerForm.Designer.cs and
 //     MediaPlayerForm.resx.
 //   - Change the namespace.
-//   - Add the NuGet packages LibVLCSharp.WinForms and VideoLAN.LibVLC.Windows.
+//   - Add the NuGet packages LibVLCSharp.WinForms, VideoLAN.LibVLC.Windows and TagLibSharp.
 //   - Use: new MediaPlayerForm(path).Show();
 //
 // History:
@@ -48,6 +48,9 @@
 //               starts from there, and it no longer jumps back to 0.
 //   2026-10-12  The volume and mute state are set again once a file is playing (ApplyAudioState),
 //               because LibVLC could ignore them before that and leave the sound off.
+//   2026-10-12  Audio files show their embedded cover art (ShowCoverArt, picCover) instead of a
+//               black screen. Needs the NuGet package TagLibSharp.
+//   2026-10-12  Save Frame saves the cover art (SaveCoverArt) when an audio file shows it.
 
 using System.ComponentModel;
 using System.Drawing.Drawing2D;
@@ -259,8 +262,46 @@ namespace SwewolfMediaPlayer
             }
 
             _audioStateApplied = 0;
+            ShowCoverArt();
             _media = new Media(_libVlc, _filePath, _isStream ? FromType.FromLocation : FromType.FromPath);
             _player.Play(_media);
+        }
+
+        // An audio file has no picture of its own, so LibVLC shows black. If the file has embedded
+        // cover art (e.g. an MP3 with an album picture), show that over the video area instead.
+        private static readonly string[] AudioExtensions = { ".mp3", ".flac", ".m4a", ".aac", ".ogg", ".oga", ".opus", ".wma", ".wav", ".aif", ".aiff" };
+
+        private void ShowCoverArt()
+        {
+            Image? old = picCover.Image;
+            picCover.Image = null;
+            picCover.Visible = false;
+            old?.Dispose();
+
+            if (_isStream || !AudioExtensions.Contains(Path.GetExtension(_filePath), StringComparer.OrdinalIgnoreCase))
+            {
+                return;
+            }
+
+            try
+            {
+                using TagLib.File tags = TagLib.File.Create(_filePath);
+                if (tags.Tag.Pictures.Length == 0)
+                {
+                    return;
+                }
+
+                // Prefer the front cover; otherwise take the first picture.
+                TagLib.IPicture picture = tags.Tag.Pictures.FirstOrDefault(p => p.Type == TagLib.PictureType.FrontCover) ?? tags.Tag.Pictures[0];
+                using MemoryStream stream = new(picture.Data.Data);
+                using Image loaded = Image.FromStream(stream);
+                picCover.Image = new Bitmap(loaded);   // a copy: the stream is closed when this method ends
+                picCover.Visible = true;
+            }
+            catch (Exception)
+            {
+                // No readable tags or picture: leave the black video area as it was.
+            }
         }
 
         // LibVLC creates its audio output when playback starts and can ignore a volume or mute set
@@ -661,6 +702,13 @@ namespace SwewolfMediaPlayer
                 return;
             }
 
+            // An audio file showing its cover art: save that picture, at its own resolution.
+            if (picCover.Visible && picCover.Image != null)
+            {
+                SaveCoverArt();
+                return;
+            }
+
             bool atEnd = IsAtEnd();
 
             // A stopped player has no picture: saving would fail.
@@ -718,6 +766,41 @@ namespace SwewolfMediaPlayer
 
             MessageBox.Show(this, "The frame could not be saved.", AppName,
                 MessageBoxButtons.OK, MessageBoxIcon.Warning);
+        }
+
+        // Saves the cover art on screen as a PNG (there is no video frame to take).
+        private void SaveCoverArt()
+        {
+            if (picCover.Image == null)
+            {
+                return;
+            }
+
+            using var dialog = new SaveFileDialog
+            {
+                Title = "Save Cover Art as PNG",
+                Filter = "PNG Image|*.png",
+                DefaultExt = "png",
+                FileName = $"{Path.GetFileNameWithoutExtension(_filePath)}_cover.png",
+                InitialDirectory = _lastSaveFolder ?? Path.GetDirectoryName(Path.GetFullPath(_filePath)),
+                OverwritePrompt = true
+            };
+
+            if (dialog.ShowDialog(this) != DialogResult.OK)
+            {
+                return;
+            }
+
+            _lastSaveFolder = Path.GetDirectoryName(dialog.FileName);
+            try
+            {
+                picCover.Image.Save(dialog.FileName, System.Drawing.Imaging.ImageFormat.Png);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(this, $"The cover art could not be saved.\n\n{ex.Message}", AppName,
+                    MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            }
         }
 
         // True when a file has played to its end, or the user has moved to the end.

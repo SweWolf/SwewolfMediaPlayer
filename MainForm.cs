@@ -49,6 +49,23 @@ namespace SwewolfMediaPlayer
             if (dialog.ShowDialog(this) == DialogResult.OK)
             {
                 txtFile.Text = dialog.FileName;
+                // The user has chosen the file, so there is no need to click Open as well.
+                btnOpen.PerformClick();
+            }
+        }
+
+        // The text box accepts a file dragged from Windows Explorer; it only fills in the path.
+        private void txtFile_DragEnter(object? sender, DragEventArgs e)
+        {
+            e.Effect = e.Data?.GetDataPresent(DataFormats.FileDrop) == true ? DragDropEffects.Copy : DragDropEffects.None;
+        }
+
+        private void txtFile_DragDrop(object? sender, DragEventArgs e)
+        {
+            if (e.Data?.GetData(DataFormats.FileDrop) is string[] { Length: > 0 } files)
+            {
+                txtFile.Text = files[0];
+                txtFile.SelectionStart = txtFile.TextLength;
             }
         }
 

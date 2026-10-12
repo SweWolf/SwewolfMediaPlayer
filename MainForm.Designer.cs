@@ -28,20 +28,33 @@
         /// </summary>
         private void InitializeComponent()
         {
+            lblFile = new Label();
             txtFile = new TextBox();
             btnBrowse = new Button();
             btnOpen = new Button();
             SuspendLayout();
-            // 
+            //
+            // lblFile
+            //
+            lblFile.AutoSize = true;
+            lblFile.Location = new Point(12, 19);
+            lblFile.Name = "lblFile";
+            lblFile.Size = new Size(64, 15);
+            lblFile.TabIndex = 0;
+            lblFile.Text = "&Media File";
+            //
             // txtFile
-            // 
+            //
+            txtFile.AllowDrop = true;
             txtFile.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
             txtFile.Font = new Font("Segoe UI", 12F);
             txtFile.Location = new Point(12, 40);
             txtFile.Name = "txtFile";
             txtFile.Size = new Size(673, 29);
-            txtFile.TabIndex = 0;
+            txtFile.TabIndex = 1;
             txtFile.TextChanged += txtFile_TextChanged;
+            txtFile.DragEnter += txtFile_DragEnter;
+            txtFile.DragDrop += txtFile_DragDrop;
             // 
             // btnBrowse
             // 
@@ -49,7 +62,7 @@
             btnBrowse.Location = new Point(706, 40);
             btnBrowse.Name = "btnBrowse";
             btnBrowse.Size = new Size(34, 29);
-            btnBrowse.TabIndex = 1;
+            btnBrowse.TabIndex = 2;
             btnBrowse.Text = "...";
             btnBrowse.UseVisualStyleBackColor = true;
             btnBrowse.Click += btnBrowse_Click;
@@ -61,7 +74,7 @@
             btnOpen.Location = new Point(503, 93);
             btnOpen.Name = "btnOpen";
             btnOpen.Size = new Size(182, 45);
-            btnOpen.TabIndex = 2;
+            btnOpen.TabIndex = 3;
             btnOpen.Text = "Open";
             btnOpen.UseVisualStyleBackColor = true;
             btnOpen.Click += btnOpen_Click;
@@ -75,6 +88,7 @@
             Controls.Add(btnOpen);
             Controls.Add(btnBrowse);
             Controls.Add(txtFile);
+            Controls.Add(lblFile);
             Name = "MainForm";
             StartPosition = FormStartPosition.CenterScreen;
             Text = "SweWolf Media Player";
@@ -84,6 +98,7 @@
 
         #endregion
 
+        private Label lblFile;
         private TextBox txtFile;
         private Button btnBrowse;
         private Button btnOpen;
