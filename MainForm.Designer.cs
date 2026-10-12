@@ -28,6 +28,8 @@
         /// </summary>
         private void InitializeComponent()
         {
+            components = new System.ComponentModel.Container();
+            toolTip = new ToolTip(components);
             lblFile = new Label();
             txtFile = new TextBox();
             btnBrowse = new Button();
@@ -64,6 +66,7 @@
             btnBrowse.Size = new Size(34, 29);
             btnBrowse.TabIndex = 2;
             btnBrowse.Text = "...";
+            toolTip.SetToolTip(btnBrowse, "Browse for a media file");
             btnBrowse.UseVisualStyleBackColor = true;
             btnBrowse.Click += btnBrowse_Click;
             // 
@@ -98,6 +101,7 @@
 
         #endregion
 
+        private ToolTip toolTip;
         private Label lblFile;
         private TextBox txtFile;
         private Button btnBrowse;
