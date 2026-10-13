@@ -438,6 +438,12 @@ namespace SwewolfMediaPlayer
                 SetFullScreen(false);
                 return true;
             }
+            // Escape hides the trim group box (and any group box added later like it).
+            if (keyData == Keys.Escape && _trimVisible)
+            {
+                SetTrimVisible(false);
+                return true;
+            }
             return base.ProcessCmdKey(ref msg, keyData);
         }
 
@@ -1274,22 +1280,64 @@ namespace SwewolfMediaPlayer
 
         private void trkSeek_Scroll(object? sender, EventArgs e)
         {
-            if (_player != null && _lengthMs > 0)
+            if (_lengthMs > 0)
             {
-                EndPreview(false);
-                long timeMs = _lengthMs * trkSeek.Value / trkSeek.Maximum;
-                if (IsStopped(_player))
+                SeekTo(_lengthMs * trkSeek.Value / trkSeek.Maximum);
+            }
+        }
+
+        private void SeekTo(long timeMs)
+        {
+            if (_player == null || _lengthMs <= 0)
+            {
+                return;
+            }
+
+            EndPreview(false);
+            if (IsStopped(_player))
+            {
+                // A stopped player ignores seeks: remember the position for Play.
+                _pendingSeekMs = timeMs;
+                UpdateTime(timeMs);
+                return;
+            }
+            _player.Time = timeMs;
+            _stepTimeMs = timeMs;
+            // LibVLC raises no time events while paused, so update the label ourselves.
+            UpdateTime(timeMs);
+        }
+
+        // The media keys on some keyboards arrive as WM_APPCOMMAND, not as key presses.
+        // Previous/Next track jump to the beginning/end of the video (there are no chapters).
+        protected override void WndProc(ref Message m)
+        {
+            const int WM_APPCOMMAND = 0x0319;
+            const int APPCOMMAND_MEDIA_NEXTTRACK = 11;
+            const int APPCOMMAND_MEDIA_PREVIOUSTRACK = 12;
+            const int APPCOMMAND_MEDIA_PLAY_PAUSE = 14;
+
+            if (m.Msg == WM_APPCOMMAND)
+            {
+                int command = (int)(((long)m.LParam >> 16) & 0x7FFF);
+                if (command is APPCOMMAND_MEDIA_PLAY_PAUSE or APPCOMMAND_MEDIA_NEXTTRACK or APPCOMMAND_MEDIA_PREVIOUSTRACK)
                 {
-                    // A stopped player ignores seeks: remember the position for Play.
-                    _pendingSeekMs = timeMs;
-                    UpdateTime(timeMs);
+                    if (!_trimming)
+                    {
+                        if (command == APPCOMMAND_MEDIA_PLAY_PAUSE)
+                        {
+                            TogglePlayPause();
+                        }
+                        else if (!_isStream)
+                        {
+                            // Stay a little before the end, so playback does not end by itself.
+                            SeekTo(command == APPCOMMAND_MEDIA_PREVIOUSTRACK ? 0 : Math.Max(_lengthMs - 100, 0));
+                        }
+                    }
+                    m.Result = 1;
                     return;
                 }
-                _player.Time = timeMs;
-                _stepTimeMs = timeMs;
-                // LibVLC raises no time events while paused, so update the label ourselves.
-                UpdateTime(timeMs);
             }
+            base.WndProc(ref m);
         }
 
         // Mute and the volume slider work together:
