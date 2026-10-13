@@ -4,14 +4,14 @@ namespace SwewolfMediaPlayer
     {
         private const string AppName = "SweWolf Media Player";
 
-        public MainForm()
+        // initialPath: a file given on the command line that was not found, shown for correcting.
+        public MainForm(string? initialPath = null)
         {
             InitializeComponent();
-            // The icon is built into the program, so it also works when only the EXE is shipped.
-            using Stream? iconStream = typeof(MainForm).Assembly.GetManifestResourceStream("SwewolfMediaPlayer.ico");
-            if (iconStream != null)
+            Icon = Program.LoadIcon();
+            if (!string.IsNullOrEmpty(initialPath))
             {
-                Icon = new Icon(iconStream);
+                txtFile.Text = initialPath;
             }
             UpdateOpenButton();
 
@@ -54,7 +54,8 @@ namespace SwewolfMediaPlayer
             }
         }
 
-        // The text box accepts a file dragged from Windows Explorer; it only fills in the path.
+        // A file dragged from Windows Explorer can be dropped anywhere in the window (the form and
+        // the text box both accept it); it only fills in the path.
         private void txtFile_DragEnter(object? sender, DragEventArgs e)
         {
             e.Effect = e.Data?.GetDataPresent(DataFormats.FileDrop) == true ? DragDropEffects.Copy : DragDropEffects.None;

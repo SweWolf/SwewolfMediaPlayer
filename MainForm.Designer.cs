@@ -85,6 +85,7 @@
             // MainForm
             // 
             AcceptButton = btnOpen;
+            AllowDrop = true;
             AutoScaleDimensions = new SizeF(7F, 15F);
             AutoScaleMode = AutoScaleMode.Font;
             ClientSize = new Size(754, 171);
@@ -95,6 +96,8 @@
             Name = "MainForm";
             StartPosition = FormStartPosition.CenterScreen;
             Text = "SweWolf Media Player";
+            DragEnter += txtFile_DragEnter;
+            DragDrop += txtFile_DragDrop;
             ResumeLayout(false);
             PerformLayout();
         }
