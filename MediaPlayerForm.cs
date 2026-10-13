@@ -1315,17 +1315,33 @@ namespace SwewolfMediaPlayer
             const int APPCOMMAND_MEDIA_NEXTTRACK = 11;
             const int APPCOMMAND_MEDIA_PREVIOUSTRACK = 12;
             const int APPCOMMAND_MEDIA_PLAY_PAUSE = 14;
+            const int APPCOMMAND_MEDIA_STOP = 13;
+            const int APPCOMMAND_MEDIA_PLAY = 46;
+            const int APPCOMMAND_MEDIA_PAUSE = 47;
 
             if (m.Msg == WM_APPCOMMAND)
             {
                 int command = (int)(((long)m.LParam >> 16) & 0x7FFF);
-                if (command is APPCOMMAND_MEDIA_PLAY_PAUSE or APPCOMMAND_MEDIA_NEXTTRACK or APPCOMMAND_MEDIA_PREVIOUSTRACK)
+                if (command is APPCOMMAND_MEDIA_PLAY_PAUSE or APPCOMMAND_MEDIA_STOP or APPCOMMAND_MEDIA_PLAY or APPCOMMAND_MEDIA_PAUSE
+                    or APPCOMMAND_MEDIA_NEXTTRACK or APPCOMMAND_MEDIA_PREVIOUSTRACK)
                 {
                     if (!_trimming)
                     {
                         if (command == APPCOMMAND_MEDIA_PLAY_PAUSE)
                         {
                             TogglePlayPause();
+                        }
+                        else if (command == APPCOMMAND_MEDIA_STOP)
+                        {
+                            btnStop_Click(null, EventArgs.Empty);
+                        }
+                        else if (command is APPCOMMAND_MEDIA_PLAY or APPCOMMAND_MEDIA_PAUSE)
+                        {
+                            // Separate Play and Pause keys: only act when the state differs.
+                            if (_player != null && _player.IsPlaying == (command == APPCOMMAND_MEDIA_PAUSE))
+                            {
+                                TogglePlayPause();
+                            }
                         }
                         else if (!_isStream)
                         {
