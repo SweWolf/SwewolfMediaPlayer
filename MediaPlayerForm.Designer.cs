@@ -51,6 +51,10 @@ namespace SwewolfMediaPlayer
             lblTime = new Label();
             menuControls = new ContextMenuStrip(components);
             mnuShowTrim = new ToolStripMenuItem();
+            mnuShowControlPanel = new ToolStripMenuItem();
+            grpControlPanel = new GroupBox();
+            lblWhenEnds = new Label();
+            cboWhenEnds = new ComboBox();
             grpTrim = new GroupBox();
             lblStartAt = new Label();
             lblEndAt = new Label();
@@ -63,6 +67,7 @@ namespace SwewolfMediaPlayer
             (trkSeek).BeginInit();
             menuControls.SuspendLayout();
             grpTrim.SuspendLayout();
+            grpControlPanel.SuspendLayout();
             SuspendLayout();
             // 
             // btnPlayPause
@@ -321,7 +326,7 @@ namespace SwewolfMediaPlayer
             // 
             // menuControls
             // 
-            menuControls.Items.AddRange(new ToolStripItem[] { mnuShowTrim });
+            menuControls.Items.AddRange(new ToolStripItem[] { mnuShowTrim, mnuShowControlPanel });
             menuControls.Name = "menuControls";
             menuControls.Size = new Size(178, 26);
             menuControls.Opening += menuControls_Opening;
@@ -332,6 +337,49 @@ namespace SwewolfMediaPlayer
             mnuShowTrim.Size = new Size(177, 22);
             mnuShowTrim.Text = "Show Trim Features";
             mnuShowTrim.Click += mnuShowTrim_Click;
+            // 
+            // mnuShowControlPanel
+            // 
+            mnuShowControlPanel.Name = "mnuShowControlPanel";
+            mnuShowControlPanel.Size = new Size(177, 22);
+            mnuShowControlPanel.Text = "Control Panel";
+            mnuShowControlPanel.Click += mnuShowControlPanel_Click;
+            // 
+            // grpControlPanel
+            // 
+            grpControlPanel.ContextMenuStrip = menuControls;
+            grpControlPanel.Controls.Add(lblWhenEnds);
+            grpControlPanel.Controls.Add(cboWhenEnds);
+            grpControlPanel.Dock = DockStyle.Bottom;
+            grpControlPanel.Location = new Point(0, 518);
+            grpControlPanel.Name = "grpControlPanel";
+            grpControlPanel.Size = new Size(1178, 62);
+            grpControlPanel.TabIndex = 3;
+            grpControlPanel.TabStop = false;
+            grpControlPanel.Text = "Control Panel";
+            grpControlPanel.Visible = false;
+            // 
+            // lblWhenEnds
+            // 
+            lblWhenEnds.AutoSize = true;
+            lblWhenEnds.Location = new Point(12, 28);
+            lblWhenEnds.Name = "lblWhenEnds";
+            lblWhenEnds.Size = new Size(106, 15);
+            lblWhenEnds.TabIndex = 0;
+            lblWhenEnds.Text = "When the Video Ends";
+            // 
+            // cboWhenEnds
+            // 
+            cboWhenEnds.BackColor = Color.FromArgb(48, 48, 48);
+            cboWhenEnds.DropDownStyle = ComboBoxStyle.DropDownList;
+            cboWhenEnds.FlatStyle = FlatStyle.Flat;
+            cboWhenEnds.ForeColor = Color.FromArgb(230, 230, 230);
+            cboWhenEnds.Location = new Point(150, 25);
+            cboWhenEnds.Name = "cboWhenEnds";
+            cboWhenEnds.Size = new Size(170, 23);
+            cboWhenEnds.TabIndex = 1;
+            toolTip.SetToolTip(cboWhenEnds, "What the player does when a video has played to its end");
+            cboWhenEnds.SelectedIndexChanged += cboWhenEnds_SelectedIndexChanged;
             // 
             // grpTrim
             // 
@@ -402,6 +450,7 @@ namespace SwewolfMediaPlayer
             ClientSize = new Size(1178, 698);
             Controls.Add(picCover);
             Controls.Add(videoView);
+            Controls.Add(grpControlPanel);
             Controls.Add(grpTrim);
             Controls.Add(pnlControls);
             ForeColor = Color.FromArgb(230, 230, 230);
@@ -419,6 +468,8 @@ namespace SwewolfMediaPlayer
             menuControls.ResumeLayout(false);
             grpTrim.ResumeLayout(false);
             grpTrim.PerformLayout();
+            grpControlPanel.ResumeLayout(false);
+            grpControlPanel.PerformLayout();
             ResumeLayout(false);
         }
 
@@ -451,5 +502,9 @@ namespace SwewolfMediaPlayer
         private Button btnTrim;
         private ContextMenuStrip menuControls;
         private ToolStripMenuItem mnuShowTrim;
+        private ToolStripMenuItem mnuShowControlPanel;
+        private GroupBox grpControlPanel;
+        private Label lblWhenEnds;
+        private ComboBox cboWhenEnds;
     }
 }

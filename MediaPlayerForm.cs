@@ -141,6 +141,7 @@ namespace SwewolfMediaPlayer
         public MediaPlayerForm(string filePath)
         {
             InitializeComponent();
+            InitControlPanel();
             StyleMenu(menuVideo);
             _filePath = filePath;
             _isStream = TryGetStreamUri(filePath, out Uri? uri);
@@ -438,10 +439,17 @@ namespace SwewolfMediaPlayer
                 SetFullScreen(false);
                 return true;
             }
-            // Escape hides the trim group box (and any group box added later like it).
-            if (keyData == Keys.Escape && _trimVisible)
+            // Escape hides the group boxes (one per press, the top one first).
+            if (keyData == Keys.Escape && (_panelVisible || _trimVisible))
             {
-                SetTrimVisible(false);
+                if (_panelVisible)
+                {
+                    SetPanelVisible(false);
+                }
+                else
+                {
+                    SetTrimVisible(false);
+                }
                 return true;
             }
             return base.ProcessCmdKey(ref msg, keyData);
@@ -543,6 +551,7 @@ namespace SwewolfMediaPlayer
             }
             pnlControls.Visible = !fullScreen;
             grpTrim.Visible = _trimVisible && !fullScreen;
+            grpControlPanel.Visible = _panelVisible && !fullScreen;
         }
 
         // LibVLC raises its events on its own threads: hand the work over to the UI thread.
@@ -576,6 +585,19 @@ namespace SwewolfMediaPlayer
             MediaPlayer? player = _player;
             if (player == null || _isStream)
             {
+                ShowStopped();
+                return;
+            }
+
+            // The Control Panel decides what happens at the end (not while a preview plays).
+            if (!_previewing && _whenEnds == EndAction.Repeat)
+            {
+                RestartPlayback();
+                return;
+            }
+            if (!_previewing && _whenEnds == EndAction.BlackScreen)
+            {
+                _ = Task.Run(player.Stop);
                 ShowStopped();
                 return;
             }
