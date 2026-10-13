@@ -396,6 +396,7 @@ namespace SwewolfMediaPlayer
             // MediaPlayerForm
             // 
             AutoScaleDimensions = new SizeF(7F, 15F);
+            AllowDrop = true;
             AutoScaleMode = AutoScaleMode.Font;
             BackColor = Color.FromArgb(32, 32, 32);
             ClientSize = new Size(1178, 698);
@@ -407,6 +408,8 @@ namespace SwewolfMediaPlayer
             Name = "MediaPlayerForm";
             StartPosition = FormStartPosition.CenterParent;
             Text = "Media Player";
+            DragEnter += MediaPlayerForm_DragEnter;
+            DragDrop += MediaPlayerForm_DragDrop;
             WindowState = FormWindowState.Maximized;
             (trkVolume).EndInit();
             ((System.ComponentModel.ISupportInitialize)videoView).EndInit();

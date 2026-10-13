@@ -48,6 +48,7 @@
 //               starts from there, and it no longer jumps back to 0.
 //   2026-10-12  The volume and mute state are set again once a file is playing (ApplyAudioState),
 //               because LibVLC could ignore them before that and leave the sound off.
+//   2026-10-12  A file dropped anywhere on the window is played; the Trim fields are cleared.
 //   2026-10-12  Audio files show their embedded cover art (ShowCoverArt, picCover) instead of a
 //               black screen. Needs the NuGet package TagLibSharp.
 //   2026-10-12  Save Frame saves the cover art (SaveCoverArt) when an audio file shows it.
@@ -80,8 +81,8 @@ namespace SwewolfMediaPlayer
             });
         }
 
-        private readonly string _filePath;
-        private readonly bool _isStream;   // a web address (e.g. an HLS stream) and not a file
+        private string _filePath;   // changes when another file is dropped on the window
+        private bool _isStream;   // a web address (e.g. an HLS stream) and not a file
         private MediaPlayer? _player;
         private Media? _media;
         private long _lengthMs;
@@ -146,6 +147,50 @@ namespace SwewolfMediaPlayer
             Text = _isStream ? uri!.Host : Path.GetFileName(filePath);
             // A stream cannot be seeked or stepped back: the seek bar is of no use.
             trkSeek.Enabled = !_isStream;
+        }
+
+        // A file dragged from Windows Explorer can be dropped anywhere in the window and is played
+        // instead of the current one. The Trim fields are cleared: their times belonged to the old file.
+        private void MediaPlayerForm_DragEnter(object? sender, DragEventArgs e)
+        {
+            e.Effect = !_trimming && e.Data?.GetDataPresent(DataFormats.FileDrop) == true ? DragDropEffects.Copy : DragDropEffects.None;
+        }
+
+        private async void MediaPlayerForm_DragDrop(object? sender, DragEventArgs e)
+        {
+            MediaPlayer? player = _player;
+            if (player == null || _trimming || _restoringEnd
+                || e.Data?.GetData(DataFormats.FileDrop) is not string[] { Length: > 0 } files || !File.Exists(files[0]))
+            {
+                return;
+            }
+
+            EndPreview(false);
+            Media? oldMedia = _media;
+            _media = null;
+            _filePath = files[0];
+            _isStream = false;
+            Text = Path.GetFileName(_filePath);
+            trkSeek.Enabled = true;
+            txtStartAt.Clear();
+            txtEndAt.Clear();
+            txtFadeIn.Text = "0";
+            txtFadeOut.Text = "0";
+            _lengthMs = 0;
+            _frameMs = 0;
+            _pendingSeekMs = -1;
+            _lastSubtitleTrack = -1;
+            _videoCheckDone = false;
+            _playingSinceTicks = 0;
+            await Task.Run(() =>
+            {
+                player.Stop();
+                oldMedia?.Dispose();
+            });
+            if (_player == player && !IsDisposed)
+            {
+                StartMedia();
+            }
         }
 
         protected override void OnLoad(EventArgs e)
