@@ -7,6 +7,14 @@
     <UseWindowsForms>true</UseWindowsForms>
     <ImplicitUsings>enable</ImplicitUsings>
     <ApplicationIcon>Resources\SwewolfMediaPlayer.ico</ApplicationIcon>
+    <Version>1.0.0</Version>
+    <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
+    <AssemblyTitle>SweWolf Media Player</AssemblyTitle>
+    <Product>SweWolf Media Player</Product>
+    <Company>SweWolf Software</Company>
+    <Copyright>SweWolf Software</Copyright>
+    <Authors>SweWolf</Authors>
+    <Description>A media player with frame stepping, frame saving and trimming</Description>
   </PropertyGroup>
 
   <ItemGroup>

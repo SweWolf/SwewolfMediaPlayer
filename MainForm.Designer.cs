@@ -30,16 +30,58 @@
         {
             components = new System.ComponentModel.Container();
             toolTip = new ToolTip(components);
+            menuStrip = new MenuStrip();
+            menuTools = new ToolStripMenuItem();
+            menuCreateShortcut = new ToolStripMenuItem();
+            menuHelp = new ToolStripMenuItem();
+            menuAbout = new ToolStripMenuItem();
             lblFile = new Label();
             txtFile = new TextBox();
             btnBrowse = new Button();
             btnOpen = new Button();
+            menuStrip.SuspendLayout();
             SuspendLayout();
+            //
+            // menuStrip
+            //
+            menuStrip.Items.AddRange(new ToolStripItem[] { menuTools, menuHelp });
+            menuStrip.Location = new Point(0, 0);
+            menuStrip.Name = "menuStrip";
+            menuStrip.Size = new Size(754, 24);
+            menuStrip.TabIndex = 4;
+            //
+            // menuTools
+            //
+            menuTools.DropDownItems.AddRange(new ToolStripItem[] { menuCreateShortcut });
+            menuTools.Name = "menuTools";
+            menuTools.Size = new Size(47, 20);
+            menuTools.Text = "Tools";
+            //
+            // menuCreateShortcut
+            //
+            menuCreateShortcut.Name = "menuCreateShortcut";
+            menuCreateShortcut.Size = new Size(180, 22);
+            menuCreateShortcut.Text = "Create Shortcut...";
+            menuCreateShortcut.Click += menuCreateShortcut_Click;
+            //
+            // menuHelp
+            //
+            menuHelp.DropDownItems.AddRange(new ToolStripItem[] { menuAbout });
+            menuHelp.Name = "menuHelp";
+            menuHelp.Size = new Size(44, 20);
+            menuHelp.Text = "Help";
+            //
+            // menuAbout
+            //
+            menuAbout.Name = "menuAbout";
+            menuAbout.Size = new Size(180, 22);
+            menuAbout.Text = "About";
+            menuAbout.Click += menuAbout_Click;
             //
             // lblFile
             //
             lblFile.AutoSize = true;
-            lblFile.Location = new Point(12, 19);
+            lblFile.Location = new Point(12, 43);
             lblFile.Name = "lblFile";
             lblFile.Size = new Size(64, 15);
             lblFile.TabIndex = 0;
@@ -50,7 +92,7 @@
             txtFile.AllowDrop = true;
             txtFile.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
             txtFile.Font = new Font("Segoe UI", 12F);
-            txtFile.Location = new Point(12, 40);
+            txtFile.Location = new Point(12, 64);
             txtFile.Name = "txtFile";
             txtFile.Size = new Size(673, 29);
             txtFile.TabIndex = 1;
@@ -61,7 +103,7 @@
             // btnBrowse
             // 
             btnBrowse.Anchor = AnchorStyles.Top | AnchorStyles.Right;
-            btnBrowse.Location = new Point(706, 40);
+            btnBrowse.Location = new Point(706, 64);
             btnBrowse.Name = "btnBrowse";
             btnBrowse.Size = new Size(34, 29);
             btnBrowse.TabIndex = 2;
@@ -74,7 +116,7 @@
             // 
             btnOpen.Anchor = AnchorStyles.Top | AnchorStyles.Right;
             btnOpen.Font = new Font("Segoe UI", 12F);
-            btnOpen.Location = new Point(503, 93);
+            btnOpen.Location = new Point(503, 117);
             btnOpen.Name = "btnOpen";
             btnOpen.Size = new Size(182, 45);
             btnOpen.TabIndex = 3;
@@ -88,16 +130,20 @@
             AllowDrop = true;
             AutoScaleDimensions = new SizeF(7F, 15F);
             AutoScaleMode = AutoScaleMode.Font;
-            ClientSize = new Size(754, 171);
+            ClientSize = new Size(754, 195);
             Controls.Add(btnOpen);
             Controls.Add(btnBrowse);
             Controls.Add(txtFile);
             Controls.Add(lblFile);
+            Controls.Add(menuStrip);
+            MainMenuStrip = menuStrip;
             Name = "MainForm";
             StartPosition = FormStartPosition.CenterScreen;
             Text = "SweWolf Media Player";
             DragEnter += txtFile_DragEnter;
             DragDrop += txtFile_DragDrop;
+            menuStrip.ResumeLayout(false);
+            menuStrip.PerformLayout();
             ResumeLayout(false);
             PerformLayout();
         }
@@ -109,5 +155,10 @@
         private TextBox txtFile;
         private Button btnBrowse;
         private Button btnOpen;
+        private MenuStrip menuStrip;
+        private ToolStripMenuItem menuTools;
+        private ToolStripMenuItem menuCreateShortcut;
+        private ToolStripMenuItem menuHelp;
+        private ToolStripMenuItem menuAbout;
     }
 }

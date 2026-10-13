@@ -2,7 +2,7 @@ namespace SwewolfMediaPlayer
 {
     public partial class MainForm : Form
     {
-        private const string AppName = "SweWolf Media Player";
+        internal const string AppName = "SweWolf Media Player";
 
         // initialPath: a file given on the command line that was not found, shown for correcting.
         public MainForm(string? initialPath = null)
@@ -17,6 +17,18 @@ namespace SwewolfMediaPlayer
 
             // Start loading the video engine now, so the first video opens without a wait.
             _ = MediaPlayerForm.PreloadAsync();
+        }
+
+        private void menuCreateShortcut_Click(object? sender, EventArgs e)
+        {
+            using var form = new CreateShortcutForm(Application.ExecutablePath);
+            form.ShowDialog(this);
+        }
+
+        private void menuAbout_Click(object? sender, EventArgs e)
+        {
+            using var form = new AboutForm();
+            form.ShowDialog(this);
         }
 
         private void txtFile_TextChanged(object? sender, EventArgs e)

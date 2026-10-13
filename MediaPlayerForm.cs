@@ -439,20 +439,37 @@ namespace SwewolfMediaPlayer
                 SetFullScreen(false);
                 return true;
             }
-            // Escape hides the group boxes (one per press, the top one first).
+            // Escape hides the group box that has the focus; when none of them has it, all of them.
             if (keyData == Keys.Escape && (_panelVisible || _trimVisible))
             {
-                if (_panelVisible)
+                if (_panelVisible && IsInside(ActiveControl, grpControlPanel))
                 {
                     SetPanelVisible(false);
                 }
+                else if (_trimVisible && IsInside(ActiveControl, grpTrim))
+                {
+                    SetTrimVisible(false);
+                }
                 else
                 {
+                    SetPanelVisible(false);
                     SetTrimVisible(false);
                 }
                 return true;
             }
             return base.ProcessCmdKey(ref msg, keyData);
+        }
+
+        private static bool IsInside(Control? control, Control container)
+        {
+            for (Control? c = control; c != null; c = c.Parent)
+            {
+                if (c == container)
+                {
+                    return true;
+                }
+            }
+            return false;
         }
 
         // While paused, the mouse wheel anywhere in the window steps one frame (wheel up =
