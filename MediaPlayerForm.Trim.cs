@@ -3,9 +3,11 @@
 // The group box is hidden at start and is never remembered: the right-click menu on the control bar
 // shows it. The user types a start and end time (or takes the player's position with the "Now"
 // buttons) and fade lengths. "Preview" plays that part with the fades (in the volume only), and
-// "Trim" cuts the file in place with the sibling program SplitMediaFiles, which is started with
-// command-line arguments and waited for (-i, -ss, -to, -fadein, -fadeout; exit code 0 = done,
-// -1 = failed, -2 = canceled). The file is released while SplitMediaFiles replaces it.
+// "Trim" asks whether to replace the file or save a new one, and uses the sibling program
+// SplitMediaFiles either way (arguments -i, -ss, -to, -fadein, -fadeout). To replace, it adds
+// -overwrite and waits for it (exit code 0 = done, -1 = failed, -2 = canceled), and the file is
+// released meanwhile. For a new file SplitMediaFiles opens its window with the values filled in
+// and the player does not wait.
 //
 // To reuse it: copy this file together with the three files named in MediaPlayerForm.cs.
 //
@@ -14,6 +16,8 @@
 //   2026-10-12  Removed the development path; when SplitMediaFiles is not found, the user can locate
 //               it or open its download page.
 //   2026-10-12  The Now buttons use the position the seek bar was dragged to while stopped.
+//   2026-10-12  Trim asks: Replace the File (-overwrite, as before) or Save as a New File (SplitMediaFiles
+//               opens with the values filled in and the player does not wait).
 
 using System.ComponentModel;
 using System.Diagnostics;
@@ -380,16 +384,42 @@ namespace SwewolfMediaPlayer
                 return;   // the user did not pick the program
             }
 
-            string summary = $"Trim \"{Path.GetFileName(_filePath)}\"?\n\n"
-                + $"Start: {(request.HasStart ? FormatTime((long)(request.Start * 1000), true) : "the beginning")}\n"
+            string summary = $"Start: {(request.HasStart ? FormatTime((long)(request.Start * 1000), true) : "the beginning")}\n"
                 + $"End: {(request.HasEnd ? FormatTime((long)(request.End * 1000), true) : "the end")}\n"
                 + $"Fade in: {(request.FadeIn > 0 ? FormatSeconds(request.FadeIn) + " s" : "none")}\n"
                 + $"Fade out: {(request.FadeOut > 0 ? FormatSeconds(request.FadeOut) + " s" : "none")}\n\n"
-                + "The file is trimmed in place. SplitMediaFiles keeps the original in its folder for original files "
-                + "(\"_old\" next to the file, unless it is set otherwise there). The player lets go of the file "
-                + "meanwhile and opens it again afterwards.";
-            if (MessageBox.Show(this, summary, AppName, MessageBoxButtons.OKCancel, MessageBoxIcon.Question,
-                    MessageBoxDefaultButton.Button2) != DialogResult.OK)
+                + "Replace the File: the file is trimmed in place. SplitMediaFiles keeps the original in its folder "
+                + "for original files (\"_old\" next to the file, unless it is set otherwise there). The player lets go "
+                + "of the file meanwhile and opens it again afterwards.\n\n"
+                + "Save as a New File: SplitMediaFiles opens with these values filled in. You choose the name and "
+                + "the folder there, and start it yourself. The original file is not changed.";
+            TaskDialogButton replaceButton = new("Replace the File");
+            TaskDialogButton newFileButton = new("Save as a New File");
+            TaskDialogPage choicePage = new()
+            {
+                Caption = AppName,
+                Heading = $"Trim \"{Path.GetFileName(_filePath)}\"?",
+                Text = summary,
+                Icon = TaskDialogIcon.Information,
+                Buttons = { replaceButton, newFileButton, TaskDialogButton.Cancel },
+                DefaultButton = newFileButton   // the one that cannot lose anything
+            };
+            TaskDialogButton choice = TaskDialog.ShowDialog(this, choicePage);
+            if (choice == newFileButton)
+            {
+                // The original is not touched, so the player keeps it open and does not wait.
+                try
+                {
+                    StartSplitMediaFiles(exe, request, false)?.Dispose();
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show(this, $"SplitMediaFiles could not be started.\n\n{ex.Message}", AppName,
+                        MessageBoxButtons.OK, MessageBoxIcon.Error);
+                }
+                return;
+            }
+            if (choice != replaceButton)
             {
                 return;
             }
@@ -456,8 +486,19 @@ namespace SwewolfMediaPlayer
             }
         }
 
-        // Starts SplitMediaFiles in its automatic mode and waits for it. Returns its exit code.
+        // Starts SplitMediaFiles in its automatic mode, trimming the file in place, and waits for it.
+        // Returns its exit code.
         private int RunSplitMediaFiles(string exe, TrimRequest request)
+        {
+            using Process process = StartSplitMediaFiles(exe, request, true)
+                ?? throw new InvalidOperationException("The process did not start.");
+            process.WaitForExit();
+            return process.ExitCode;
+        }
+
+        // Starts SplitMediaFiles with the trim values. With overwrite (-overwrite) it works by itself
+        // and replaces the file; without, its window opens with the values filled in.
+        private Process? StartSplitMediaFiles(string exe, TrimRequest request, bool overwrite)
         {
             ProcessStartInfo info = new(exe)
             {
@@ -486,14 +527,12 @@ namespace SwewolfMediaPlayer
                 info.ArgumentList.Add("-fadeout");
                 info.ArgumentList.Add(FormatSeconds(request.FadeOut));
             }
-
-            using Process? process = Process.Start(info);
-            if (process == null)
+            if (overwrite)
             {
-                throw new InvalidOperationException("The process did not start.");
+                info.ArgumentList.Add("-overwrite");
             }
-            process.WaitForExit();
-            return process.ExitCode;
+
+            return Process.Start(info);
         }
 
         private static string FormatSeconds(double seconds)
