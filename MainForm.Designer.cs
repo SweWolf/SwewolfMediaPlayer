@@ -33,8 +33,10 @@
             menuStrip = new MenuStrip();
             menuTools = new ToolStripMenuItem();
             menuCreateShortcut = new ToolStripMenuItem();
+            menuSettings = new ToolStripMenuItem();
             menuHelp = new ToolStripMenuItem();
             menuAbout = new ToolStripMenuItem();
+            menuNewVersion = new ToolStripMenuItem();
             lblFile = new Label();
             txtFile = new TextBox();
             btnBrowse = new Button();
@@ -44,7 +46,7 @@
             //
             // menuStrip
             //
-            menuStrip.Items.AddRange(new ToolStripItem[] { menuTools, menuHelp });
+            menuStrip.Items.AddRange(new ToolStripItem[] { menuTools, menuHelp, menuNewVersion });
             menuStrip.Location = new Point(0, 0);
             menuStrip.Name = "menuStrip";
             menuStrip.Size = new Size(754, 24);
@@ -52,7 +54,7 @@
             //
             // menuTools
             //
-            menuTools.DropDownItems.AddRange(new ToolStripItem[] { menuCreateShortcut });
+            menuTools.DropDownItems.AddRange(new ToolStripItem[] { menuCreateShortcut, menuSettings });
             menuTools.Name = "menuTools";
             menuTools.Size = new Size(47, 20);
             menuTools.Text = "Tools";
@@ -63,6 +65,13 @@
             menuCreateShortcut.Size = new Size(180, 22);
             menuCreateShortcut.Text = "Create Shortcut...";
             menuCreateShortcut.Click += menuCreateShortcut_Click;
+            //
+            // menuSettings
+            //
+            menuSettings.Name = "menuSettings";
+            menuSettings.Size = new Size(180, 22);
+            menuSettings.Text = "Settings";
+            menuSettings.Click += menuSettings_Click;
             //
             // menuHelp
             //
@@ -77,6 +86,17 @@
             menuAbout.Size = new Size(180, 22);
             menuAbout.Text = "About";
             menuAbout.Click += menuAbout_Click;
+            //
+            // menuNewVersion
+            //
+            menuNewVersion.Alignment = ToolStripItemAlignment.Right;
+            menuNewVersion.Font = new Font("Segoe UI", 9F, FontStyle.Bold);
+            menuNewVersion.ForeColor = Color.FromArgb(120, 210, 120);
+            menuNewVersion.Name = "menuNewVersion";
+            menuNewVersion.Size = new Size(142, 20);
+            menuNewVersion.Text = "New Version Available";
+            menuNewVersion.Visible = false;
+            menuNewVersion.Click += menuNewVersion_Click;
             //
             // lblFile
             //
@@ -158,6 +178,8 @@
         private MenuStrip menuStrip;
         private ToolStripMenuItem menuTools;
         private ToolStripMenuItem menuCreateShortcut;
+        private ToolStripMenuItem menuSettings;
+        private ToolStripMenuItem menuNewVersion;
         private ToolStripMenuItem menuHelp;
         private ToolStripMenuItem menuAbout;
     }

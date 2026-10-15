@@ -206,6 +206,11 @@ namespace SwewolfMediaPlayer
         {
             base.OnShown(e);
 
+            if (_settings.StartFullScreen)
+            {
+                SetFullScreen(true);
+            }
+
             try
             {
                 await PreloadAsync();

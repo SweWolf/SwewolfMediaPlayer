@@ -6,6 +6,7 @@
 //
 // History:
 //   2026-10-13  First version: WhenVideoEnds.
+//   2026-10-15  StartFullScreen and CheckForUpdatesOnStartup (both on by default).
 
 using System.Text.Json;
 
@@ -18,6 +19,12 @@ namespace SwewolfMediaPlayer
         // What the player does when a video has played to its end: 0 = show the last frame,
         // 1 = show a black screen, 2 = repeat.
         public int WhenVideoEnds { get; set; }
+
+        // Whether the player opens in full screen mode.
+        public bool StartFullScreen { get; set; } = true;
+
+        // Whether the main window asks GitHub for a newer version when it starts.
+        public bool CheckForUpdatesOnStartup { get; set; } = true;
 
         private static string FilePath => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
             "SweWolfSoftware", AppFolder, "settings.json");

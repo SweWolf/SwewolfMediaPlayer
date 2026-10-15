@@ -1,8 +1,12 @@
+using System.Diagnostics;
+
 namespace SwewolfMediaPlayer
 {
     public partial class MainForm : Form
     {
         internal const string AppName = "SweWolf Media Player";
+
+        private string? _updateReleasePageUrl;
 
         // initialPath: a file given on the command line that was not found, shown for correcting.
         public MainForm(string? initialPath = null)
@@ -25,10 +29,46 @@ namespace SwewolfMediaPlayer
             form.ShowDialog(this);
         }
 
+        private void menuSettings_Click(object? sender, EventArgs e)
+        {
+            using var form = new SettingsForm();
+            form.ShowDialog(this);
+        }
+
         private void menuAbout_Click(object? sender, EventArgs e)
         {
             using var form = new AboutForm();
             form.ShowDialog(this);
+        }
+
+        protected override async void OnShown(EventArgs e)
+        {
+            base.OnShown(e);
+            if (AppSettings.Load().CheckForUpdatesOnStartup)
+            {
+                await CheckForUpdatesAsync();
+            }
+        }
+
+        // Runs in the background and fails silently: the menu item only appears if a newer version exists.
+        private async Task CheckForUpdatesAsync()
+        {
+            var fvi = FileVersionInfo.GetVersionInfo(Application.ExecutablePath);
+            var currentVersion = new Version(fvi.FileMajorPart, fvi.FileMinorPart, fvi.FileBuildPart);
+            var result = await GitHubUpdateChecker.CheckAsync("SweWolf", "SwewolfMediaPlayer", currentVersion);
+            if (result is { IsUpdateAvailable: true } && !IsDisposed)
+            {
+                _updateReleasePageUrl = result.ReleasePageUrl;
+                menuNewVersion.Visible = true;
+            }
+        }
+
+        private void menuNewVersion_Click(object? sender, EventArgs e)
+        {
+            if (_updateReleasePageUrl != null)
+            {
+                Process.Start(new ProcessStartInfo(_updateReleasePageUrl) { UseShellExecute = true });
+            }
         }
 
         private void txtFile_TextChanged(object? sender, EventArgs e)

@@ -37,8 +37,10 @@ namespace SwewolfMediaPlayer
             if (cboWhenEnds.SelectedIndex >= 0)
             {
                 _whenEnds = (EndAction)cboWhenEnds.SelectedIndex;
-                _settings.WhenVideoEnds = cboWhenEnds.SelectedIndex;
-                _settings.Save();
+                // Save from a fresh copy, so a change made in the Settings window meanwhile is not overwritten.
+                AppSettings settings = AppSettings.Load();
+                settings.WhenVideoEnds = cboWhenEnds.SelectedIndex;
+                settings.Save();
             }
         }
 
