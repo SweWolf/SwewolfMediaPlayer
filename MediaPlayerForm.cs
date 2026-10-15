@@ -600,6 +600,13 @@ namespace SwewolfMediaPlayer
         private async void OnEndReached()
         {
             MediaPlayer? player = _player;
+            if (player != null && !_previewing && _whenEnds == EndAction.ClosePlayer)
+            {
+                // Closed from the message loop, not from inside the LibVLC event.
+                BeginInvoke(Close);
+                return;
+            }
+
             if (player == null || _isStream)
             {
                 ShowStopped();

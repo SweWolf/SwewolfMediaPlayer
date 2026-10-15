@@ -7,6 +7,7 @@
 // History:
 //   2026-10-13  First version: "When the Video Ends" (last frame, black screen, repeat).
 //   2026-10-13  "When the Video Ends" is remembered between runs (AppSettings.cs).
+//   2026-10-15  New option "Close Player": the window closes when the video ends.
 
 namespace SwewolfMediaPlayer
 {
@@ -17,6 +18,7 @@ namespace SwewolfMediaPlayer
             LastFrame,
             BlackScreen,
             Repeat,
+            ClosePlayer,
         }
 
         private bool _panelVisible;
@@ -25,7 +27,7 @@ namespace SwewolfMediaPlayer
 
         private void InitControlPanel()
         {
-            cboWhenEnds.Items.AddRange(new object[] { "Show the Last Frame", "Show a Black Screen", "Repeat" });
+            cboWhenEnds.Items.AddRange(new object[] { "Show the Last Frame", "Show a Black Screen", "Repeat", "Close Player" });
             _whenEnds = Enum.IsDefined((EndAction)_settings.WhenVideoEnds) ? (EndAction)_settings.WhenVideoEnds : EndAction.LastFrame;
             cboWhenEnds.SelectedIndex = (int)_whenEnds;
         }
