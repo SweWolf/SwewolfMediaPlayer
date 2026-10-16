@@ -55,6 +55,7 @@
 //   2026-10-16  Full screen at start is for video files only (IsAudioFile, setting StartFullScreenForVideo).
 //   2026-10-16  Thumbnail picture above the seek bar while pointing at it (MediaPlayerForm.Thumbnails.cs,
 //               FrameThumbnailer.cs; needs FFmpeg).
+//   2026-10-16  Files with several tunes (SID): buttons, Page Up/Down and a menu to switch tune (MediaPlayerForm.Tunes.cs).
 //   2026-10-16  CanSeek: SID files and files LibVLC cannot seek in get a read-only seek bar, no frame
 //               stepping (keys, wheel), no media-key jumps and no trimming.
 //   2026-10-16  SID files show their length from the song length database (SidSongLengths.cs).
@@ -153,6 +154,7 @@ namespace SwewolfMediaPlayer
         {
             InitializeComponent();
             InitControlPanel();
+            InitTuneControls();
             StyleMenu(menuVideo);
             _filePath = filePath;
             _isStream = TryGetStreamUri(filePath, out Uri? uri);
@@ -345,6 +347,7 @@ namespace SwewolfMediaPlayer
 
             _audioStateApplied = 0;
             _knownLengthMs = 0;
+            ResetTunes();
             _vlcSeekable = true;
             ApplySeekState();
             ResetThumbnails();
@@ -362,11 +365,15 @@ namespace SwewolfMediaPlayer
         // is left blank. Only the time label and the progress bar use it, not seeking or trimming.
         private async Task ShowSidLengthAsync(string path)
         {
-            long? length = await SidSongLengths.FindLengthMsAsync(path);
-            if (length is > 0 && !IsDisposed && path == _filePath && _lengthMs <= 0)
+            SidTunes? tunes = await SidSongLengths.FindTunesAsync(path);
+            if (tunes != null && !IsDisposed && path == _filePath && _lengthMs <= 0)
             {
-                _knownLengthMs = length.Value;
-                UpdateTime(_player?.Time ?? 0);
+                _tuneLengths = tunes.Lengths;
+                if (!_tuneChecked)
+                {
+                    _tuneIndex = tunes.StartSong - 1;   // until LibVLC says which tune plays
+                }
+                ApplyTune();
             }
         }
 
@@ -488,6 +495,11 @@ namespace SwewolfMediaPlayer
             if (keyData == Keys.Space)
             {
                 TogglePlayPause();
+                return true;
+            }
+            if (keyData is Keys.PageUp or Keys.PageDown && _tuneCount > 1)
+            {
+                ChangeTune(_tuneIndex + (keyData == Keys.PageDown ? 1 : -1));
                 return true;
             }
             if (keyData is Keys.Left or Keys.Right && _paused && CanSeek)
@@ -1194,6 +1206,8 @@ namespace SwewolfMediaPlayer
                 ShowPlayPause(_player.IsPlaying);
             }
 
+            CheckTunes();
+
             if (_isStream && !_videoCheckDone && _player.IsPlaying)
             {
                 if (_playingSinceTicks == 0)
@@ -1314,6 +1328,7 @@ namespace SwewolfMediaPlayer
             }
             subtitles.Enabled = subtitles.DropDownItems.Count > 1;
             menuVideo.Items.Add(subtitles);
+            AddTuneMenu();
 
             // WinForms sets Cancel when the menu has no items yet, which is the case here.
             e.Cancel = false;
@@ -1466,6 +1481,10 @@ namespace SwewolfMediaPlayer
                                 TogglePlayPause();
                             }
                         }
+                        else if (_tuneCount > 1)
+                        {
+                            ChangeTune(_tuneIndex + (command == APPCOMMAND_MEDIA_PREVIOUSTRACK ? -1 : 1));
+                        }
                         else if (CanSeek)
                         {
                             // Stay a little before the end, so playback does not end by itself.
@@ -1583,7 +1602,7 @@ namespace SwewolfMediaPlayer
 
     // A button that draws its own icon, so it can be filled and take the colors of the dark theme.
     // BackColor is the button color, ForeColor the icon color.
-    internal enum IconKind { Play, Pause, Stop, Camera, Volume, Muted }
+    internal enum IconKind { Play, Pause, Stop, Camera, Volume, Muted, PreviousTune, NextTune }
 
     internal sealed class IconButton : Button
     {
@@ -1650,6 +1669,14 @@ namespace SwewolfMediaPlayer
                     break;
                 case IconKind.Stop:
                     g.FillRectangle(brush, R(0.08f, 0.08f, 0.84f, 0.84f));
+                    break;
+                case IconKind.PreviousTune:
+                    g.FillRectangle(brush, R(0.08f, 0.05f, 0.14f, 0.90f));
+                    g.FillPolygon(brush, new[] { P(0.95f, 0.05f), P(0.95f, 0.95f), P(0.30f, 0.5f) });
+                    break;
+                case IconKind.NextTune:
+                    g.FillRectangle(brush, R(0.78f, 0.05f, 0.14f, 0.90f));
+                    g.FillPolygon(brush, new[] { P(0.05f, 0.05f), P(0.05f, 0.95f), P(0.70f, 0.5f) });
                     break;
                 case IconKind.Camera:
                     g.FillRectangle(brush, R(0.30f, 0.05f, 0.40f, 0.25f));

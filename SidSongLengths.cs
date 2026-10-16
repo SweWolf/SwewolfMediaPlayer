@@ -16,6 +16,7 @@
 //
 // History:
 //   2026-10-16  First version: local HVSC first, then the shared copy (downloaded on first use).
+//   2026-10-16  FindTunesAsync gives the lengths of all tunes in the file and the one that starts first.
 
 using System.Net.Http;
 using System.Security.Cryptography;
@@ -23,6 +24,10 @@ using System.Text;
 
 namespace SwewolfMediaPlayer
 {
+    // The tunes of one SID file: the number (1 to n) of the one that starts first, and the length in
+    // milliseconds of each tune (null for a length that is not known).
+    internal sealed record SidTunes(int StartSong, long?[] Lengths);
+
     internal static class SidSongLengths
     {
         private const string DownloadUrl = "https://hvsc.c64.org/download/C64Music/DOCUMENTS/Songlengths.md5";
@@ -38,10 +43,9 @@ namespace SwewolfMediaPlayer
 
         private static string SharedFile => Path.Combine(SharedFolder, FileName);
 
-        // The length in milliseconds of the tune that starts first in the file, or null if it is
-        // not known. Waits for the first download if there is no database yet, so call it without
-        // blocking the window.
-        public static async Task<long?> FindLengthMsAsync(string sidFile)
+        // The lengths of the tunes in the file, or null if the file is not in the database. Waits for
+        // the first download if there is no database yet, so call it without blocking the window.
+        public static async Task<SidTunes?> FindTunesAsync(string sidFile)
         {
             try
             {
@@ -69,12 +73,28 @@ namespace SwewolfMediaPlayer
                     database = SharedFile;
                 }
 
-                return await Task.Run(() => Lookup(database, hash, startSong));
+                long?[]? lengths = await Task.Run(() => Lookup(database, hash));
+                return lengths == null ? null : new SidTunes(startSong, lengths);
             }
             catch (Exception ex)
             {
                 Log("Length lookup failed: " + ex.Message);
                 return null;
+            }
+        }
+
+        // The number (1 to n) of the tune that starts first, read from the file header; 1 if it cannot be read.
+        public static int ReadStartSong(string sidFile)
+        {
+            try
+            {
+                using FileStream file = File.OpenRead(sidFile);
+                byte[] header = new byte[0x12];
+                return file.Read(header, 0, header.Length) == header.Length && TryReadHeader(header, out int start) ? start : 1;
+            }
+            catch (Exception)
+            {
+                return 1;
             }
         }
 
@@ -112,7 +132,7 @@ namespace SwewolfMediaPlayer
             return null;
         }
 
-        private static long? Lookup(string databasePath, string hash, int startSong)
+        private static long?[]? Lookup(string databasePath, string hash)
         {
             string text = Encoding.Latin1.GetString(File.ReadAllBytes(databasePath));
             int at = text.IndexOf("\n" + hash + "=", StringComparison.Ordinal);
@@ -123,8 +143,8 @@ namespace SwewolfMediaPlayer
 
             int start = at + 1 + hash.Length + 1;
             int end = text.IndexOfAny(new[] { '\r', '\n' }, start);
-            string[] lengths = text[start..(end < 0 ? text.Length : end)].Split(' ', StringSplitOptions.RemoveEmptyEntries);
-            return startSong <= lengths.Length ? ParseLength(lengths[startSong - 1]) : null;
+            return text[start..(end < 0 ? text.Length : end)].Split(' ', StringSplitOptions.RemoveEmptyEntries)
+                .Select(ParseLength).ToArray();
         }
 
         // "3:21", "4:33.108" or "1:02:03".
