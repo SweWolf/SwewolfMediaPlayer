@@ -55,6 +55,8 @@
 //   2026-10-16  Full screen at start is for video files only (IsAudioFile, setting StartFullScreenForVideo).
 //   2026-10-16  Thumbnail picture above the seek bar while pointing at it (MediaPlayerForm.Thumbnails.cs,
 //               FrameThumbnailer.cs; needs FFmpeg).
+//   2026-10-16  CanSeek: SID files and files LibVLC cannot seek in get a read-only seek bar, no frame
+//               stepping (keys, wheel), no media-key jumps and no trimming.
 //   2026-10-16  SID files show their length from the song length database (SidSongLengths.cs).
 //   2026-10-16  SID files: the plugin is copied from the user's VLC the first time (see
 //               MediaPlayerForm.SidSupport.cs and SidPluginSetup.cs); PreloadAsync sets the plugin path.
@@ -93,6 +95,7 @@ namespace SwewolfMediaPlayer
         private MediaPlayer? _player;
         private Media? _media;
         private long _lengthMs;
+        private bool _vlcSeekable = true;   // LibVLC's own answer: false for a file it cannot jump in
         private long _knownLengthMs;   // SID files: from the song length database, as LibVLC does not know it
         private bool _seeking;
         private string? _lastSaveFolder;
@@ -155,7 +158,7 @@ namespace SwewolfMediaPlayer
             _isStream = TryGetStreamUri(filePath, out Uri? uri);
             Text = _isStream ? uri!.Host : Path.GetFileName(filePath);
             // A stream cannot be seeked or stepped back: the seek bar is of no use.
-            trkSeek.Enabled = !_isStream;
+            ApplySeekState();
         }
 
         // A file dragged from Windows Explorer can be dropped anywhere in the window and is played
@@ -180,7 +183,8 @@ namespace SwewolfMediaPlayer
             _filePath = files[0];
             _isStream = false;
             Text = Path.GetFileName(_filePath);
-            trkSeek.Enabled = true;
+            _vlcSeekable = true;
+            ApplySeekState();
             txtStartAt.Clear();
             txtEndAt.Clear();
             txtFadeIn.Text = "0";
@@ -290,6 +294,11 @@ namespace SwewolfMediaPlayer
                 }
             });
             _player.EndReached += (s, a) => Post(OnEndReached);
+            _player.SeekableChanged += (s, a) => Post(() =>
+            {
+                _vlcSeekable = a.Seekable != 0;
+                ApplySeekState();
+            });
             _player.LengthChanged += (s, a) => Post(() =>
             {
                 _lengthMs = a.Length;
@@ -336,6 +345,8 @@ namespace SwewolfMediaPlayer
 
             _audioStateApplied = 0;
             _knownLengthMs = 0;
+            _vlcSeekable = true;
+            ApplySeekState();
             ResetThumbnails();
             ShowCoverArt();
             _media = new Media(_libVlc, _filePath, _isStream ? FromType.FromLocation : FromType.FromPath);
@@ -362,6 +373,16 @@ namespace SwewolfMediaPlayer
         // An audio file has no picture of its own, so LibVLC shows black. If the file has embedded
         // cover art (e.g. an MP3 with an album picture), show that over the video area instead.
         private static readonly string[] AudioExtensions = { ".mp3", ".flac", ".m4a", ".aac", ".ogg", ".oga", ".opus", ".wma", ".wav", ".aif", ".aiff" };
+
+        // Whether the user can jump around in the file: not in a stream, not in SID music (the plugin only
+        // plays on) and not in anything else LibVLC reports as not seekable. When it is false the seek
+        // bar is read-only (it still shows the progress) and frame stepping and trimming are off.
+        private bool CanSeek => !_isStream && !SidPluginSetup.IsSidFile(_filePath) && _vlcSeekable;
+
+        private void ApplySeekState()
+        {
+            trkSeek.Enabled = CanSeek;
+        }
 
         // Audio files do not open in full screen mode, even when the setting asks for it for video.
         // SID music has no picture either.
@@ -469,7 +490,7 @@ namespace SwewolfMediaPlayer
                 TogglePlayPause();
                 return true;
             }
-            if (keyData is Keys.Left or Keys.Right && _paused && !_isStream)
+            if (keyData is Keys.Left or Keys.Right && _paused && CanSeek)
             {
                 StepFrame(keyData == Keys.Right ? 1 : -1);
                 return true;
@@ -533,7 +554,7 @@ namespace SwewolfMediaPlayer
         public bool PreFilterMessage(ref Message m)
         {
             const int WM_MOUSEWHEEL = 0x020A;
-            if (m.Msg != WM_MOUSEWHEEL || !_paused || _isStream || _trimming || ActiveForm != this)
+            if (m.Msg != WM_MOUSEWHEEL || !_paused || !CanSeek || _trimming || ActiveForm != this)
             {
                 return false;
             }
@@ -561,7 +582,7 @@ namespace SwewolfMediaPlayer
         // step forward natively, and this way both directions behave the same.
         private void StepFrame(int direction)
         {
-            if (_player == null || _isStream)
+            if (_player == null || !CanSeek)
             {
                 return;
             }
@@ -1445,7 +1466,7 @@ namespace SwewolfMediaPlayer
                                 TogglePlayPause();
                             }
                         }
-                        else if (!_isStream)
+                        else if (CanSeek)
                         {
                             // Stay a little before the end, so playback does not end by itself.
                             SeekTo(command == APPCOMMAND_MEDIA_PREVIOUSTRACK ? 0 : Math.Max(_lengthMs - 100, 0));

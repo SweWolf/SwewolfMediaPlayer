@@ -52,8 +52,8 @@ namespace SwewolfMediaPlayer
 
         private void menuControls_Opening(object? sender, CancelEventArgs e)
         {
-            // A stream has no file to trim.
-            mnuShowTrim.Enabled = !_isStream && !_trimming;
+            // A stream has no file to trim, and neither has a file that cannot be searched (SID music).
+            mnuShowTrim.Enabled = CanSeek && !_trimming;
             mnuShowTrim.Checked = _trimVisible;
             mnuShowControlPanel.Checked = _panelVisible;
         }
@@ -362,7 +362,7 @@ namespace SwewolfMediaPlayer
         private async void btnTrim_Click(object? sender, EventArgs e)
         {
             MediaPlayer? player = _player;
-            if (player == null || _trimming || _isStream || _restoringEnd || !TryReadTrim(out TrimRequest request))
+            if (player == null || _trimming || !CanSeek || _restoringEnd || !TryReadTrim(out TrimRequest request))
             {
                 return;
             }
