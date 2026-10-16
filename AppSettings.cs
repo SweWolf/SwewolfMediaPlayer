@@ -9,6 +9,7 @@
 //   2026-10-15  StartFullScreen and CheckForUpdatesOnStartup (both on by default).
 //   2026-10-16  StartFullScreen renamed StartFullScreenForVideo: audio files never open in full screen
 //               (an old settings.json value is ignored, the default is on).
+//   2026-10-16  ShowSeekBarThumbnails (on by default).
 
 using System.Text.Json;
 
@@ -24,6 +25,9 @@ namespace SwewolfMediaPlayer
 
         // Whether the player opens video files in full screen mode (audio files never do).
         public bool StartFullScreenForVideo { get; set; } = true;
+
+        // Whether a small picture of the video pops up while the pointer is on the seek bar.
+        public bool ShowSeekBarThumbnails { get; set; } = true;
 
         // Whether the main window asks GitHub for a newer version when it starts.
         public bool CheckForUpdatesOnStartup { get; set; } = true;

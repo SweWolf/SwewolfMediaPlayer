@@ -311,6 +311,8 @@ namespace SwewolfMediaPlayer
             trkSeek.Scroll += trkSeek_Scroll;
             trkSeek.MouseDown += trkSeek_MouseDown;
             trkSeek.MouseUp += trkSeek_MouseUp;
+            trkSeek.MouseMove += trkSeek_MouseMove;
+            trkSeek.MouseLeave += trkSeek_MouseLeave;
             // 
             // lblTime
             // 

@@ -53,6 +53,8 @@
 //               black screen. Needs the NuGet package TagLibSharp.
 //   2026-10-12  Save Frame saves the cover art (SaveCoverArt) when an audio file shows it.
 //   2026-10-16  Full screen at start is for video files only (IsAudioFile, setting StartFullScreenForVideo).
+//   2026-10-16  Thumbnail picture above the seek bar while pointing at it (MediaPlayerForm.Thumbnails.cs,
+//               FrameThumbnailer.cs; needs FFmpeg).
 //   2026-10-16  SID files: the plugin is copied from the user's VLC the first time (see
 //               MediaPlayerForm.SidSupport.cs and SidPluginSetup.cs); PreloadAsync sets the plugin path.
 
@@ -331,6 +333,7 @@ namespace SwewolfMediaPlayer
             }
 
             _audioStateApplied = 0;
+            ResetThumbnails();
             ShowCoverArt();
             _media = new Media(_libVlc, _filePath, _isStream ? FromType.FromLocation : FromType.FromPath);
             _player.Play(_media);
@@ -412,6 +415,7 @@ namespace SwewolfMediaPlayer
             EndPreview(false);
             _previewTimer?.Dispose();
             _previewTimer = null;
+            DisposeThumbnails();
             Application.RemoveMessageFilter(this);
             _rightClickTimer?.Dispose();
             _rightClickTimer = null;
@@ -1507,6 +1511,14 @@ namespace SwewolfMediaPlayer
     {
         private const int WM_LBUTTONDOWN = 0x0201;
 
+        // The position (0 to 1) of the bar under a pointer at x (in the control's pixels).
+        public double RatioAt(int x)
+        {
+            int pad = LogicalToDeviceUnits(8);
+            int channel = Math.Max(Width - 2 * pad, 1);
+            return Math.Clamp((x - pad) / (double)channel, 0, 1);
+        }
+
         protected override void WndProc(ref Message m)
         {
             if (m.Msg == WM_LBUTTONDOWN && Orientation == Orientation.Horizontal)
@@ -1519,8 +1531,7 @@ namespace SwewolfMediaPlayer
                 // A click on the thumb itself starts a normal drag.
                 if (Math.Abs(x - thumbX) > pad)
                 {
-                    double ratio = Math.Clamp((x - pad) / (double)channel, 0, 1);
-                    Value = Minimum + (int)Math.Round(ratio * (Maximum - Minimum));
+                    Value = Minimum + (int)Math.Round(RatioAt(x) * (Maximum - Minimum));
                     OnScroll(EventArgs.Empty);
                 }
             }

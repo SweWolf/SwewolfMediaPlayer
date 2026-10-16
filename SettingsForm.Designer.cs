@@ -17,6 +17,7 @@ namespace SwewolfMediaPlayer
             toolTip = new ToolTip(components);
             grpPlayer = new GroupBox();
             chkStartFullScreen = new CheckBox();
+            chkSeekThumbnails = new CheckBox();
             grpUpdate = new GroupBox();
             cboNewVersionCheck = new ComboBox();
             lblNewVersionCheck = new Label();
@@ -35,9 +36,10 @@ namespace SwewolfMediaPlayer
             // grpPlayer
             //
             grpPlayer.Controls.Add(chkStartFullScreen);
+            grpPlayer.Controls.Add(chkSeekThumbnails);
             grpPlayer.Location = new Point(12, 12);
             grpPlayer.Name = "grpPlayer";
-            grpPlayer.Size = new Size(360, 58);
+            grpPlayer.Size = new Size(360, 84);
             grpPlayer.TabIndex = 0;
             grpPlayer.TabStop = false;
             grpPlayer.Text = "Player";
@@ -53,11 +55,22 @@ namespace SwewolfMediaPlayer
             toolTip.SetToolTip(chkStartFullScreen, "Open every video file in full screen mode, whether it is opened from the main window or from the command line. Audio files never open in full screen mode. Press Esc to leave full screen mode.");
             chkStartFullScreen.UseVisualStyleBackColor = true;
             //
+            // chkSeekThumbnails
+            //
+            chkSeekThumbnails.AutoSize = true;
+            chkSeekThumbnails.Location = new Point(10, 50);
+            chkSeekThumbnails.Name = "chkSeekThumbnails";
+            chkSeekThumbnails.Size = new Size(240, 19);
+            chkSeekThumbnails.TabIndex = 1;
+            chkSeekThumbnails.Text = "Show &Thumbnail Previews on the Seek Bar";
+            toolTip.SetToolTip(chkSeekThumbnails, "Show a small picture of the video at the pointer while you point at the seek bar. Video files only. It needs FFmpeg (ffmpeg.exe in the program folder or in the PATH); without it nothing is shown.");
+            chkSeekThumbnails.UseVisualStyleBackColor = true;
+            //
             // grpUpdate
             //
             grpUpdate.Controls.Add(cboNewVersionCheck);
             grpUpdate.Controls.Add(lblNewVersionCheck);
-            grpUpdate.Location = new Point(12, 82);
+            grpUpdate.Location = new Point(12, 108);
             grpUpdate.Name = "grpUpdate";
             grpUpdate.Size = new Size(360, 90);
             grpUpdate.TabIndex = 1;
@@ -85,7 +98,7 @@ namespace SwewolfMediaPlayer
             // btnOK
             //
             btnOK.Anchor = AnchorStyles.Bottom | AnchorStyles.Right;
-            btnOK.Location = new Point(216, 190);
+            btnOK.Location = new Point(216, 216);
             btnOK.Name = "btnOK";
             btnOK.Size = new Size(75, 27);
             btnOK.TabIndex = 2;
@@ -97,7 +110,7 @@ namespace SwewolfMediaPlayer
             //
             btnCancel.Anchor = AnchorStyles.Bottom | AnchorStyles.Right;
             btnCancel.DialogResult = DialogResult.Cancel;
-            btnCancel.Location = new Point(297, 190);
+            btnCancel.Location = new Point(297, 216);
             btnCancel.Name = "btnCancel";
             btnCancel.Size = new Size(75, 27);
             btnCancel.TabIndex = 3;
@@ -111,7 +124,7 @@ namespace SwewolfMediaPlayer
             AutoScaleDimensions = new SizeF(7F, 15F);
             AutoScaleMode = AutoScaleMode.Font;
             CancelButton = btnCancel;
-            ClientSize = new Size(384, 229);
+            ClientSize = new Size(384, 255);
             ControlBox = false;
             Controls.Add(grpPlayer);
             Controls.Add(grpUpdate);
@@ -135,6 +148,7 @@ namespace SwewolfMediaPlayer
         private ToolTip toolTip;
         private GroupBox grpPlayer;
         private CheckBox chkStartFullScreen;
+        private CheckBox chkSeekThumbnails;
         private GroupBox grpUpdate;
         private ComboBox cboNewVersionCheck;
         private Label lblNewVersionCheck;
