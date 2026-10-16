@@ -52,6 +52,8 @@
 //   2026-10-12  Audio files show their embedded cover art (ShowCoverArt, picCover) instead of a
 //               black screen. Needs the NuGet package TagLibSharp.
 //   2026-10-12  Save Frame saves the cover art (SaveCoverArt) when an audio file shows it.
+//   2026-10-16  SID files: the plugin is copied from the user's VLC the first time (see
+//               MediaPlayerForm.SidSupport.cs and SidPluginSetup.cs); PreloadAsync sets the plugin path.
 
 using System.ComponentModel;
 using System.Drawing.Drawing2D;
@@ -76,6 +78,7 @@ namespace SwewolfMediaPlayer
         {
             return _loadTask ??= Task.Run(() =>
             {
+                SidPluginSetup.ConfigurePluginPath();
                 Core.Initialize();
                 _libVlc = new LibVLC();
             });
@@ -188,7 +191,7 @@ namespace SwewolfMediaPlayer
                 player.Stop();
                 oldMedia?.Dispose();
             });
-            if (_player == player && !IsDisposed)
+            if (_player == player && !IsDisposed && await EnsureSidSupportAsync(false))
             {
                 StartMedia();
             }
@@ -228,6 +231,20 @@ namespace SwewolfMediaPlayer
             }
 
             // The window may have been closed while LibVLC was loading.
+            if (IsDisposed || _libVlc == null)
+            {
+                return;
+            }
+
+            // A SID file needs a plugin from VLC the first time (SidPluginSetup).
+            if (!await EnsureSidSupportAsync(true))
+            {
+                if (!IsDisposed)
+                {
+                    Close();
+                }
+                return;
+            }
             if (IsDisposed || _libVlc == null)
             {
                 return;
