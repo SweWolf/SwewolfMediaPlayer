@@ -6,6 +6,7 @@
 //
 // History:
 //   2026-10-16  First version.
+//   2026-10-16  The next tune starts by itself 3 seconds after a tune has played to its known length.
 
 using LibVLCSharp.Shared;
 
@@ -15,18 +16,18 @@ namespace SwewolfMediaPlayer
     {
         private IconButton? btnPrevTune;
         private IconButton? btnNextTune;
-        private int _seekLeftWithoutTunes;   // where the seek bar starts when the tune buttons are hidden
 
         private int _tuneCount;   // 0 = not known yet or the file has one tune
         private int _tuneIndex;   // the tune that plays, from 0 (the same number LibVLC uses for its title)
         private bool _tuneChecked;   // the number of tunes has been read from LibVLC
+        private bool _tuneEndHandled;   // the end of this tune has been dealt with (so Play afterwards does not repeat it)
+        private long _tuneAdvanceAtTicks;   // when the next tune starts (Environment.TickCount64), 0 = not waiting
         private long?[]? _tuneLengths;
 
         private void InitTuneControls()
         {
             btnPrevTune = NewTuneButton(IconKind.PreviousTune, "Previous Tune (Page Up)", () => ChangeTune(_tuneIndex - 1));
             btnNextTune = NewTuneButton(IconKind.NextTune, "Next Tune (Page Down)", () => ChangeTune(_tuneIndex + 1));
-            _seekLeftWithoutTunes = trkSeek.Left;
         }
 
         private IconButton NewTuneButton(IconKind icon, string tip, Action click)
@@ -53,6 +54,8 @@ namespace SwewolfMediaPlayer
             _tuneCount = 0;
             _tuneIndex = 0;
             _tuneChecked = false;
+            _tuneEndHandled = false;
+            _tuneAdvanceAtTicks = 0;
             _tuneLengths = null;
             ShowTuneControls(false);
             Text = TitleBase();
@@ -66,6 +69,7 @@ namespace SwewolfMediaPlayer
         // Called by the timer: reads how many tunes the file has once LibVLC knows it.
         private void CheckTunes()
         {
+            CheckTuneEnd();
             if (_tuneChecked || _player == null || _isStream || !_player.IsPlaying || !SidPluginSetup.IsSidFile(_filePath))
             {
                 return;
@@ -95,13 +99,42 @@ namespace SwewolfMediaPlayer
                 return;
             }
 
-            int gap = LogicalToDeviceUnits(6);
-            btnPrevTune.Left = btnSaveFrame.Right + gap;
-            btnNextTune.Left = btnPrevTune.Right + gap;
             btnPrevTune.Visible = btnNextTune.Visible = show;
+            LayoutControlBar();
+        }
 
-            // The seek bar keeps its right edge and gives up the room for the buttons.
-            int left = show ? btnNextTune.Right + LogicalToDeviceUnits(8) : _seekLeftWithoutTunes;
+        // The Save Frame button is only useful when there is a picture to save: a video, or an audio
+        // file that shows its cover art. SID music and audio without a picture have none.
+        private void UpdateSaveFrameButton()
+        {
+            btnSaveFrame.Visible = !IsAudioFile(_filePath) || picCover.Visible;
+            LayoutControlBar();
+        }
+
+        // The buttons left of the seek bar follow each other without gaps for hidden ones, and the
+        // seek bar takes the rest (it keeps its right edge).
+        private void LayoutControlBar()
+        {
+            if (btnPrevTune == null || btnNextTune == null)
+            {
+                return;
+            }
+
+            int gap = LogicalToDeviceUnits(6);
+            int x = btnStop.Right;
+            if (btnSaveFrame.Visible)
+            {
+                btnSaveFrame.Left = x + gap;
+                x = btnSaveFrame.Right;
+            }
+            if (btnPrevTune.Visible)
+            {
+                btnPrevTune.Left = x + gap;
+                btnNextTune.Left = btnPrevTune.Right + gap;
+                x = btnNextTune.Right;
+            }
+
+            int left = x + LogicalToDeviceUnits(8);
             trkSeek.SetBounds(left, trkSeek.Top, trkSeek.Right - left, trkSeek.Height);
         }
 
@@ -129,8 +162,63 @@ namespace SwewolfMediaPlayer
 
             player.Title = index;
             _tuneIndex = index;
+            _tuneEndHandled = false;
+            _tuneAdvanceAtTicks = 0;
             _stepTimeMs = -1;
             ApplyTune();
+        }
+
+        // A tune that has played to its known length stops (silence), and 3 seconds later the next one
+        // starts. After the last tune the "When the Video Ends" option decides: Repeat starts again with
+        // the first tune, Close Player closes the window, the others leave the player paused. A tune with
+        // an unknown length plays on until the user chooses another.
+        private void CheckTuneEnd()
+        {
+            MediaPlayer? player = _player;
+            if (_tuneCount < 2 || player == null || _restoringEnd)
+            {
+                return;
+            }
+
+            if (_tuneAdvanceAtTicks != 0)
+            {
+                if (Environment.TickCount64 >= _tuneAdvanceAtTicks)
+                {
+                    _tuneAdvanceAtTicks = 0;
+                    AdvanceTune(player);
+                }
+                return;
+            }
+
+            if (_tuneEndHandled || _knownLengthMs <= 0 || !player.IsPlaying || player.Time < _knownLengthMs)
+            {
+                return;
+            }
+
+            _tuneEndHandled = true;
+            player.SetPause(true);
+            _tuneAdvanceAtTicks = Environment.TickCount64 + 3000;
+        }
+
+        private void AdvanceTune(MediaPlayer player)
+        {
+            int next = _tuneIndex + 1;
+            if (next >= _tuneCount)
+            {
+                if (_whenEnds == EndAction.ClosePlayer)
+                {
+                    Close();
+                    return;
+                }
+                if (_whenEnds != EndAction.Repeat)
+                {
+                    return;   // stays paused at the end of the last tune
+                }
+                next = 0;
+            }
+
+            ChangeTune(next);
+            player.SetPause(false);
         }
 
         private void AddTuneMenu()

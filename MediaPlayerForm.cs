@@ -55,6 +55,7 @@
 //   2026-10-16  Full screen at start is for video files only (IsAudioFile, setting StartFullScreenForVideo).
 //   2026-10-16  Thumbnail picture above the seek bar while pointing at it (MediaPlayerForm.Thumbnails.cs,
 //               FrameThumbnailer.cs; needs FFmpeg).
+//   2026-10-16  The Save Frame button is only shown when there is a picture (video, or audio with cover art).
 //   2026-10-16  Files with several tunes (SID): buttons, Page Up/Down and a menu to switch tune (MediaPlayerForm.Tunes.cs).
 //   2026-10-16  CanSeek: SID files and files LibVLC cannot seek in get a read-only seek bar, no frame
 //               stepping (keys, wheel), no media-key jumps and no trimming.
@@ -352,6 +353,7 @@ namespace SwewolfMediaPlayer
             ApplySeekState();
             ResetThumbnails();
             ShowCoverArt();
+            UpdateSaveFrameButton();
             _media = new Media(_libVlc, _filePath, _isStream ? FromType.FromLocation : FromType.FromPath);
             _player.Play(_media);
 
@@ -808,6 +810,8 @@ namespace SwewolfMediaPlayer
                 return;
             }
 
+            _tuneAdvanceAtTicks = 0;   // the user decides now: no automatic next tune
+
             if (_player.State is VLCState.Stopped or VLCState.Ended or VLCState.Error or VLCState.NothingSpecial)
             {
                 RestartPlayback();
@@ -883,7 +887,7 @@ namespace SwewolfMediaPlayer
         // the very last frame is taken with FFmpeg, because LibVLC cannot show the last frames.
         private async void SaveFrame()
         {
-            if (_player == null)
+            if (_player == null || !btnSaveFrame.Visible)
             {
                 return;
             }
@@ -1398,6 +1402,7 @@ namespace SwewolfMediaPlayer
 
         private void btnStop_Click(object? sender, EventArgs e)
         {
+            _tuneAdvanceAtTicks = 0;
             EndPreview(false);
             MediaPlayer? player = _player;
             if (player != null)
