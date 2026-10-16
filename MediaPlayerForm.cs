@@ -55,6 +55,7 @@
 //   2026-10-16  Full screen at start is for video files only (IsAudioFile, setting StartFullScreenForVideo).
 //   2026-10-16  Thumbnail picture above the seek bar while pointing at it (MediaPlayerForm.Thumbnails.cs,
 //               FrameThumbnailer.cs; needs FFmpeg).
+//   2026-10-16  SID files show their length from the song length database (SidSongLengths.cs).
 //   2026-10-16  SID files: the plugin is copied from the user's VLC the first time (see
 //               MediaPlayerForm.SidSupport.cs and SidPluginSetup.cs); PreloadAsync sets the plugin path.
 
@@ -92,6 +93,7 @@ namespace SwewolfMediaPlayer
         private MediaPlayer? _player;
         private Media? _media;
         private long _lengthMs;
+        private long _knownLengthMs;   // SID files: from the song length database, as LibVLC does not know it
         private bool _seeking;
         private string? _lastSaveFolder;
         private int _lastSubtitleTrack = -1;
@@ -333,10 +335,28 @@ namespace SwewolfMediaPlayer
             }
 
             _audioStateApplied = 0;
+            _knownLengthMs = 0;
             ResetThumbnails();
             ShowCoverArt();
             _media = new Media(_libVlc, _filePath, _isStream ? FromType.FromLocation : FromType.FromPath);
             _player.Play(_media);
+
+            if (!_isStream && SidPluginSetup.IsSidFile(_filePath))
+            {
+                _ = ShowSidLengthAsync(_filePath);
+            }
+        }
+
+        // LibVLC cannot tell how long a SID tune is: look it up (SidSongLengths). An unknown length
+        // is left blank. Only the time label and the progress bar use it, not seeking or trimming.
+        private async Task ShowSidLengthAsync(string path)
+        {
+            long? length = await SidSongLengths.FindLengthMsAsync(path);
+            if (length is > 0 && !IsDisposed && path == _filePath && _lengthMs <= 0)
+            {
+                _knownLengthMs = length.Value;
+                UpdateTime(_player?.Time ?? 0);
+            }
         }
 
         // An audio file has no picture of its own, so LibVLC shows black. If the file has embedded
@@ -731,12 +751,13 @@ namespace SwewolfMediaPlayer
         private void UpdateTime(long timeMs)
         {
             // A stream has no real length (a live stream reports a fixed window): show only the time.
-            lblTime.Text = _isStream || _lengthMs <= 0
+            long length = _lengthMs > 0 ? _lengthMs : _knownLengthMs;
+            lblTime.Text = _isStream || length <= 0
                 ? FormatTime(timeMs, _paused)
-                : $"{FormatTime(timeMs, _paused)} / {FormatTime(_lengthMs, false)}";
-            if (!_seeking && !_isStream && _lengthMs > 0)
+                : $"{FormatTime(timeMs, _paused)} / {FormatTime(length, false)}";
+            if (!_seeking && !_isStream && length > 0)
             {
-                trkSeek.Value = (int)Math.Clamp(timeMs * trkSeek.Maximum / _lengthMs, 0, trkSeek.Maximum);
+                trkSeek.Value = (int)Math.Clamp(timeMs * trkSeek.Maximum / length, 0, trkSeek.Maximum);
             }
         }
 
