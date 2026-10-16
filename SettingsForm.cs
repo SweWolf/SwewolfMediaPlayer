@@ -2,6 +2,7 @@
 //
 // History:
 //   2026-10-15  First version: Start Player in Full Screen Mode, Check for New Version at Startup.
+//   2026-10-16  The full screen option is for video files only.
 
 namespace SwewolfMediaPlayer
 {
@@ -21,7 +22,7 @@ namespace SwewolfMediaPlayer
         private void SettingsForm_Load(object? sender, EventArgs e)
         {
             AppSettings settings = AppSettings.Load();
-            chkStartFullScreen.Checked = settings.StartFullScreen;
+            chkStartFullScreen.Checked = settings.StartFullScreenForVideo;
             cboNewVersionCheck.SelectedItem = settings.CheckForUpdatesOnStartup ? "Yes" : "No";
         }
 
@@ -29,7 +30,7 @@ namespace SwewolfMediaPlayer
         {
             // Load again, so nothing else in the file (e.g. When the Video Ends) is overwritten.
             AppSettings settings = AppSettings.Load();
-            settings.StartFullScreen = chkStartFullScreen.Checked;
+            settings.StartFullScreenForVideo = chkStartFullScreen.Checked;
             settings.CheckForUpdatesOnStartup = cboNewVersionCheck.SelectedItem?.ToString() != "No";
             settings.Save();
 

@@ -52,6 +52,7 @@
 //   2026-10-12  Audio files show their embedded cover art (ShowCoverArt, picCover) instead of a
 //               black screen. Needs the NuGet package TagLibSharp.
 //   2026-10-12  Save Frame saves the cover art (SaveCoverArt) when an audio file shows it.
+//   2026-10-16  Full screen at start is for video files only (IsAudioFile, setting StartFullScreenForVideo).
 //   2026-10-16  SID files: the plugin is copied from the user's VLC the first time (see
 //               MediaPlayerForm.SidSupport.cs and SidPluginSetup.cs); PreloadAsync sets the plugin path.
 
@@ -209,7 +210,7 @@ namespace SwewolfMediaPlayer
         {
             base.OnShown(e);
 
-            if (_settings.StartFullScreen)
+            if (_settings.StartFullScreenForVideo && !IsAudioFile(_filePath))
             {
                 SetFullScreen(true);
             }
@@ -338,6 +339,14 @@ namespace SwewolfMediaPlayer
         // An audio file has no picture of its own, so LibVLC shows black. If the file has embedded
         // cover art (e.g. an MP3 with an album picture), show that over the video area instead.
         private static readonly string[] AudioExtensions = { ".mp3", ".flac", ".m4a", ".aac", ".ogg", ".oga", ".opus", ".wma", ".wav", ".aif", ".aiff" };
+
+        // Audio files do not open in full screen mode, even when the setting asks for it for video.
+        // SID music has no picture either.
+        private bool IsAudioFile(string path)
+        {
+            return !_isStream && (SidPluginSetup.IsSidFile(path)
+                || AudioExtensions.Contains(Path.GetExtension(path), StringComparer.OrdinalIgnoreCase));
+        }
 
         private void ShowCoverArt()
         {

@@ -7,6 +7,8 @@
 // History:
 //   2026-10-13  First version: WhenVideoEnds.
 //   2026-10-15  StartFullScreen and CheckForUpdatesOnStartup (both on by default).
+//   2026-10-16  StartFullScreen renamed StartFullScreenForVideo: audio files never open in full screen
+//               (an old settings.json value is ignored, the default is on).
 
 using System.Text.Json;
 
@@ -20,8 +22,8 @@ namespace SwewolfMediaPlayer
         // 1 = show a black screen, 2 = repeat.
         public int WhenVideoEnds { get; set; }
 
-        // Whether the player opens in full screen mode.
-        public bool StartFullScreen { get; set; } = true;
+        // Whether the player opens video files in full screen mode (audio files never do).
+        public bool StartFullScreenForVideo { get; set; } = true;
 
         // Whether the main window asks GitHub for a newer version when it starts.
         public bool CheckForUpdatesOnStartup { get; set; } = true;

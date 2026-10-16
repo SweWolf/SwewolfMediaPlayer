@@ -47,10 +47,10 @@ namespace SwewolfMediaPlayer
             chkStartFullScreen.AutoSize = true;
             chkStartFullScreen.Location = new Point(10, 24);
             chkStartFullScreen.Name = "chkStartFullScreen";
-            chkStartFullScreen.Size = new Size(190, 19);
+            chkStartFullScreen.Size = new Size(280, 19);
             chkStartFullScreen.TabIndex = 0;
-            chkStartFullScreen.Text = "Start Player in &Full Screen Mode";
-            toolTip.SetToolTip(chkStartFullScreen, "Open every video in full screen mode, whether it is opened from the main window or from the command line. Press Esc to leave full screen mode.");
+            chkStartFullScreen.Text = "Start Player in &Full Screen Mode for Video Files";
+            toolTip.SetToolTip(chkStartFullScreen, "Open every video file in full screen mode, whether it is opened from the main window or from the command line. Audio files never open in full screen mode. Press Esc to leave full screen mode.");
             chkStartFullScreen.UseVisualStyleBackColor = true;
             //
             // grpUpdate
