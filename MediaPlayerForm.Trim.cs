@@ -50,6 +50,13 @@ namespace SwewolfMediaPlayer
 
         // ---- Showing and hiding the group box ----
 
+        // The "More Options" button opens the menu of the control bar (the same one as the right-click)
+        // above itself, with its right edge at the right edge of the button.
+        private void btnMore_Click(object? sender, EventArgs e)
+        {
+            menuControls.Show(btnMore.PointToScreen(new Point(btnMore.Width, 0)), ToolStripDropDownDirection.AboveLeft);
+        }
+
         private void menuControls_Opening(object? sender, CancelEventArgs e)
         {
             // A stream has no file to trim, and neither has a file that cannot be searched (SID music).
@@ -90,7 +97,7 @@ namespace SwewolfMediaPlayer
         // control bar (and the trim group box, when it is shown) no longer fits.
         private void UpdateMinimumSize()
         {
-            int width = LogicalToDeviceUnits(_trimVisible ? 880 : 800);
+            int width = LogicalToDeviceUnits(_trimVisible ? 880 : 840);
             int height = LogicalToDeviceUnits(200) + (_trimVisible ? grpTrim.Height : 0) + (_panelVisible ? grpControlPanel.Height : 0);
             MinimumSize = SizeFromClientSize(new Size(width, height));
         }

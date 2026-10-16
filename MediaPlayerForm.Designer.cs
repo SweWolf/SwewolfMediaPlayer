@@ -34,6 +34,7 @@ namespace SwewolfMediaPlayer
             btnStop = new IconButton();
             btnSaveFrame = new IconButton();
             btnMute = new IconButton();
+            btnMore = new IconButton();
             trkVolume = new JumpTrackBar();
             txtStartAt = new TextBox();
             btnStartNow = new Button();
@@ -119,7 +120,7 @@ namespace SwewolfMediaPlayer
             btnMute.FlatStyle = FlatStyle.Flat;
             btnMute.ForeColor = Color.FromArgb(230, 230, 230);
             btnMute.Icon = IconKind.Volume;
-            btnMute.Location = new Point(1010, 12);
+            btnMute.Location = new Point(964, 12);
             btnMute.Name = "btnMute";
             btnMute.Size = new Size(40, 32);
             btnMute.TabIndex = 5;
@@ -127,13 +128,28 @@ namespace SwewolfMediaPlayer
             btnMute.UseVisualStyleBackColor = false;
             btnMute.Click += btnMute_Click;
             // 
+            // btnMore
+            // 
+            btnMore.Anchor = AnchorStyles.Top | AnchorStyles.Right;
+            btnMore.BackColor = Color.FromArgb(48, 48, 48);
+            btnMore.FlatStyle = FlatStyle.Flat;
+            btnMore.ForeColor = Color.FromArgb(230, 230, 230);
+            btnMore.Icon = IconKind.More;
+            btnMore.Location = new Point(1126, 12);
+            btnMore.Name = "btnMore";
+            btnMore.Size = new Size(40, 32);
+            btnMore.TabIndex = 7;
+            toolTip.SetToolTip(btnMore, "More Options");
+            btnMore.UseVisualStyleBackColor = false;
+            btnMore.Click += btnMore_Click;
+            // 
             // trkVolume
             // 
             trkVolume.Anchor = AnchorStyles.Top | AnchorStyles.Right;
             trkVolume.AutoSize = false;
             trkVolume.BackColor = Color.FromArgb(32, 32, 32);
             trkVolume.LargeChange = 10;
-            trkVolume.Location = new Point(1056, 12);
+            trkVolume.Location = new Point(1010, 12);
             trkVolume.Maximum = 100;
             trkVolume.Name = "trkVolume";
             trkVolume.Size = new Size(110, 32);
@@ -288,6 +304,7 @@ namespace SwewolfMediaPlayer
             pnlControls.Controls.Add(btnStop);
             pnlControls.Controls.Add(btnSaveFrame);
             pnlControls.Controls.Add(trkSeek);
+            pnlControls.Controls.Add(btnMore);
             pnlControls.Controls.Add(lblTime);
             pnlControls.Controls.Add(btnMute);
             pnlControls.Controls.Add(trkVolume);
@@ -305,7 +322,7 @@ namespace SwewolfMediaPlayer
             trkSeek.Location = new Point(152, 12);
             trkSeek.Maximum = 1000;
             trkSeek.Name = "trkSeek";
-            trkSeek.Size = new Size(684, 32);
+            trkSeek.Size = new Size(638, 32);
             trkSeek.TabIndex = 3;
             trkSeek.TickStyle = TickStyle.None;
             trkSeek.Scroll += trkSeek_Scroll;
@@ -319,7 +336,7 @@ namespace SwewolfMediaPlayer
             lblTime.Anchor = AnchorStyles.Top | AnchorStyles.Right;
             lblTime.ContextMenuStrip = menuControls;
             lblTime.ForeColor = Color.FromArgb(230, 230, 230);
-            lblTime.Location = new Point(844, 12);
+            lblTime.Location = new Point(798, 12);
             lblTime.Name = "lblTime";
             lblTime.Size = new Size(160, 32);
             lblTime.TabIndex = 4;
@@ -488,6 +505,7 @@ namespace SwewolfMediaPlayer
         private JumpTrackBar trkSeek;
         private Label lblTime;
         private IconButton btnMute;
+        private IconButton btnMore;
         private JumpTrackBar trkVolume;
         private GroupBox grpTrim;
         private Label lblStartAt;

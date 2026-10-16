@@ -55,6 +55,7 @@
 //   2026-10-16  Full screen at start is for video files only (IsAudioFile, setting StartFullScreenForVideo).
 //   2026-10-16  Thumbnail picture above the seek bar while pointing at it (MediaPlayerForm.Thumbnails.cs,
 //               FrameThumbnailer.cs; needs FFmpeg).
+//   2026-10-16  A "More Options" button (three dots, right end of the control bar) opens the control bar menu.
 //   2026-10-16  The Save Frame button is only shown when there is a picture (video, or audio with cover art).
 //   2026-10-16  Files with several tunes (SID): buttons, Page Up/Down and a menu to switch tune (MediaPlayerForm.Tunes.cs).
 //   2026-10-16  CanSeek: SID files and files LibVLC cannot seek in get a read-only seek bar, no frame
@@ -1607,7 +1608,7 @@ namespace SwewolfMediaPlayer
 
     // A button that draws its own icon, so it can be filled and take the colors of the dark theme.
     // BackColor is the button color, ForeColor the icon color.
-    internal enum IconKind { Play, Pause, Stop, Camera, Volume, Muted, PreviousTune, NextTune }
+    internal enum IconKind { Play, Pause, Stop, Camera, Volume, Muted, PreviousTune, NextTune, More }
 
     internal sealed class IconButton : Button
     {
@@ -1678,6 +1679,12 @@ namespace SwewolfMediaPlayer
                 case IconKind.PreviousTune:
                     g.FillRectangle(brush, R(0.08f, 0.05f, 0.14f, 0.90f));
                     g.FillPolygon(brush, new[] { P(0.95f, 0.05f), P(0.95f, 0.95f), P(0.30f, 0.5f) });
+                    break;
+                case IconKind.More:
+                    foreach (float cx in new[] { 0.10f, 0.50f, 0.90f })
+                    {
+                        g.FillEllipse(brush, R(cx - 0.12f, 0.38f, 0.24f, 0.24f));
+                    }
                     break;
                 case IconKind.NextTune:
                     g.FillRectangle(brush, R(0.78f, 0.05f, 0.14f, 0.90f));
