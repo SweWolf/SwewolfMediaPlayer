@@ -13,6 +13,7 @@
 //   2026-10-16  SaveResumePoint and ResumeAudioMinMinutes (resume points in the shared library database).
 //   2026-10-16  ResumeWhenOpening (Yes / Ask / No); SaveResumePoint has two values now (the old "none" is the new No).
 //   2026-10-16  ResumeRewindSeconds (default 10).
+//   2026-10-16  Visualization (audio files: "none", or the key of one in MediaPlayerForm.Visualization.cs).
 
 using System.Text.Json;
 
@@ -43,6 +44,9 @@ namespace SwewolfMediaPlayer
 
         // The saved position is this many seconds before the point where the user stopped (0 = the exact point).
         public int ResumeRewindSeconds { get; set; } = 10;
+
+        // The visualization shown while an audio file plays: "none" (the default) or the key of one of them.
+        public string Visualization { get; set; } = "none";
 
         // Whether the main window asks GitHub for a newer version when it starts.
         public bool CheckForUpdatesOnStartup { get; set; } = true;

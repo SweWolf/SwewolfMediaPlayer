@@ -55,6 +55,7 @@
 //   2026-10-16  Full screen at start is for video files only (IsAudioFile, setting StartFullScreenForVideo).
 //   2026-10-16  Thumbnail picture above the seek bar while pointing at it (MediaPlayerForm.Thumbnails.cs,
 //               FrameThumbnailer.cs; needs FFmpeg).
+//   2026-10-16  Visualizations for audio files (MediaPlayerForm.Visualization.cs).
 //   2026-10-16  Escape leaves full screen, then hides the group boxes, then closes the window.
 //   2026-10-16  A "More Options" button (three dots, right end of the control bar) opens the control bar menu.
 //   2026-10-16  The Save Frame button is only shown when there is a picture (video, or audio with cover art).
@@ -272,7 +273,42 @@ namespace SwewolfMediaPlayer
                 return;
             }
 
-            _player = new MediaPlayer(_libVlc);
+            // A visualization needs an engine of its own (see MediaPlayerForm.Visualization.cs).
+            LibVLC engine = _libVlc!;
+            if (ActiveVisualization() != null)
+            {
+                engine = _ownLibVlc = await CreateOwnEngineAsync() ?? engine;
+                if (IsDisposed)
+                {
+                    DisposeOwnEngine();
+                    return;
+                }
+            }
+            AttachPlayer(engine);
+            Application.AddMessageFilter(this);
+
+            // The video window of LibVLC does not pass mouse clicks on to the form, so watch the
+            // right mouse button ourselves and open the menu when it is released over the video.
+            _rightClickTimer = new System.Windows.Forms.Timer { Interval = 30 };
+            _rightClickTimer.Tick += (s, a) =>
+            {
+                CheckRightClick();
+                CheckLeftClick();
+                CheckCursorIdle();
+                CheckPlayerState();
+            };
+            _rightClickTimer.Start();
+
+            _player!.Volume = trkVolume.Value;
+            StartMedia();
+        }
+
+        // Makes the player (on the engine lib) and connects its events and the video window. Used when the window
+        // opens, and again when a new visualization needs a new engine.
+        private void AttachPlayer(LibVLC lib)
+        {
+            _activeLib = lib;
+            _player = new MediaPlayer(lib);
             // Without this the native video window swallows the mouse, and no right-click menu opens.
             _player.EnableMouseInput = false;
             _player.Playing += (s, a) => Post(() =>
@@ -332,28 +368,13 @@ namespace SwewolfMediaPlayer
                 ApplyResume();
             });
             videoView.MediaPlayer = _player;
-            Application.AddMessageFilter(this);
-
-            // The video window of LibVLC does not pass mouse clicks on to the form, so watch the
-            // right mouse button ourselves and open the menu when it is released over the video.
-            _rightClickTimer = new System.Windows.Forms.Timer { Interval = 30 };
-            _rightClickTimer.Tick += (s, a) =>
-            {
-                CheckRightClick();
-                CheckLeftClick();
-                CheckCursorIdle();
-                CheckPlayerState();
-            };
-            _rightClickTimer.Start();
-
-            _player.Volume = trkVolume.Value;
-            StartMedia();
         }
 
         // Opens the file (or stream) and plays it. Also used to open a file again after a trim.
-        private void StartMedia()
+        // restart: the same file starts again (for a new visualization): the library and the resume offer are left alone.
+        private void StartMedia(bool restart = false)
         {
-            if (_player == null || _libVlc == null)
+            if (_player == null || _activeLib == null)
             {
                 return;
             }
@@ -366,8 +387,11 @@ namespace SwewolfMediaPlayer
             ResetThumbnails();
             ShowCoverArt();
             UpdateSaveFrameButton();
-            StartLibrary();   // forget what was counted for the last file; offer to resume
-            _media = new Media(_libVlc, _filePath, _isStream ? FromType.FromLocation : FromType.FromPath);
+            if (!restart)
+            {
+                StartLibrary();   // forget what was counted for the last file; offer to resume
+            }
+            _media = new Media(_activeLib, _filePath, _isStream ? FromType.FromLocation : FromType.FromPath);
             _player.Play(_media);
 
             if (!_isStream && SidPluginSetup.IsSidFile(_filePath))
@@ -421,7 +445,8 @@ namespace SwewolfMediaPlayer
             picCover.Visible = false;
             old?.Dispose();
 
-            if (_isStream || !AudioExtensions.Contains(Path.GetExtension(_filePath), StringComparer.OrdinalIgnoreCase))
+            // A visualization takes the place of the cover art.
+            if (_isStream || ActiveVisualization() != null || !AudioExtensions.Contains(Path.GetExtension(_filePath), StringComparer.OrdinalIgnoreCase))
             {
                 return;
             }
@@ -488,16 +513,19 @@ namespace SwewolfMediaPlayer
             // UI thread can deadlock.
             MediaPlayer? player = _player;
             Media? media = _media;
+            LibVLC? ownEngine = _ownLibVlc;
             _player = null;
             _media = null;
+            _ownLibVlc = null;
             videoView.MediaPlayer = null;
-            if (player != null)
+            if (player != null || ownEngine != null)
             {
                 Task.Run(() =>
                 {
-                    player.Stop();
-                    player.Dispose();
+                    player?.Stop();
+                    player?.Dispose();
                     media?.Dispose();
+                    ownEngine?.Dispose();
                 });
             }
         }
@@ -1355,6 +1383,7 @@ namespace SwewolfMediaPlayer
             subtitles.Enabled = subtitles.DropDownItems.Count > 1;
             menuVideo.Items.Add(subtitles);
             AddTuneMenu();
+            AddVisualizationMenu();
 
             // WinForms sets Cancel when the menu has no items yet, which is the case here.
             e.Cancel = false;

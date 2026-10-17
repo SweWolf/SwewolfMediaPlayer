@@ -57,6 +57,7 @@ namespace SwewolfMediaPlayer
             _tuneChecked = false;
             _tuneEndHandled = false;
             _tuneAdvanceAtTicks = 0;
+            _restoreTune = -1;
             _tuneLengths = null;
             ShowTuneControls(false);
             Text = TitleBase();
@@ -90,6 +91,12 @@ namespace SwewolfMediaPlayer
                 _tuneIndex = Math.Clamp(SidSongLengths.ReadStartSong(_filePath) - 1, 0, count - 1);
                 ShowTuneControls(true);
                 ApplyTune();
+                if (_restoreTune >= 0)
+                {
+                    int tune = _restoreTune;
+                    _restoreTune = -1;
+                    ChangeTune(tune);   // after a restart (new visualization): back to the tune that played
+                }
             }
         }
 
