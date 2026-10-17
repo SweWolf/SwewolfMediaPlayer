@@ -8,7 +8,8 @@ shared with SweWolf File Explorer**. The format and the rules for the files are 
 ## What the player does
 
 - A video or song counts as **read** after it has **played for 60 seconds** (`ReadAfterMs`, to be refined), or when it plays
-  to its end (a short clip counts when about half of it was played). The explorer then shows the file as read.
+  to its end (when about half of it was played). A file that is **60 seconds long or shorter counts as read as soon as it
+  starts to play**, and gets no resume point. The explorer then shows the file as read.
 - From the 60 seconds on, the **position** is saved every ~10 seconds while playing, and when the video is paused or the
   window closes. The next time the file is opened the player offers to resume, as the setting Resume says (Yes: at once,
   Ask: with the question "Do you want to resume from 1:30?", No: never).
@@ -52,5 +53,4 @@ under that path. Moving or renaming a file outside the apps loses its history (m
 ## Not done
 
 - The explorer's percent-watched column (position divided by length, both are in the database).
-- The 60 second rule for very short files is only "played to the end"; refine it if it bothers.
 - Add the feature to a README and `docs/help.md` when those exist.

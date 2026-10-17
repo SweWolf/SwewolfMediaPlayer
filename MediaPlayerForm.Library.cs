@@ -1,6 +1,7 @@
 // MediaPlayerForm.Library.cs: the shared library of SweWolf File Explorer and SweWolf Media Player (LibraryStore.cs).
 //
 // - A file counts as read (the explorer then shows it as read) after it has played for 60 seconds, or to its end.
+//   A file that is 60 seconds long or shorter counts as read as soon as it starts to play (it has no resume point).
 // - From then on the position is saved about every 10 seconds and when the video is paused or the window closes, so the
 //   next time the player offers to resume. The setting "Save Resume Point" says which files get a position.
 // - The file is remembered under _libraryPath: the path of the file, or, for a file the explorer unpacked from an archive
@@ -11,6 +12,7 @@
 //
 // History:
 //   2026-10-16  First version.
+//   2026-10-16  A file of 60 seconds or less is read as soon as it plays; no position is saved for it.
 //   2026-10-16  Resume = No also stops saving positions (read marks are still made).
 //   2026-10-16  The saved position is ResumeRewindSeconds before the point where the user stopped.
 //   2026-10-16  The setting Resume (Yes / Ask / No) says what happens with a saved position; Save Resume Point has no "none" any more.
@@ -41,6 +43,10 @@ namespace SwewolfMediaPlayer
             if (!LibraryActive || SidPluginSetup.IsSidFile(_filePath) || _settings.ResumeWhenOpening == 2)
             {
                 return false;   // Resume = No: nothing is saved
+            }
+            if (_lengthMs > 0 && _lengthMs <= ReadAfterMs)
+            {
+                return false;   // a short clip is watched in one go: there is nothing to resume
             }
             return _settings.SaveResumePoint == 0
                 || !IsAudioFile(_filePath)
@@ -122,7 +128,9 @@ namespace SwewolfMediaPlayer
             }
             _lastTrackTicks = counting ? now : 0;
 
-            if (!_savingPosition && _playedMs >= ReadAfterMs)
+            // A file of 60 seconds or less is read as soon as it plays; a longer one after 60 seconds of playing.
+            bool shortFile = _lengthMs > 0 && _lengthMs <= ReadAfterMs;
+            if (!_savingPosition && (_playedMs >= ReadAfterMs || (shortFile && counting)))
             {
                 _savingPosition = true;
                 MarkReadNow();
