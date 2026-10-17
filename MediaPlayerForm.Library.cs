@@ -1,6 +1,7 @@
 // MediaPlayerForm.Library.cs: the shared library of SweWolf File Explorer and SweWolf Media Player (LibraryStore.cs).
 //
-// - A file counts as read (the explorer then shows it as read) after it has played for 60 seconds, or to its end.
+// - A video file counts as read (the explorer then shows it as read) after it has played for 60 seconds, or to its end.
+//   An audio file counts as read as soon as it plays.
 //   A file that is 60 seconds long or shorter counts as read as soon as it starts to play (it has no resume point).
 // - From then on the position is saved about every 10 seconds and when the video is paused or the window closes, so the
 //   next time the player offers to resume. The setting "Save Resume Point" says which files get a position.
@@ -16,6 +17,8 @@
 //   2026-10-16  Resume = No also stops saving positions (read marks are still made).
 //   2026-10-16  The saved position is ResumeRewindSeconds before the point where the user stopped.
 //   2026-10-16  The setting Resume (Yes / Ask / No) says what happens with a saved position; Save Resume Point has no "none" any more.
+//   2026-10-16  An audio file is read as soon as it plays; the 60 seconds are for video files (an MP4 is a video file).
+//               The resume position of an audio file is still saved only after 60 seconds of playing.
 
 namespace SwewolfMediaPlayer
 {
@@ -127,6 +130,15 @@ namespace SwewolfMediaPlayer
                 _playedMs += Math.Min(now - _lastTrackTicks, 250);   // a stalled timer must not count as playing
             }
             _lastTrackTicks = counting ? now : 0;
+
+            // An audio file (music, SID) is read as soon as it plays: the 60 seconds are for video, which is often started and
+            // left. A video file (an MP4 with a still picture too) follows the rule below. The resume position still waits
+            // for the 60 seconds (_savingPosition).
+            if (!_markedRead && counting && IsAudioFile(_filePath))
+            {
+                _markedRead = true;
+                LibraryStore.SetRead(new[] { _libraryPath }, true);
+            }
 
             // A file of 60 seconds or less is read as soon as it plays; a longer one after 60 seconds of playing.
             bool shortFile = _lengthMs > 0 && _lengthMs <= ReadAfterMs;
