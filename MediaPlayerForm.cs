@@ -55,6 +55,7 @@
 //   2026-10-16  Full screen at start is for video files only (IsAudioFile, setting StartFullScreenForVideo).
 //   2026-10-16  Thumbnail picture above the seek bar while pointing at it (MediaPlayerForm.Thumbnails.cs,
 //               FrameThumbnailer.cs; needs FFmpeg).
+//   2026-10-16  Escape leaves full screen, then hides the group boxes, then closes the window.
 //   2026-10-16  A "More Options" button (three dots, right end of the control bar) opens the control bar menu.
 //   2026-10-16  The Save Frame button is only shown when there is a picture (video, or audio with cover art).
 //   2026-10-16  Files with several tunes (SID): buttons, Page Up/Down and a menu to switch tune (MediaPlayerForm.Tunes.cs).
@@ -558,6 +559,12 @@ namespace SwewolfMediaPlayer
                     SetPanelVisible(false);
                     SetTrimVisible(false);
                 }
+                return true;
+            }
+            // Third: with nothing left to leave or hide, Escape closes the window.
+            if (keyData == Keys.Escape)
+            {
+                Close();
                 return true;
             }
             return base.ProcessCmdKey(ref msg, keyData);
