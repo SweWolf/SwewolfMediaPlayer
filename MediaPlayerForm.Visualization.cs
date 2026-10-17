@@ -1,6 +1,6 @@
 // MediaPlayerForm.Visualization.cs: moving graphics (bars, waves, patterns) in the video area while an audio
 // file plays. LibVLC makes them; the right-click menu has a Visualization entry to pick one, and the choice is
-// remembered (AppSettings.Visualization). Only audio files get the menu entry; video files never show it.
+// not remembered: every window starts without one. Only audio files get the menu entry; video files never show it.
 //
 // LibVLC 3 reads the visualization (--audio-visual) only when its engine is created, not per file. A window
 // that shows one therefore has an engine of its own (_ownLibVlc, a few seconds to start); the other windows
@@ -10,6 +10,7 @@
 //
 // History:
 //   2026-10-16  First version.
+//   2026-10-16  Not remembered between windows: a window always starts without a visualization. Escape turns it off.
 
 using LibVLCSharp.Shared;
 
@@ -29,6 +30,7 @@ namespace SwewolfMediaPlayer
             ("glspectrum", "3D Spectrum", "glspectrum", null),
         };
 
+        private string _visualization = "none";   // the key of the one that is on in this window
         private LibVLC? _ownLibVlc;   // this window's own engine, only while a visualization is on
         private LibVLC? _activeLib;   // the engine of the player (the shared one or _ownLibVlc)
         private int _restoreTune = -1;   // after a new engine: the tune to go back to (SID files)
@@ -42,7 +44,7 @@ namespace SwewolfMediaPlayer
             }
             foreach (var visualization in Visualizations)
             {
-                if (visualization.Key == _settings.Visualization)
+                if (visualization.Key == _visualization)
                 {
                     return visualization;
                 }
@@ -109,24 +111,19 @@ namespace SwewolfMediaPlayer
             foreach (var visualization in Visualizations)
             {
                 string key = visualization.Key;
-                menu.DropDownItems.Add(TrackItem(visualization.Text, key == _settings.Visualization, () => SetVisualization(key)));
+                menu.DropDownItems.Add(TrackItem(visualization.Text, key == _visualization, () => SetVisualization(key)));
             }
             menuVideo.Items.Add(menu);
         }
 
         private void SetVisualization(string key)
         {
-            if (key == _settings.Visualization)
+            if (key == _visualization)
             {
                 return;
             }
 
-            // Save from a fresh copy, so a change made in the Settings window meanwhile is not overwritten.
-            AppSettings settings = AppSettings.Load();
-            settings.Visualization = key;
-            settings.Save();
-            _settings.Visualization = key;
-
+            _visualization = key;
             SwitchEngineAsync();
         }
 

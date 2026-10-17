@@ -56,7 +56,8 @@
 //   2026-10-16  Thumbnail picture above the seek bar while pointing at it (MediaPlayerForm.Thumbnails.cs,
 //               FrameThumbnailer.cs; needs FFmpeg).
 //   2026-10-16  Visualizations for audio files (MediaPlayerForm.Visualization.cs).
-//   2026-10-16  Escape leaves full screen, then hides the group boxes, then closes the window.
+//   2026-10-16  Escape leaves full screen, then hides the group boxes, then turns off a visualization, then closes the window.
+//   2026-10-16  The pointer is hidden again after a change to or from full screen (it stayed visible before).
 //   2026-10-16  A "More Options" button (three dots, right end of the control bar) opens the control bar menu.
 //   2026-10-16  The Save Frame button is only shown when there is a picture (video, or audio with cover art).
 //   2026-10-16  Files with several tunes (SID): buttons, Page Up/Down and a menu to switch tune (MediaPlayerForm.Tunes.cs).
@@ -589,7 +590,13 @@ namespace SwewolfMediaPlayer
                 }
                 return true;
             }
-            // Third: with nothing left to leave or hide, Escape closes the window.
+            // Third: a visualization that is on is turned off.
+            if (keyData == Keys.Escape && ActiveVisualization() != null)
+            {
+                SetVisualization("none");
+                return true;
+            }
+            // Fourth: with nothing left to leave, hide or turn off, Escape closes the window.
             if (keyData == Keys.Escape)
             {
                 Close();
@@ -707,6 +714,12 @@ namespace SwewolfMediaPlayer
             pnlControls.Visible = !fullScreen;
             grpTrim.Visible = _trimVisible && !fullScreen;
             grpControlPanel.Visible = _panelVisible && !fullScreen;
+
+            // Changing the border style makes a new window, which shows the normal pointer again: forget that it was
+            // hidden, and count the change as activity, so the pointer is hidden again after the delay.
+            _cursorHidden = false;
+            videoView.Cursor = Cursors.Default;
+            _lastCursorActivityTicks = Environment.TickCount64;
         }
 
         // LibVLC raises its events on its own threads: hand the work over to the UI thread.
