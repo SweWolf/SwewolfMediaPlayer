@@ -63,6 +63,10 @@
 //   2026-10-16  SID files show their length from the song length database (SidSongLengths.cs).
 //   2026-10-16  SID files: the plugin is copied from the user's VLC the first time (see
 //               MediaPlayerForm.SidSupport.cs and SidPluginSetup.cs); PreloadAsync sets the plugin path.
+//   2026-10-16  Fixed: while the control bar was hidden (full screen) the seek bar was laid out under the Save Frame button,
+//               and S did not save a frame (the Visible getter is false then): _saveFrameShown, _tuneButtonsShown.
+//   2026-10-16  Read marks and resume points in the library shared with SweWolf File Explorer
+//               (MediaPlayerForm.Library.cs, LibraryStore.cs); the constructor takes an optional library path.
 
 using System.ComponentModel;
 using System.Drawing.Drawing2D;
@@ -152,13 +156,16 @@ namespace SwewolfMediaPlayer
             return false;
         }
 
-        public MediaPlayerForm(string filePath)
+        // libraryPath: what the file is called in the library (read marks and resume points, MediaPlayerForm.Library.cs).
+        // It differs from filePath when the explorer has unpacked the file from an archive to play it.
+        public MediaPlayerForm(string filePath, string? libraryPath = null)
         {
             InitializeComponent();
             InitControlPanel();
             InitTuneControls();
             StyleMenu(menuVideo);
             _filePath = filePath;
+            _libraryPath = libraryPath ?? filePath;
             _isStream = TryGetStreamUri(filePath, out Uri? uri);
             Text = _isStream ? uri!.Host : Path.GetFileName(filePath);
             // A stream cannot be seeked or stepped back: the seek bar is of no use.
@@ -185,6 +192,7 @@ namespace SwewolfMediaPlayer
             Media? oldMedia = _media;
             _media = null;
             _filePath = files[0];
+            _libraryPath = files[0];
             _isStream = false;
             Text = Path.GetFileName(_filePath);
             _vlcSeekable = true;
@@ -289,6 +297,7 @@ namespace SwewolfMediaPlayer
                 {
                     UpdateTime(_player.Time);
                 }
+                SavePosition(false);   // where the user paused (after the first 60 seconds of playing)
             });
             _player.Stopped += (s, a) => Post(() =>
             {
@@ -319,6 +328,7 @@ namespace SwewolfMediaPlayer
                     UpdateTime(a.Time);
                 }
                 ApplyAudioState();
+                ApplyResume();
             });
             videoView.MediaPlayer = _player;
             Application.AddMessageFilter(this);
@@ -355,6 +365,7 @@ namespace SwewolfMediaPlayer
             ResetThumbnails();
             ShowCoverArt();
             UpdateSaveFrameButton();
+            StartLibrary();   // forget what was counted for the last file; offer to resume
             _media = new Media(_libVlc, _filePath, _isStream ? FromType.FromLocation : FromType.FromPath);
             _player.Play(_media);
 
@@ -463,6 +474,7 @@ namespace SwewolfMediaPlayer
                 return;
             }
 
+            SavePosition(true);   // before the player is released: where the user stopped
             EndPreview(false);
             _previewTimer?.Dispose();
             _previewTimer = null;
@@ -690,6 +702,7 @@ namespace SwewolfMediaPlayer
         // silently and pause on the last frame it can show. Play then starts from the beginning.
         private async void OnEndReached()
         {
+            LibraryOnEnded();
             MediaPlayer? player = _player;
             if (player != null && !_previewing && _whenEnds == EndAction.ClosePlayer)
             {
@@ -888,7 +901,7 @@ namespace SwewolfMediaPlayer
         // the very last frame is taken with FFmpeg, because LibVLC cannot show the last frames.
         private async void SaveFrame()
         {
-            if (_player == null || !btnSaveFrame.Visible)
+            if (_player == null || !_saveFrameShown)
             {
                 return;
             }
@@ -1212,6 +1225,7 @@ namespace SwewolfMediaPlayer
             }
 
             CheckTunes();
+            TrackLibrary();
 
             if (_isStream && !_videoCheckDone && _player.IsPlaying)
             {

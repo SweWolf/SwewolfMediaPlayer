@@ -472,6 +472,7 @@ namespace SwewolfMediaPlayer
                 txtStartAt.Clear();
                 txtEndAt.Clear();
                 _frameMs = 0;
+                LibraryFileReplaced();
             }
             StartMedia();
             Activate();

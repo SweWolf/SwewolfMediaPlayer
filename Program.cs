@@ -12,6 +12,13 @@ namespace SwewolfMediaPlayer
             // see https://aka.ms/applicationconfiguration.
             ApplicationConfiguration.Initialize();
 
+            // For testing a copy of the player without touching the real library file.
+            string? testDb = Environment.GetEnvironmentVariable("SWEWOLF_LIBRARY_TEST_DB");
+            if (!string.IsNullOrEmpty(testDb))
+            {
+                LibraryStore.MainDbFileOverride = testDb;
+            }
+
             // The app always uses the dark theme (there is no setting for it yet).
 #pragma warning disable WFO5001   // SetColorMode is still marked experimental in .NET 10
             Application.SetColorMode(SystemColorMode.Dark);
@@ -20,12 +27,27 @@ namespace SwewolfMediaPlayer
             // A file or web address on the command line (e.g. "Open with", or a file dropped on the
             // EXE) opens the player at once and skips the main window; the program ends when the
             // player is closed. A file that does not exist is shown in the main window instead.
-            string? path = args.Length > 0 ? args[0].Trim().Trim('"') : null;
+            //
+            // --library-path "<path>" says what the file is called in the library (read marks, resume points): the
+            // explorer passes it when it has unpacked the file from an archive to play it.
+            string? path = null;
+            string? libraryPath = null;
+            for (int i = 0; i < args.Length; i++)
+            {
+                if (args[i].Equals("--library-path", StringComparison.OrdinalIgnoreCase) && i + 1 < args.Length)
+                {
+                    libraryPath = args[++i].Trim().Trim('"');
+                }
+                else if (path == null)
+                {
+                    path = args[i].Trim().Trim('"');
+                }
+            }
             if (!string.IsNullOrEmpty(path))
             {
                 if (MediaPlayerForm.TryGetStreamUri(path, out _) || File.Exists(path))
                 {
-                    Application.Run(new MediaPlayerForm(Path.GetFullPath(path)) { Icon = LoadIcon() });
+                    Application.Run(new MediaPlayerForm(Path.GetFullPath(path), string.IsNullOrEmpty(libraryPath) ? null : libraryPath) { Icon = LoadIcon() });
                     return;
                 }
                 MessageBox.Show($"The file \"{path}\" does not exist.", "SweWolf Media Player",
@@ -41,4 +63,4 @@ namespace SwewolfMediaPlayer
             return stream == null ? null : new Icon(stream);
         }
     }
-}
+}

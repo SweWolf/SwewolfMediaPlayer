@@ -1,68 +1,56 @@
-# Resume Position (specification)
+# Resume Position and Read Marks
 
-Status: **planned, not implemented.** Specified 2026-10-13.
+Status: **built 2026-10-16** (`MediaPlayerForm.Library.cs`, `LibraryStore.cs`). This replaces the first specification
+(a `positions.json` file, a hash of the file as the key, a 90 second rule): the player now uses the **library database
+shared with SweWolf File Explorer**. The format and the rules for the files are in the explorer's `docs/library-db.md`
+(that copy is the master).
 
-When the user closes a video and opens it again, the player offers to continue where they stopped.
+## What the player does
 
-## Setting
+- A video or song counts as **read** after it has **played for 60 seconds** (`ReadAfterMs`, to be refined), or when it plays
+  to its end (a short clip counts when about half of it was played). The explorer then shows the file as read.
+- From the 60 seconds on, the **position** is saved every ~10 seconds while playing, and when the video is paused or the
+  window closes. The next time the file is opened the player offers to resume, as the setting Resume says (Yes: at once,
+  Ask: with the question "Do you want to resume from 1:30?", No: never).
+- **Played time** is real time while the file plays. Paused time and dragging the seek bar do not count, and jumping ahead
+  adds nothing. It starts over each time a file is opened (also after a video ended and starts again).
+- **Before the 60 seconds nothing is written**, and a saved position is left alone: opening a video for a quick look must not
+  overwrite the point where the user really stopped.
+- A saved position is **not offered** when it is less than 10 seconds in, or in the last 30 seconds (or 5 %) of the file,
+  or when the saved length differs from the file's length (the file was changed).
+- A saved position is **cleared** when the video plays to its end (the file stays read) and when a trim replaces the file.
+- No position is saved while a trim runs or a trim preview plays, for streams (web addresses) and for SID music.
 
-A drop-down in the Control Panel, **When Opening a Video I Have Watched Before** (final wording to be
-decided), remembered in `settings.json` like "When the Video Ends":
+## Settings (Tools > Settings > Resume)
 
-| Option | Behavior |
+**Resume** (what happens when a file with a saved position is opened):
+
+| Choice | Behavior |
 |---|---|
-| **Always Ask** (default) | A dialog: "Resume from 12:34, or start from the beginning?" Resume is the default button. |
-| **Always Resume** | Plays from the saved position without asking. |
-| **Never Resume** | Always plays from the beginning, and **no positions are saved** (a real off switch). |
+| Yes | Continue from where you stopped, without asking. |
+| **Ask** (default) | "Do you want to resume from 1:30?" Yes continues, No starts from the beginning. |
+| No | Always start from the beginning, and nothing is saved (the other settings of the group are hidden). |
 
-## Storage
+**Move the Resume Point Back by** N seconds (default 10, 0 or more): the saved position is N seconds before the point where
+the user stopped (never before the start), so there is a little of what came before. Stopping at 2:00 saves 1:50.
 
-- One file for all videos: `%AppData%\SweWolfSoftware\SwewolfMediaPlayer\positions.json`, next to
-  `settings.json`. Nothing is written to the folders that hold the videos.
-- JSON to start with (code like `AppSettings.cs`, readable by hand). Keep the most recent ~500 entries and
-  drop the oldest. If it ever gets slow or large, switch to SQLite: only the load and save code changes.
-- Per video: position (ms), length (ms), last played (date), last known path (information only).
-- A missing or damaged file means "no saved positions". Never show an error for it.
+**Save Resume Point for** (which files get a position):
 
-## Identifying a video
+| Choice | Saves a position for |
+|---|---|
+| Video and Audio Files | every video and audio file |
+| **Video Files and Long Audio Files** (default) | every video file, and audio files of at least N minutes (default 10: podcasts, audio books) |
 
-The key is a small hash of the file, not its path, so renaming the file or its folder, or moving it, does not
-lose the position: the file size plus the first and last 64 KB of the content. The last known path is only
-stored as information. A web address (stream) uses the address as the key. A live stream has nothing to
-resume, so streams are not saved.
+The box for N minutes is only shown for "Video Files and Long Audio Files". With Resume = No the other settings are hidden. Read marks are made in every case.
 
-## When a position is saved
+## Where the file is remembered
 
-Only after the video has **played for 90 seconds in this session** (a constant in the code).
+By the path of the file. When the explorer has unpacked the file from an archive to a temporary folder to play it, it passes
+`--library-path "D:\Videos\Trip.zip\Day 1\clip.mp4"` on the command line: the player plays the temporary file and remembers it
+under that path. Moving or renaming a file outside the apps loses its history (matching moved files is a later idea).
 
-- The 90 seconds is time the video was actually playing. Paused time does not count, and neither does
-  dragging the seek bar: jumping ahead 10 minutes adds nothing.
-- It carries on through pause and resume (60 s, a pause, then 40 s makes 100 s), and starts over each time
-  a video is opened. (`_playingSinceTicks` in `MediaPlayerForm.cs` is a starting point.)
-- **Before the 90 seconds:** nothing is written, and an existing saved position is left alone. Opening a
-  video for a quick look must not overwrite the point where the user really stopped.
-- **After the 90 seconds:** the position is saved every ~10 seconds while playing, and on pause, stop and
-  close (saving only on close loses it if the app crashes). From then on it follows the playback position,
-  wherever the user has dragged to.
-- No position is saved while a trim runs (the file is being replaced), during a trim preview, or when the
-  setting is Never Resume.
+## Not done
 
-## When a saved position is removed
-
-- The video **played to its end** (also if shorter than 90 seconds, so a short clip never keeps a stale
-  point). It then starts from the beginning next time.
-- The file was **replaced by a trim** (the length changed, so the old time no longer fits).
-- The oldest entries, when there are more than ~500.
-
-## When a saved position is offered or used
-
-Only if the video was watched long enough to have one, and the position is more than ~10 seconds in and not
-within the last ~5% (or last 30 seconds), because then the video was basically finished. Otherwise the video
-just plays from the beginning. If the stored length differs from the file's real length, ignore the position.
-
-## Open questions
-
-- Short videos (under 90 s) never get a position. Fine for clips, but a "90 s or 10% of the length,
-  whichever is smaller" rule would cover them too. Keep the plain 90 s unless it turns out to bother.
-- Exact wording of the setting and of the dialog (US spelling, Title Case for the labels).
-- Add the feature to the README and `docs/help.md` when it is built.
+- The explorer's percent-watched column (position divided by length, both are in the database).
+- The 60 second rule for very short files is only "played to the end"; refine it if it bothers.
+- Add the feature to a README and `docs/help.md` when those exist.

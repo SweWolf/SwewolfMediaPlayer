@@ -10,6 +10,9 @@
 //   2026-10-16  StartFullScreen renamed StartFullScreenForVideo: audio files never open in full screen
 //               (an old settings.json value is ignored, the default is on).
 //   2026-10-16  ShowSeekBarThumbnails (on by default).
+//   2026-10-16  SaveResumePoint and ResumeAudioMinMinutes (resume points in the shared library database).
+//   2026-10-16  ResumeWhenOpening (Yes / Ask / No); SaveResumePoint has two values now (the old "none" is the new No).
+//   2026-10-16  ResumeRewindSeconds (default 10).
 
 using System.Text.Json;
 
@@ -28,6 +31,18 @@ namespace SwewolfMediaPlayer
 
         // Whether a small picture of the video pops up while the pointer is on the seek bar.
         public bool ShowSeekBarThumbnails { get; set; } = true;
+
+        // What happens when a file is opened that has a saved resume point: 0 = Yes (continue without asking),
+        // 1 = Ask (the default), 2 = No (start from the beginning).
+        public int ResumeWhenOpening { get; set; } = 1;
+
+        // Which files get a resume point (where you stopped, saved in the library database): 0 = video and audio
+        // files, 1 = video files, and audio files of at least ResumeAudioMinMinutes (the default).
+        public int SaveResumePoint { get; set; } = 1;
+        public int ResumeAudioMinMinutes { get; set; } = 10;
+
+        // The saved position is this many seconds before the point where the user stopped (0 = the exact point).
+        public int ResumeRewindSeconds { get; set; } = 10;
 
         // Whether the main window asks GitHub for a newer version when it starts.
         public bool CheckForUpdatesOnStartup { get; set; } = true;

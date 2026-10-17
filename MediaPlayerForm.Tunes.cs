@@ -7,6 +7,7 @@
 // History:
 //   2026-10-16  First version.
 //   2026-10-16  The next tune starts by itself 3 seconds after a tune has played to its known length.
+//   2026-10-16  LayoutControlBar uses what the buttons were set to (_saveFrameShown, _tuneButtonsShown), not their Visible getter.
 
 using LibVLCSharp.Shared;
 
@@ -94,11 +95,12 @@ namespace SwewolfMediaPlayer
 
         private void ShowTuneControls(bool show)
         {
-            if (btnPrevTune == null || btnNextTune == null || btnPrevTune.Visible == show)
+            if (btnPrevTune == null || btnNextTune == null || _tuneButtonsShown == show)
             {
                 return;
             }
 
+            _tuneButtonsShown = show;
             btnPrevTune.Visible = btnNextTune.Visible = show;
             LayoutControlBar();
         }
@@ -107,9 +109,15 @@ namespace SwewolfMediaPlayer
         // file that shows its cover art. SID music and audio without a picture have none.
         private void UpdateSaveFrameButton()
         {
-            btnSaveFrame.Visible = !IsAudioFile(_filePath) || picCover.Visible;
+            _saveFrameShown = !IsAudioFile(_filePath) || picCover.Visible;
+            btnSaveFrame.Visible = _saveFrameShown;
             LayoutControlBar();
         }
+
+        // What the Visible property of these buttons was set to. Their Visible getter says false while the whole control bar
+        // is hidden (full screen, the pointer idle), and then the seek bar was laid out under the Save Frame button.
+        private bool _saveFrameShown = true;
+        private bool _tuneButtonsShown;
 
         // The buttons left of the seek bar follow each other without gaps for hidden ones, and the
         // seek bar takes the rest (it keeps its right edge).
@@ -122,12 +130,12 @@ namespace SwewolfMediaPlayer
 
             int gap = LogicalToDeviceUnits(6);
             int x = btnStop.Right;
-            if (btnSaveFrame.Visible)
+            if (_saveFrameShown)
             {
                 btnSaveFrame.Left = x + gap;
                 x = btnSaveFrame.Right;
             }
-            if (btnPrevTune.Visible)
+            if (_tuneButtonsShown)
             {
                 btnPrevTune.Left = x + gap;
                 btnNextTune.Left = btnPrevTune.Right + gap;
