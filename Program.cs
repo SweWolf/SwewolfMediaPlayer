@@ -19,6 +19,14 @@ namespace SwewolfMediaPlayer
                 LibraryStore.MainDbFileOverride = testDb;
             }
 
+            // A damaged library file is replaced by LibraryStore (the newest good backup, or a new file): say so.
+            LibraryStore.Repaired += (movedTo, whatNow) => Task.Run(() =>
+                MessageBox.Show($"The file that remembers which files you have opened was damaged. It was moved to:\n{movedTo}\n\n{whatNow}",
+                    "SweWolf Media Player", MessageBoxButtons.OK, MessageBoxIcon.Warning));
+
+            // One backup of the main library file a day (the first start of the day), the last 7 are kept.
+            Task.Run(() => LibraryStore.BackUpMainFile());
+
             // The app always uses the dark theme (there is no setting for it yet).
 #pragma warning disable WFO5001   // SetColorMode is still marked experimental in .NET 10
             Application.SetColorMode(SystemColorMode.Dark);

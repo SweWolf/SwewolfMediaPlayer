@@ -18,6 +18,10 @@ public sealed record LibraryRoute(string DbFile, string Prefix, bool Relative, s
 /// what it knows.
 ///
 /// History:
+///   2026-10-16  A damaged file is also found when a call fails (RepairAfter), not only by the check when it is opened.
+///   2026-10-16  A damaged file is found (quick_check, once per file and run), moved aside as library.corrupt-<date>.db and
+///               replaced (the main file by the newest good backup); event Repaired. BackUpMainFile: one backup a day,
+///               the last 7 kept, in a Backups folder next to the main file.
 ///   2026-10-16  Split out of the explorer's LibraryService. Schema 2: File.Position and File.Length (resume position, ms).
 ///               The main file moved to %AppData%\SweWolfSoftware\Library\library.db (shared by the apps; an old file in
 ///               the explorer's folder is moved there once).
@@ -210,8 +214,13 @@ public static class LibraryStore
 
     // ── The database files ───────────────────────────────────────────────────
 
-    /// <summary>Opens the file of the route (null if it is not there and <paramref name="create"/> is false, or cannot be opened).</summary>
-    public static SqliteConnection? Open(LibraryRoute route, bool create)
+    /// <summary>
+    /// Opens the file of the route (null if it is not there and <paramref name="create"/> is false, or cannot be opened).
+    /// A file that turns out to be damaged is moved aside and replaced first (see <see cref="Repair"/>).
+    /// </summary>
+    public static SqliteConnection? Open(LibraryRoute route, bool create) => Open(route, create, allowRepair: true);
+
+    private static SqliteConnection? Open(LibraryRoute route, bool create, bool allowRepair)
     {
         if (!File.Exists(route.DbFile))
         {
@@ -220,9 +229,10 @@ public static class LibraryStore
             catch { return null; }
         }
 
+        SqliteConnection? connection = null;
         try
         {
-            var connection = new SqliteConnection(new SqliteConnectionStringBuilder
+            connection = new SqliteConnection(new SqliteConnectionStringBuilder
             {
                 DataSource = route.DbFile,
                 Mode = SqliteOpenMode.ReadWriteCreate,
@@ -230,13 +240,180 @@ public static class LibraryStore
                 DefaultTimeout = 5,        // the other app may be writing
             }.ToString());
             connection.Open();
+            CheckOnce(connection, route.DbFile);
             EnsureSchema(connection, route.DbFile);
             return connection;
         }
+        catch (Exception ex) when (allowRepair && IsDamaged(ex))
+        {
+            connection?.Dispose();
+            return Repair(route.DbFile) ? Open(route, create: true, allowRepair: false) : null;
+        }
         catch
         {
+            connection?.Dispose();
             return null;
         }
+    }
+
+    // ── A damaged file ───────────────────────────────────────────────────────
+
+    private sealed class DamagedFileException : Exception { }
+
+    private static readonly HashSet<string> CheckedFiles = new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// A file was found damaged, moved aside and replaced (raised on whatever thread found it): the old file's new name,
+    /// and what was done instead ("restored from the backup of ..." or "a new, empty file was started"). The app tells the user.
+    /// </summary>
+    public static event Action<string, string>? Repaired;
+
+    private static bool IsDamaged(Exception ex) =>
+        ex is DamagedFileException || ex is SqliteException { SqliteErrorCode: 11 or 26 };   // SQLITE_CORRUPT, SQLITE_NOTADB
+
+    /// <summary>
+    /// A database call failed with <paramref name="ex"/>. If the file turns out to be damaged it is replaced (see
+    /// <see cref="Repair"/>) and true is returned; the call itself is lost. Call it from a catch block, after the connection of
+    /// the failed call is closed (an open file cannot be moved).
+    /// </summary>
+    public static bool RepairAfter(Exception ex, string path)
+    {
+        if (!IsDamaged(ex)) return false;
+
+        lock (Gate)
+        {
+            var route = Resolve(path, create: false);
+            return route != null && Repair(route.DbFile);
+        }
+    }
+
+    // SQLite's own quick check, once per file and run: a small file takes a few milliseconds.
+    private static void CheckOnce(SqliteConnection connection, string file)
+    {
+        if (CheckedFiles.Contains(file)) return;
+
+        using (var command = connection.CreateCommand())
+        {
+            command.CommandText = "PRAGMA quick_check(1)";
+            if (!"ok".Equals(command.ExecuteScalar() as string, StringComparison.OrdinalIgnoreCase))
+                throw new DamagedFileException();
+        }
+        CheckedFiles.Add(file);
+    }
+
+    /// <summary>
+    /// Moves the damaged file aside (library.corrupt-yyyyMMdd-HHmmss.db, in the same folder: nothing is deleted) and puts a
+    /// working one in its place: for the main file the newest backup that is good, otherwise nothing (a new file is made).
+    /// </summary>
+    private static bool Repair(string file)
+    {
+        try
+        {
+            var asideBase = Path.Combine(Path.GetDirectoryName(file)!, $"library.corrupt-{DateTime.Now:yyyyMMdd-HHmmss}");
+            var aside = asideBase + ".db";
+            for (int n = 2; File.Exists(aside); n++) aside = $"{asideBase}-{n}.db";   // two repairs in the same second
+            File.Move(file, aside);
+            foreach (var extra in new[] { "-journal", "-wal", "-shm" })
+                try { File.Delete(file + extra); } catch { }
+            SchemaDone.Remove(file);
+            CheckedFiles.Remove(file);
+
+            string how = "A new, empty file was started.";
+            if (string.Equals(file, MainDbFile, StringComparison.OrdinalIgnoreCase) && RestoreNewestBackup(file) is { } day)
+                how = $"It was restored from the backup of {day}.";
+
+            Repaired?.Invoke(aside, how);
+            return true;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    // ── Backup of the main file ──────────────────────────────────────────────
+
+    private static string BackupFolder(string file) => Path.Combine(Path.GetDirectoryName(file)!, "Backups");
+
+    private static bool IsGood(string file)
+    {
+        try
+        {
+            using var connection = new SqliteConnection(new SqliteConnectionStringBuilder
+            {
+                DataSource = file, Mode = SqliteOpenMode.ReadOnly, Pooling = false, DefaultTimeout = 5,
+            }.ToString());
+            connection.Open();
+            using var command = connection.CreateCommand();
+            command.CommandText = "PRAGMA quick_check(1)";
+            return "ok".Equals(command.ExecuteScalar() as string, StringComparison.OrdinalIgnoreCase);
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    /// <summary>The newest good backup is copied to <paramref name="file"/>. Returns its date as text (yyyy-MM-dd), or null.</summary>
+    private static string? RestoreNewestBackup(string file)
+    {
+        try
+        {
+            var folder = BackupFolder(file);
+            if (!Directory.Exists(folder)) return null;
+
+            foreach (var backup in Directory.GetFiles(folder, "library-*.db").OrderByDescending(f => f, StringComparer.OrdinalIgnoreCase))
+            {
+                if (!IsGood(backup)) continue;
+                File.Copy(backup, file, overwrite: false);
+
+                var name = Path.GetFileNameWithoutExtension(backup);   // library-20261016
+                var day = name.Substring(name.IndexOf('-') + 1);
+                return day.Length == 8 ? $"{day[..4]}-{day[4..6]}-{day[6..]}" : day;
+            }
+        }
+        catch { }
+        return null;
+    }
+
+    /// <summary>
+    /// Once a day (the first time an app starts that day): a copy of the main file in the Backups folder next to it
+    /// (library-yyyyMMdd.db); the last <paramref name="keep"/> are kept. Done with SQLite's backup, so it is a consistent copy
+    /// even while the other app is writing. Call it in the background at startup. The USB files are not backed up: they
+    /// travel with the drive.
+    /// </summary>
+    public static void BackUpMainFile(int keep = 7)
+    {
+        try
+        {
+            lock (Gate)
+            {
+                var file = MainDbFile;
+                if (!File.Exists(file)) return;
+
+                var folder = BackupFolder(file);
+                var today = Path.Combine(folder, $"library-{DateTime.Now:yyyyMMdd}.db");
+                if (File.Exists(today)) return;
+
+                // Opening checks the file (and repairs it): a damaged file must not become today's backup.
+                using var source = Open(new LibraryRoute(file, "", false, ""), create: false);
+                if (source == null) return;
+
+                Directory.CreateDirectory(folder);
+                var temp = today + ".tmp";
+                File.Delete(temp);
+                using (var target = new SqliteConnection(new SqliteConnectionStringBuilder { DataSource = temp, Pooling = false }.ToString()))
+                {
+                    target.Open();
+                    source.BackupDatabase(target);
+                }
+                File.Move(temp, today);
+
+                foreach (var old in Directory.GetFiles(folder, "library-*.db").OrderByDescending(f => f, StringComparer.OrdinalIgnoreCase).Skip(keep))
+                    try { File.Delete(old); } catch { }
+            }
+        }
+        catch { /* no backup today: tried again at the next start */ }
     }
 
     private static void EnsureSchema(SqliteConnection connection, string file)
@@ -365,34 +542,41 @@ public static class LibraryStore
 
         foreach (var group in byFolder)
         {
+            bool written = false;
             lock (Gate)
             {
                 var route = Resolve(group.Key, create: true);
                 if (route == null) continue;
 
-                using var connection = Open(route, create: true);
-                if (connection == null) continue;
-                var key = KeyOf(route, group.Key);
-
-                try
+                Exception? failure = null;
+                using (var connection = Open(route, create: true))
                 {
-                    using var transaction = connection.BeginTransaction();
-                    foreach (var file in group)
+                    if (connection == null) continue;
+                    var key = KeyOf(route, group.Key);
+
+                    try
                     {
-                        using var command = file.Read
-                            ? Command(connection, "INSERT INTO File (Folder, Name, ReadAt) VALUES ($f, $n, $t) ON CONFLICT DO NOTHING",
-                                ("$f", key), ("$n", file.Name), ("$t", DateTime.UtcNow.ToString("o")))
-                            : Command(connection, "DELETE FROM File WHERE Folder = $f AND Name = $n",
-                                ("$f", key), ("$n", file.Name));
-                        command.Transaction = transaction;
-                        command.ExecuteNonQuery();
+                        using var transaction = connection.BeginTransaction();
+                        foreach (var file in group)
+                        {
+                            using var command = file.Read
+                                ? Command(connection, "INSERT INTO File (Folder, Name, ReadAt) VALUES ($f, $n, $t) ON CONFLICT DO NOTHING",
+                                    ("$f", key), ("$n", file.Name), ("$t", DateTime.UtcNow.ToString("o")))
+                                : Command(connection, "DELETE FROM File WHERE Folder = $f AND Name = $n",
+                                    ("$f", key), ("$n", file.Name));
+                            command.Transaction = transaction;
+                            command.ExecuteNonQuery();
+                        }
+                        transaction.Commit();
+                        written = true;
                     }
-                    transaction.Commit();
+                    catch (Exception ex) { failure = ex; }   // write-protected, busy or damaged
                 }
-                catch { continue; }   // write-protected
+
+                if (failure != null) RepairAfter(failure, group.Key);
             }
 
-            FolderWritten?.Invoke(group.Key);
+            if (written) FolderWritten?.Invoke(group.Key);
         }
     }
 
@@ -421,7 +605,11 @@ public static class LibraryStore
                 if (!reader.Read() || reader.IsDBNull(0)) return null;
                 return (reader.GetInt64(0), reader.IsDBNull(1) ? 0 : reader.GetInt64(1));
             }
-            catch { return null; }
+            catch (Exception ex)
+            {
+                RepairAfter(ex, folder);
+                return null;
+            }
         }
     }
 
@@ -452,7 +640,10 @@ public static class LibraryStore
                     ("$p", positionMilliseconds), ("$l", lengthMilliseconds));
                 command.ExecuteNonQuery();
             }
-            catch { /* write-protected, or the file is busy: the next save tries again */ }
+            catch (Exception ex)
+            {
+                RepairAfter(ex, folder);   // otherwise write-protected or busy: the next save tries again
+            }
         }
     }
 
@@ -477,7 +668,10 @@ public static class LibraryStore
                     ("$f", KeyOf(route, folder)), ("$n", name));
                 command.ExecuteNonQuery();
             }
-            catch { }
+            catch (Exception ex)
+            {
+                RepairAfter(ex, folder);
+            }
         }
     }
 }
