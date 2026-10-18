@@ -947,7 +947,12 @@ namespace SwewolfMediaPlayer
         // Saves the frame on screen as a PNG, at the video's own resolution. The file name
         // suggested contains the (approximate) time of the frame. When the video is at its end,
         // the very last frame is taken with FFmpeg, because LibVLC cannot show the last frames.
-        private async void SaveFrame()
+        //
+        // With asPreviewPicture (right-click on the camera button: Set as Preview Picture) the frame is saved as the video's
+        // preview picture for the file explorer: the suggested name is <video name>-poster.png in the folder of the video, the
+        // file gets the Hidden attribute, and the picture the user saved it as is written to the library (the table PreviewPick,
+        // which the explorer reads), so the explorer shows it for this video.
+        private async void SaveFrame(bool asPreviewPicture = false)
         {
             if (_player == null || !_saveFrameShown)
             {
@@ -955,7 +960,7 @@ namespace SwewolfMediaPlayer
             }
 
             // An audio file showing its cover art: save that picture, at its own resolution.
-            if (picCover.Visible && picCover.Image != null)
+            if (!asPreviewPicture && picCover.Visible && picCover.Image != null)
             {
                 SaveCoverArt();
                 return;
@@ -975,13 +980,16 @@ namespace SwewolfMediaPlayer
             TimeSpan t = TimeSpan.FromMilliseconds(Math.Max(timeMs, 0));
             string stamp = $"{(int)t.TotalHours}-{t.Minutes:00}-{t.Seconds:00}-{t.Milliseconds:000}";
 
+            string folder = _isStream ? "" : Path.GetDirectoryName(Path.GetFullPath(_filePath)) ?? "";
             using var dialog = new SaveFileDialog
             {
-                Title = "Save Frame as PNG",
+                Title = asPreviewPicture ? "Set as Preview Picture" : "Save Frame as PNG",
                 Filter = "PNG Image|*.png",
                 DefaultExt = "png",
-                FileName = $"{(_isStream ? "stream" : Path.GetFileNameWithoutExtension(_filePath))}_{stamp}{(atEnd ? "_last" : "")}.png",
-                InitialDirectory = _lastSaveFolder ?? (_isStream ? null : Path.GetDirectoryName(Path.GetFullPath(_filePath))),
+                FileName = asPreviewPicture
+                    ? $"{Path.GetFileNameWithoutExtension(_filePath)}-poster.png"
+                    : $"{(_isStream ? "stream" : Path.GetFileNameWithoutExtension(_filePath))}_{stamp}{(atEnd ? "_last" : "")}.png",
+                InitialDirectory = asPreviewPicture ? folder : _lastSaveFolder ?? (_isStream ? null : folder),
                 OverwritePrompt = true
             };
 
@@ -990,12 +998,24 @@ namespace SwewolfMediaPlayer
                 return;
             }
 
-            _lastSaveFolder = Path.GetDirectoryName(dialog.FileName);
+            if (!asPreviewPicture)
+            {
+                _lastSaveFolder = Path.GetDirectoryName(dialog.FileName);
+            }
+
+            // A hidden poster (the explorer makes them hidden) cannot be written over as it is: the user has just agreed to
+            // replace it, so the attribute goes first and comes back with the new picture.
+            if (asPreviewPicture)
+            {
+                ClearHidden(dialog.FileName);
+            }
+            DateTime started = DateTime.UtcNow;
 
             if (atEnd)
             {
                 if (await SaveLastFrameWithFfmpegAsync(dialog.FileName))
                 {
+                    if (asPreviewPicture) await FinishPreviewPictureAsync(dialog.FileName, started);
                     return;
                 }
                 if (IsDisposed || _player == null)
@@ -1006,6 +1026,7 @@ namespace SwewolfMediaPlayer
                 // FFmpeg is not available, or failed: save what the player can show instead.
                 if (_player.TakeSnapshot(0, dialog.FileName, 0, 0))
                 {
+                    if (asPreviewPicture) await FinishPreviewPictureAsync(dialog.FileName, started);
                     MessageBox.Show(this, "FFmpeg was not found or could not read the video, so the frame closest to the end that the player can show was saved instead. It may be one or two frames before the very last one.", AppName,
                         MessageBoxButtons.OK, MessageBoxIcon.Information);
                     return;
@@ -1013,11 +1034,81 @@ namespace SwewolfMediaPlayer
             }
             else if (_player.TakeSnapshot(0, dialog.FileName, 0, 0))
             {
+                if (asPreviewPicture) await FinishPreviewPictureAsync(dialog.FileName, started);
                 return;
             }
 
+            if (asPreviewPicture)
+            {
+                SetHidden(dialog.FileName);   // an old poster that was there stays hidden
+            }
             MessageBox.Show(this, "The frame could not be saved.", AppName,
                 MessageBoxButtons.OK, MessageBoxIcon.Warning);
+        }
+
+        private static void ClearHidden(string file)
+        {
+            try
+            {
+                if (File.Exists(file)) File.SetAttributes(file, File.GetAttributes(file) & ~FileAttributes.Hidden);
+            }
+            catch { /* the save will say if it cannot write */ }
+        }
+
+        private static void SetHidden(string file)
+        {
+            try
+            {
+                if (File.Exists(file)) File.SetAttributes(file, File.GetAttributes(file) | FileAttributes.Hidden);
+            }
+            catch { /* a file that stays visible is not an error */ }
+        }
+
+        // The frame is saved as the preview picture: hide the file and remember it in the library for this video.
+        // LibVLC writes a snapshot a moment after TakeSnapshot has returned, so the file is waited for (it must have been
+        // written after the save started, and stop growing) before it gets the Hidden attribute.
+        private async Task FinishPreviewPictureAsync(string file, DateTime startedUtc)
+        {
+            long lastLength = -1;
+            for (int i = 0; i < 100; i++)   // at most 5 seconds
+            {
+                try
+                {
+                    var info = new FileInfo(file);
+                    if (info.Exists && info.Length > 0 && info.LastWriteTimeUtc >= startedUtc.AddSeconds(-1))
+                    {
+                        if (info.Length == lastLength) break;   // unchanged since the last look: it is complete
+                        lastLength = info.Length;
+                    }
+                }
+                catch { }
+                await Task.Delay(50);
+            }
+
+            SetHidden(file);
+
+            if (!LibraryStore.SetPreviewChoice(_libraryPath, new LibraryStore.PreviewChoice(false, file)))
+            {
+                MessageBox.Show(this, "The picture was saved, but it could not be remembered for this video in the library (the drive may be write-protected).", AppName,
+                    MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            }
+        }
+
+        // Right-click on the camera button: only for a video file on the disk (not a stream, not a file unpacked from an archive,
+        // not an audio file's cover art), as that is what the explorer shows a preview picture for.
+        private void menuSaveFrame_Opening(object? sender, CancelEventArgs e)
+        {
+            bool available = _saveFrameShown && !_isStream && !(picCover.Visible && picCover.Image != null)
+                && string.Equals(_libraryPath, _filePath, StringComparison.OrdinalIgnoreCase);
+            if (!available)
+            {
+                e.Cancel = true;
+            }
+        }
+
+        private void mnuSetPreviewPicture_Click(object? sender, EventArgs e)
+        {
+            SaveFrame(asPreviewPicture: true);
         }
 
         // Saves the cover art on screen as a PNG (there is no video frame to take).

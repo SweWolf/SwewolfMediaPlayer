@@ -51,6 +51,8 @@ namespace SwewolfMediaPlayer
             trkSeek = new JumpTrackBar();
             lblTime = new Label();
             menuControls = new ContextMenuStrip(components);
+            menuSaveFrame = new ContextMenuStrip(components);
+            mnuSetPreviewPicture = new ToolStripMenuItem();
             mnuShowTrim = new ToolStripMenuItem();
             mnuShowControlPanel = new ToolStripMenuItem();
             grpControlPanel = new GroupBox();
@@ -67,6 +69,7 @@ namespace SwewolfMediaPlayer
             pnlControls.SuspendLayout();
             (trkSeek).BeginInit();
             menuControls.SuspendLayout();
+            menuSaveFrame.SuspendLayout();
             grpTrim.SuspendLayout();
             grpControlPanel.SuspendLayout();
             SuspendLayout();
@@ -112,6 +115,7 @@ namespace SwewolfMediaPlayer
             toolTip.SetToolTip(btnSaveFrame, "Save Frame as PNG (S)");
             btnSaveFrame.UseVisualStyleBackColor = false;
             btnSaveFrame.Click += btnSaveFrame_Click;
+            btnSaveFrame.ContextMenuStrip = menuSaveFrame;
             // 
             // btnMute
             // 
@@ -349,7 +353,21 @@ namespace SwewolfMediaPlayer
             menuControls.Name = "menuControls";
             menuControls.Size = new Size(178, 26);
             menuControls.Opening += menuControls_Opening;
-            // 
+            //
+            // menuSaveFrame (right-click on the camera button)
+            //
+            menuSaveFrame.Items.AddRange(new ToolStripItem[] { mnuSetPreviewPicture });
+            menuSaveFrame.Name = "menuSaveFrame";
+            menuSaveFrame.Size = new Size(210, 26);
+            menuSaveFrame.Opening += menuSaveFrame_Opening;
+            //
+            // mnuSetPreviewPicture
+            //
+            mnuSetPreviewPicture.Name = "mnuSetPreviewPicture";
+            mnuSetPreviewPicture.Size = new Size(209, 22);
+            mnuSetPreviewPicture.Text = "Set as Preview Picture...";
+            mnuSetPreviewPicture.Click += mnuSetPreviewPicture_Click;
+            //
             // mnuShowTrim
             // 
             mnuShowTrim.Name = "mnuShowTrim";
@@ -485,6 +503,7 @@ namespace SwewolfMediaPlayer
             pnlControls.ResumeLayout(false);
             (trkSeek).EndInit();
             menuControls.ResumeLayout(false);
+            menuSaveFrame.ResumeLayout(false);
             grpTrim.ResumeLayout(false);
             grpTrim.PerformLayout();
             grpControlPanel.ResumeLayout(false);
@@ -521,6 +540,8 @@ namespace SwewolfMediaPlayer
         private Button btnPreview;
         private Button btnTrim;
         private ContextMenuStrip menuControls;
+        private ContextMenuStrip menuSaveFrame;
+        private ToolStripMenuItem mnuSetPreviewPicture;
         private ToolStripMenuItem mnuShowTrim;
         private ToolStripMenuItem mnuShowControlPanel;
         private GroupBox grpControlPanel;

@@ -18,6 +18,15 @@ public sealed record LibraryRoute(string DbFile, string Prefix, bool Relative, s
 /// what it knows.
 ///
 /// History:
+///   2026-10-18  Schema 5: table PreviewPick (per file: the picture the user chose as its preview picture, or "none").
+///               GetPreviewChoice / SetPreviewChoice; Forget and Move carry the rows. An older copy ignores the table.
+///   2026-10-17  Schema 4: table FolderPrefs (per folder: the sort order of its list and of its subfolders in the tree).
+///               GetFolderPrefs / SetFolderSort / SetFolderTreeSort; Forget and Move carry the rows. An older copy ignores the table.
+///   2026-10-17  Forget (what the app deleted) and Move (what the app renamed or moved): the rows of a file, or of a folder and
+///               everything below it, are removed or follow it to the new path (also to another database file).
+///   2026-10-17  Schema 3: table Rated (rating 1-10 and expectation 1-10, for files and folders, in a table of its own so
+///               that the File rows keep meaning "opened"). GetRatings / GetMark / SetRating / SetExpectation. An older copy
+///               of this file ignores the table and is not harmed by it.
 ///   2026-10-16  A damaged file is also found when a call fails (RepairAfter), not only by the check when it is opened.
 ///   2026-10-16  A damaged file is found (quick_check, once per file and run), moved aside as library.corrupt-<date>.db and
 ///               replaced (the main file by the newest good backup); event Repaired. BackUpMainFile: one backup a day,
@@ -31,7 +40,7 @@ public static class LibraryStore
 {
     public const string UsbFolderName = ".SweWolfFileExplorerData";
     public const string DbFileName = "library.db";
-    private const int SchemaVersion = 2;
+    private const int SchemaVersion = 5;
 
     /// <summary>One thing at a time on the database files (inside this app).</summary>
     public static readonly object Gate = new();
@@ -442,6 +451,26 @@ public static class LibraryStore
                     Position INTEGER,
                     Length   INTEGER,
                     PRIMARY KEY (Folder, Name)
+                ) WITHOUT ROWID;
+                CREATE TABLE IF NOT EXISTS Rated (
+                    Folder      TEXT NOT NULL COLLATE NOCASE,
+                    Name        TEXT NOT NULL COLLATE NOCASE,
+                    Rating      INTEGER,
+                    Expectation REAL,
+                    PRIMARY KEY (Folder, Name)
+                ) WITHOUT ROWID;
+                CREATE TABLE IF NOT EXISTS FolderPrefs (
+                    Path              TEXT NOT NULL COLLATE NOCASE PRIMARY KEY,
+                    SortColumn        TEXT,
+                    SortAscending     INTEGER,
+                    TreeSortColumn    TEXT,
+                    TreeSortAscending INTEGER
+                ) WITHOUT ROWID;
+                CREATE TABLE IF NOT EXISTS PreviewPick (
+                    Folder  TEXT NOT NULL COLLATE NOCASE,
+                    Name    TEXT NOT NULL COLLATE NOCASE,
+                    Picture TEXT NOT NULL,
+                    PRIMARY KEY (Folder, Name)
                 ) WITHOUT ROWID;";
             create.ExecuteNonQuery();
 
@@ -577,6 +606,556 @@ public static class LibraryStore
             }
 
             if (written) FolderWritten?.Invoke(group.Key);
+        }
+    }
+
+    // ── Rating and expectation ───────────────────────────────────────────────
+
+    /// <summary>A rating (whole number 1-10) and an expectation (1-10, decimals allowed), either or both, of a file or folder.</summary>
+    public readonly record struct Marks(int? Rating, double? Expectation);
+
+    // What a path is stored under in Rated: the key of the folder that holds it, and its name. A drive's root has no
+    // folder above it: it is stored with an empty folder and its own key as the name.
+    private static (string Folder, string Name) RatedKey(LibraryRoute route, string path)
+    {
+        var trimmed = path.TrimEnd('\\', '/');
+        var parent = Path.GetDirectoryName(trimmed);
+        return string.IsNullOrEmpty(parent)
+            ? ("", KeyOf(route, path))
+            : (KeyOf(route, parent), Path.GetFileName(trimmed));
+    }
+
+    /// <summary>The ratings and expectations of the items (files and folders) directly in a folder, by name.</summary>
+    public static Dictionary<string, Marks> GetRatings(string folderPath)
+    {
+        var result = new Dictionary<string, Marks>(StringComparer.OrdinalIgnoreCase);
+        lock (Gate)
+        {
+            try
+            {
+                var route = Resolve(folderPath, create: false);
+                if (route == null) return result;
+
+                using var connection = Open(route, create: false);
+                if (connection == null) return result;
+
+                using var command = Command(connection, "SELECT Name, Rating, Expectation FROM Rated WHERE Folder = $f",
+                    ("$f", KeyOf(route, folderPath)));
+                using var reader = command.ExecuteReader();
+                while (reader.Read())
+                    result[reader.GetString(0)] = new Marks(
+                        reader.IsDBNull(1) ? null : (int)reader.GetInt64(1),
+                        reader.IsDBNull(2) ? null : reader.GetDouble(2));
+            }
+            catch (Exception ex)
+            {
+                RepairAfter(ex, folderPath);
+            }
+        }
+        return result;
+    }
+
+    /// <summary>The rating and expectation of one file or folder (both null if it has none).</summary>
+    public static Marks GetMark(string path)
+    {
+        var trimmed = path.TrimEnd('\\', '/');
+        lock (Gate)
+        {
+            try
+            {
+                var route = Resolve(trimmed, create: false);
+                if (route == null) return default;
+
+                using var connection = Open(route, create: false);
+                if (connection == null) return default;
+
+                var (folder, name) = RatedKey(route, trimmed);
+                using var command = Command(connection, "SELECT Rating, Expectation FROM Rated WHERE Folder = $f AND Name = $n",
+                    ("$f", folder), ("$n", name));
+                using var reader = command.ExecuteReader();
+                if (!reader.Read()) return default;
+                return new Marks(reader.IsDBNull(0) ? null : (int)reader.GetInt64(0), reader.IsDBNull(1) ? null : reader.GetDouble(1));
+            }
+            catch (Exception ex)
+            {
+                RepairAfter(ex, trimmed);
+                return default;
+            }
+        }
+    }
+
+    /// <summary>Sets (or, with null, removes) the rating of files and folders. False if something could not be saved (a write-protected drive).</summary>
+    public static bool SetRating(IEnumerable<string> paths, int? rating) => SetMark(paths, "Rating", rating);
+
+    /// <summary>Sets (or, with null, removes) the expectation of files and folders. False if something could not be saved.</summary>
+    public static bool SetExpectation(IEnumerable<string> paths, double? expectation) => SetMark(paths, "Expectation", expectation);
+
+    private static bool SetMark(IEnumerable<string> paths, string column, object? value)
+    {
+        bool allSaved = true;
+
+        lock (Gate)
+        {
+            foreach (var path in paths.Select(p => p.TrimEnd('\\', '/')).Where(p => p.Length > 0).Distinct(StringComparer.OrdinalIgnoreCase))
+            {
+                try
+                {
+                    // Removing something never creates a file on a removable drive.
+                    var route = Resolve(path, create: value != null);
+                    if (route == null) continue;
+
+                    using var connection = Open(route, create: value != null);
+                    if (connection == null) { if (value != null) allSaved = false; continue; }
+
+                    var (folder, name) = RatedKey(route, path);
+                    using var transaction = connection.BeginTransaction();
+
+                    using (var set = value == null
+                        ? Command(connection, $"UPDATE Rated SET {column} = NULL WHERE Folder = $f AND Name = $n", ("$f", folder), ("$n", name))
+                        : Command(connection,
+                            $"INSERT INTO Rated (Folder, Name, {column}) VALUES ($f, $n, $v) ON CONFLICT(Folder, Name) DO UPDATE SET {column} = $v",
+                            ("$f", folder), ("$n", name), ("$v", value)))
+                    {
+                        set.Transaction = transaction;
+                        set.ExecuteNonQuery();
+                    }
+
+                    // A row with neither value is not kept.
+                    using (var tidy = Command(connection,
+                        "DELETE FROM Rated WHERE Folder = $f AND Name = $n AND Rating IS NULL AND Expectation IS NULL",
+                        ("$f", folder), ("$n", name)))
+                    {
+                        tidy.Transaction = transaction;
+                        tidy.ExecuteNonQuery();
+                    }
+
+                    transaction.Commit();
+                }
+                catch (Exception ex)
+                {
+                    allSaved = false;
+                    RepairAfter(ex, path);   // otherwise write-protected or busy
+                }
+            }
+        }
+
+        return allSaved;
+    }
+
+    // ── Preview picture of a file ────────────────────────────────────────────
+
+    /// <summary>What the user chose as the preview picture of a file: none at all, or a picture (full path, not checked for existence).</summary>
+    public readonly record struct PreviewChoice(bool None, string? Picture);
+
+    // How the picture is written in PreviewPick.Picture: "" = none; a path that is not rooted = from the folder of the file (the
+    // picture lies in that folder or below it, so it follows the folder when it is renamed or moved); "\x\y" (one backslash) =
+    // from the root of the drive, on a USB drive (the letter can change); anything else = the full path.
+    private static string EncodePicture(LibraryRoute route, string folder, string picture)
+    {
+        var full = Path.GetFullPath(picture);
+        var folderFull = Path.GetFullPath(folder).TrimEnd('\\', '/') + "\\";
+        if (full.StartsWith(folderFull, StringComparison.OrdinalIgnoreCase))
+            return full.Substring(folderFull.Length);
+
+        if (route.Relative && full.StartsWith(route.Root, StringComparison.OrdinalIgnoreCase))
+            return "\\" + full.Substring(route.Root.TrimEnd('\\', '/').Length).TrimStart('\\');
+
+        return full;
+    }
+
+    private static string DecodePicture(LibraryRoute route, string folder, string stored)
+    {
+        if (stored.StartsWith("\\") && !stored.StartsWith("\\\\") && route.Relative)
+            return route.Root.TrimEnd('\\', '/') + stored;
+        if (Path.IsPathRooted(stored)) return stored;
+        return Path.Combine(folder, stored);
+    }
+
+    /// <summary>The preview picture the user chose for a file, or null if nothing was chosen (then the program looks for one itself).</summary>
+    public static PreviewChoice? GetPreviewChoice(string filePath)
+    {
+        var path = filePath.TrimEnd('\\', '/');
+        var folder = Path.GetDirectoryName(path);
+        if (string.IsNullOrEmpty(folder)) return null;
+
+        lock (Gate)
+        {
+            try
+            {
+                var route = Resolve(folder, create: false);
+                if (route == null) return null;
+
+                using var connection = Open(route, create: false);
+                if (connection == null) return null;
+
+                var (parentKey, name) = RatedKey(route, path);
+                using var command = Command(connection, "SELECT Picture FROM PreviewPick WHERE Folder = $f AND Name = $n",
+                    ("$f", parentKey), ("$n", name));
+                if (command.ExecuteScalar() is not string stored) return null;
+
+                return stored.Length == 0 ? new PreviewChoice(true, null) : new PreviewChoice(false, DecodePicture(route, folder, stored));
+            }
+            catch (Exception ex)
+            {
+                RepairAfter(ex, path);
+                return null;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Saves the choice (none, or a picture) or, with null, removes it (back to automatic). False if it could not be saved
+    /// (a write-protected drive). Removing never creates a file on a removable drive.
+    /// </summary>
+    public static bool SetPreviewChoice(string filePath, PreviewChoice? choice)
+    {
+        var path = filePath.TrimEnd('\\', '/');
+        var folder = Path.GetDirectoryName(path);
+        if (string.IsNullOrEmpty(folder)) return false;
+
+        lock (Gate)
+        {
+            try
+            {
+                var route = Resolve(folder, create: choice != null);
+                if (route == null) return choice == null;
+
+                using var connection = Open(route, create: choice != null);
+                if (connection == null) return choice == null;
+
+                var (parentKey, name) = RatedKey(route, path);
+                using var command = choice is not { } c
+                    ? Command(connection, "DELETE FROM PreviewPick WHERE Folder = $f AND Name = $n", ("$f", parentKey), ("$n", name))
+                    : Command(connection,
+                        "INSERT INTO PreviewPick (Folder, Name, Picture) VALUES ($f, $n, $p) ON CONFLICT(Folder, Name) DO UPDATE SET Picture = $p",
+                        ("$f", parentKey), ("$n", name),
+                        ("$p", c.None || string.IsNullOrEmpty(c.Picture) ? "" : EncodePicture(route, folder, c.Picture)));
+                command.ExecuteNonQuery();
+                return true;
+            }
+            catch (Exception ex)
+            {
+                RepairAfter(ex, path);
+                return false;
+            }
+        }
+    }
+
+    // ── Sort order of a folder ───────────────────────────────────────────────
+
+    /// <summary>
+    /// What the user chose for a folder: how its list is sorted, and how its subfolders are sorted in the tree. The column is the
+    /// name of the explorer's SortColumn (a text, so a newer app can add columns). Null where nothing was chosen.
+    /// </summary>
+    public sealed record FolderPrefs(string? SortColumn, bool SortAscending, string? TreeSortColumn, bool TreeSortAscending);
+
+    /// <summary>The saved sort orders of a folder, or null if none was ever chosen for it (or nothing can be read).</summary>
+    public static FolderPrefs? GetFolderPrefs(string folderPath)
+    {
+        var path = folderPath.TrimEnd('\\', '/');
+        if (path.Length == 0) return null;
+
+        lock (Gate)
+        {
+            try
+            {
+                var route = Resolve(path, create: false);   // browsing leaves no trace on a removable drive
+                if (route == null) return null;
+
+                using var connection = Open(route, create: false);
+                if (connection == null) return null;
+
+                using var command = Command(connection,
+                    "SELECT SortColumn, SortAscending, TreeSortColumn, TreeSortAscending FROM FolderPrefs WHERE Path = $p",
+                    ("$p", KeyOf(route, path)));
+                using var reader = command.ExecuteReader();
+                if (!reader.Read()) return null;
+
+                return new FolderPrefs(
+                    reader.IsDBNull(0) ? null : reader.GetString(0), reader.IsDBNull(1) || reader.GetInt64(1) != 0,
+                    reader.IsDBNull(2) ? null : reader.GetString(2), reader.IsDBNull(3) || reader.GetInt64(3) != 0);
+            }
+            catch (Exception ex)
+            {
+                RepairAfter(ex, path);
+                return null;
+            }
+        }
+    }
+
+    /// <summary>Saves how the list of a folder is sorted. False if it could not be saved (a write-protected drive).</summary>
+    public static bool SetFolderSort(string folderPath, string column, bool ascending) =>
+        SetPrefs(folderPath, "SortColumn", "SortAscending", column, ascending);
+
+    /// <summary>Saves how the subfolders of a folder are sorted in the tree. False if it could not be saved.</summary>
+    public static bool SetFolderTreeSort(string folderPath, string column, bool ascending) =>
+        SetPrefs(folderPath, "TreeSortColumn", "TreeSortAscending", column, ascending);
+
+    private static bool SetPrefs(string folderPath, string columnField, string ascendingField, string column, bool ascending)
+    {
+        var path = folderPath.TrimEnd('\\', '/');
+        if (path.Length == 0) return false;
+
+        lock (Gate)
+        {
+            try
+            {
+                var route = Resolve(path, create: true);
+                if (route == null) return false;
+
+                using var connection = Open(route, create: true);
+                if (connection == null) return false;
+
+                using var command = Command(connection,
+                    $"INSERT INTO FolderPrefs (Path, {columnField}, {ascendingField}) VALUES ($p, $c, $a) " +
+                    $"ON CONFLICT(Path) DO UPDATE SET {columnField} = $c, {ascendingField} = $a",
+                    ("$p", KeyOf(route, path)), ("$c", column), ("$a", ascending ? 1 : 0));
+                command.ExecuteNonQuery();
+                return true;
+            }
+            catch (Exception ex)
+            {
+                RepairAfter(ex, path);   // otherwise write-protected or busy
+                return false;
+            }
+        }
+    }
+
+    // ── Forgetting and moving what is remembered ─────────────────────────────
+
+    // Opens each database file at most once, in one transaction that is committed when the session ends: forgetting or moving
+    // 500 files costs one write, not 500.
+    private sealed class Session : IDisposable
+    {
+        private readonly Dictionary<string, (SqliteConnection Connection, SqliteTransaction Transaction)> _open =
+            new(StringComparer.OrdinalIgnoreCase);
+
+        public SqliteConnection? Get(LibraryRoute route, bool create)
+        {
+            if (_open.TryGetValue(route.DbFile, out var existing)) return existing.Connection;
+
+            var connection = Open(route, create);
+            if (connection == null) return null;
+            _open[route.DbFile] = (connection, connection.BeginTransaction());
+            return connection;
+        }
+
+        public SqliteCommand Command(SqliteConnection connection, string sql, params (string Name, object? Value)[] parameters)
+        {
+            var command = LibraryStore.Command(connection, sql, parameters);
+            command.Transaction = _open.Values.First(v => v.Connection == connection).Transaction;
+            return command;
+        }
+
+        public void Dispose()
+        {
+            foreach (var (connection, transaction) in _open.Values)
+            {
+                try { transaction.Commit(); } catch { /* write-protected or busy: nothing was changed */ }
+                connection.Dispose();
+            }
+            _open.Clear();
+        }
+    }
+
+    // The rows below a folder have its key plus a backslash in front of them: "K\..." lies between "K\" and "K]".
+    private static (string Below, string Above) SubtreeRange(string key) => (key + "\\", key + "]");
+
+    // Removes the rows of the item itself (a file, or a folder as an item of its parent) and of everything below it.
+    private static void DeleteRows(Session session, SqliteConnection connection, string parentKey, string name, string key)
+    {
+        var (below, above) = SubtreeRange(key);
+
+        foreach (var table in new[] { "File", "Rated", "PreviewPick" })
+        {
+            using (var item = session.Command(connection, $"DELETE FROM {table} WHERE Folder = $p AND Name = $n", ("$p", parentKey), ("$n", name)))
+                item.ExecuteNonQuery();
+            using (var sub = session.Command(connection, $"DELETE FROM {table} WHERE Folder = $k OR (Folder > $a AND Folder < $b)",
+                       ("$k", key), ("$a", below), ("$b", above)))
+                sub.ExecuteNonQuery();
+        }
+
+        foreach (var table in new[] { "Folder", "FolderPrefs" })
+        {
+            using var folders = session.Command(connection, $"DELETE FROM {table} WHERE Path = $k OR (Path > $a AND Path < $b)",
+                ("$k", key), ("$a", below), ("$b", above));
+            folders.ExecuteNonQuery();
+        }
+    }
+
+    /// <summary>
+    /// Forgets everything remembered about files and folders that were deleted: read marks, resume positions, ratings and
+    /// expectations, and for a folder (or a packed file) everything below it too. Call it for what the app deleted itself.
+    /// </summary>
+    public static void Forget(IEnumerable<string> paths)
+    {
+        lock (Gate)
+        {
+            try
+            {
+                using var session = new Session();
+                foreach (var raw in paths)
+                {
+                    var path = raw.TrimEnd('\\', '/');
+                    if (path.Length == 0) continue;
+
+                    try
+                    {
+                        var route = Resolve(path, create: false);   // nothing is created just to forget something
+                        if (route == null) continue;
+                        var connection = session.Get(route, create: false);
+                        if (connection == null) continue;
+
+                        var (parentKey, name) = RatedKey(route, path);
+                        DeleteRows(session, connection, parentKey, name, KeyOf(route, path));
+                    }
+                    catch { /* this one stays remembered; harmless */ }
+                }
+            }
+            catch { }
+        }
+    }
+
+    /// <summary>
+    /// What is remembered about a file or folder that was renamed or moved follows it to its new path (for a folder: its own
+    /// state and rating and everything below it), also to another drive. Call it for what the app moved itself.
+    /// </summary>
+    public static void Move(IEnumerable<(string From, string To)> moves)
+    {
+        lock (Gate)
+        {
+            try
+            {
+                using var session = new Session();
+                foreach (var (rawFrom, rawTo) in moves)
+                {
+                    var from = rawFrom.TrimEnd('\\', '/');
+                    var to   = rawTo.TrimEnd('\\', '/');
+                    if (from.Length == 0 || to.Length == 0) continue;
+
+                    try { MoveRows(session, from, to); }
+                    catch { /* it keeps its marks under the old path; harmless */ }
+                }
+            }
+            catch { }
+        }
+    }
+
+    private static List<object?[]> ReadAll(Session session, SqliteConnection connection, string sql, params (string Name, object? Value)[] parameters)
+    {
+        var rows = new List<object?[]>();
+        using var command = session.Command(connection, sql, parameters);
+        using var reader = command.ExecuteReader();
+        while (reader.Read())
+        {
+            var row = new object?[reader.FieldCount];
+            for (int i = 0; i < row.Length; i++) row[i] = reader.IsDBNull(i) ? null : reader.GetValue(i);
+            rows.Add(row);
+        }
+        return rows;
+    }
+
+    private static void MoveRows(Session session, string from, string to)
+    {
+        var fromRoute = Resolve(from, create: false);
+        if (fromRoute == null) return;
+        var fromConnection = session.Get(fromRoute, create: false);
+        if (fromConnection == null) return;
+
+        var fromKey = KeyOf(fromRoute, from);
+        var (fromParent, fromName) = RatedKey(fromRoute, from);
+        var (below, above) = SubtreeRange(fromKey);
+
+        // Everything remembered about the item and below it, read before anything is changed.
+        var p = new (string, object?)[] { ("$p", fromParent), ("$n", fromName), ("$k", fromKey), ("$a", below), ("$b", above) };
+        var files   = ReadAll(session, fromConnection,
+            "SELECT Folder, Name, ReadAt, Position, Length FROM File WHERE (Folder = $p AND Name = $n) OR Folder = $k OR (Folder > $a AND Folder < $b)", p);
+        var rated   = ReadAll(session, fromConnection,
+            "SELECT Folder, Name, Rating, Expectation FROM Rated WHERE (Folder = $p AND Name = $n) OR Folder = $k OR (Folder > $a AND Folder < $b)", p);
+        var folders = ReadAll(session, fromConnection,
+            "SELECT Path, OwnUnread, Complete FROM Folder WHERE Path = $k OR (Path > $a AND Path < $b)", p);
+        var prefs   = ReadAll(session, fromConnection,
+            "SELECT Path, SortColumn, SortAscending, TreeSortColumn, TreeSortAscending FROM FolderPrefs WHERE Path = $k OR (Path > $a AND Path < $b)", p);
+        var picks   = ReadAll(session, fromConnection,
+            "SELECT Folder, Name, Picture FROM PreviewPick WHERE (Folder = $p AND Name = $n) OR Folder = $k OR (Folder > $a AND Folder < $b)", p);
+        if (files.Count == 0 && rated.Count == 0 && folders.Count == 0 && prefs.Count == 0 && picks.Count == 0) return;
+
+        var toRoute = Resolve(to, create: true);
+        if (toRoute == null) return;
+        var toConnection = session.Get(toRoute, create: true);
+        if (toConnection == null) return;
+
+        var toKey = KeyOf(toRoute, to);
+        var (toParent, toName) = RatedKey(toRoute, to);
+
+        // A change of the case of the name only: the keys are the same (they ignore case), nothing to move.
+        if (string.Equals(fromRoute.DbFile, toRoute.DbFile, StringComparison.OrdinalIgnoreCase)
+            && string.Equals(fromKey, toKey, StringComparison.OrdinalIgnoreCase))
+            return;
+
+        // The old rows go first (they may be in the same file); then the rows are written under their new keys.
+        DeleteRows(session, fromConnection, fromParent, fromName, fromKey);
+
+        // The key of a folder below the item: the old key of the item becomes the new one.
+        string Remap(string key) =>
+            key.Equals(fromKey, StringComparison.OrdinalIgnoreCase) ? toKey : toKey + key.Substring(fromKey.Length);
+
+        bool IsTheItem(object? folder, object? name) =>
+            string.Equals((string?)folder, fromParent, StringComparison.OrdinalIgnoreCase)
+            && string.Equals((string?)name, fromName, StringComparison.OrdinalIgnoreCase);
+
+        foreach (var r in files)
+        {
+            var (folder, name) = IsTheItem(r[0], r[1]) ? (toParent, toName) : (Remap((string)r[0]!), (string)r[1]!);
+            using var insert = session.Command(toConnection,
+                "INSERT OR REPLACE INTO File (Folder, Name, ReadAt, Position, Length) VALUES ($f, $n, $t, $p, $l)",
+                ("$f", folder), ("$n", name), ("$t", r[2]), ("$p", r[3]), ("$l", r[4]));
+            insert.ExecuteNonQuery();
+        }
+
+        foreach (var r in rated)
+        {
+            var (folder, name) = IsTheItem(r[0], r[1]) ? (toParent, toName) : (Remap((string)r[0]!), (string)r[1]!);
+            using var insert = session.Command(toConnection,
+                "INSERT OR REPLACE INTO Rated (Folder, Name, Rating, Expectation) VALUES ($f, $n, $r, $e)",
+                ("$f", folder), ("$n", name), ("$r", r[2]), ("$e", r[3]));
+            insert.ExecuteNonQuery();
+        }
+
+        foreach (var r in picks)
+        {
+            bool item = IsTheItem(r[0], r[1]);
+            var (folder, name) = item ? (toParent, toName) : (Remap((string)r[0]!), (string)r[1]!);
+
+            // The file itself may have moved to another folder: the picture is written again from where it is now.
+            var picture = (string)r[2]!;
+            if (item && picture.Length > 0)
+            {
+                var oldFolder = Path.GetDirectoryName(from)!;
+                var newFolder = Path.GetDirectoryName(to)!;
+                picture = EncodePicture(toRoute, newFolder, DecodePicture(fromRoute, oldFolder, picture));
+            }
+
+            using var insert = session.Command(toConnection,
+                "INSERT OR REPLACE INTO PreviewPick (Folder, Name, Picture) VALUES ($f, $n, $p)",
+                ("$f", folder), ("$n", name), ("$p", picture));
+            insert.ExecuteNonQuery();
+        }
+
+        foreach (var r in folders)
+        {
+            using var insert = session.Command(toConnection,
+                "INSERT OR REPLACE INTO Folder(Path, OwnUnread, Complete) VALUES ($p, $o, $c)",
+                ("$p", Remap((string)r[0]!)), ("$o", r[1]), ("$c", r[2]));
+            insert.ExecuteNonQuery();
+        }
+
+        foreach (var r in prefs)
+        {
+            using var insert = session.Command(toConnection,
+                "INSERT OR REPLACE INTO FolderPrefs (Path, SortColumn, SortAscending, TreeSortColumn, TreeSortAscending) VALUES ($p, $c, $a, $tc, $ta)",
+                ("$p", Remap((string)r[0]!)), ("$c", r[1]), ("$a", r[2]), ("$tc", r[3]), ("$ta", r[4]));
+            insert.ExecuteNonQuery();
         }
     }
 
