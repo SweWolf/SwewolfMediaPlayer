@@ -18,6 +18,8 @@ public sealed record LibraryRoute(string DbFile, string Prefix, bool Relative, s
 /// what it knows.
 ///
 /// History:
+///   2026-10-18  Schema 6: table LastOpened (per folder: the name of the file opened last, for "Jump to Last Opened File").
+///               SetLastOpened / GetLastOpened; Forget and Move carry the rows. An older copy ignores the table.
 ///   2026-10-18  Schema 5: table PreviewPick (per file: the picture the user chose as its preview picture, or "none").
 ///               GetPreviewChoice / SetPreviewChoice; Forget and Move carry the rows. An older copy ignores the table.
 ///   2026-10-17  Schema 4: table FolderPrefs (per folder: the sort order of its list and of its subfolders in the tree).
@@ -40,7 +42,7 @@ public static class LibraryStore
 {
     public const string UsbFolderName = ".SweWolfFileExplorerData";
     public const string DbFileName = "library.db";
-    private const int SchemaVersion = 5;
+    private const int SchemaVersion = 6;
 
     /// <summary>One thing at a time on the database files (inside this app).</summary>
     public static readonly object Gate = new();
@@ -466,6 +468,10 @@ public static class LibraryStore
                     TreeSortColumn    TEXT,
                     TreeSortAscending INTEGER
                 ) WITHOUT ROWID;
+                CREATE TABLE IF NOT EXISTS LastOpened (
+                    Path TEXT NOT NULL COLLATE NOCASE PRIMARY KEY,
+                    Name TEXT NOT NULL
+                ) WITHOUT ROWID;
                 CREATE TABLE IF NOT EXISTS PreviewPick (
                     Folder  TEXT NOT NULL COLLATE NOCASE,
                     Name    TEXT NOT NULL COLLATE NOCASE,
@@ -742,6 +748,65 @@ public static class LibraryStore
         return allSaved;
     }
 
+    // ── The file opened last in a folder ─────────────────────────────────────
+
+    /// <summary>Remembers that this file was the last one opened in its folder (Jump to Last Opened File). Call when the user opens a file.</summary>
+    public static void SetLastOpened(string filePath)
+    {
+        var path = filePath.TrimEnd('\\', '/');
+        var folder = Path.GetDirectoryName(path);
+        var name = Path.GetFileName(path);
+        if (string.IsNullOrEmpty(folder) || string.IsNullOrEmpty(name)) return;
+
+        lock (Gate)
+        {
+            try
+            {
+                var route = Resolve(folder, create: true);
+                if (route == null) return;
+
+                using var connection = Open(route, create: true);
+                if (connection == null) return;
+
+                using var command = Command(connection,
+                    "INSERT INTO LastOpened (Path, Name) VALUES ($p, $n) ON CONFLICT(Path) DO UPDATE SET Name = $n",
+                    ("$p", KeyOf(route, folder)), ("$n", name));
+                command.ExecuteNonQuery();
+            }
+            catch (Exception ex)
+            {
+                RepairAfter(ex, folder);
+            }
+        }
+    }
+
+    /// <summary>The name of the file opened last in the folder, or null if none is remembered (or nothing can be read).</summary>
+    public static string? GetLastOpened(string folderPath)
+    {
+        var folder = folderPath.TrimEnd('\\', '/');
+        if (folder.Length == 0) return null;
+
+        lock (Gate)
+        {
+            try
+            {
+                var route = Resolve(folder, create: false);
+                if (route == null) return null;
+
+                using var connection = Open(route, create: false);
+                if (connection == null) return null;
+
+                using var command = Command(connection, "SELECT Name FROM LastOpened WHERE Path = $p", ("$p", KeyOf(route, folder)));
+                return command.ExecuteScalar() as string;
+            }
+            catch (Exception ex)
+            {
+                RepairAfter(ex, folder);
+                return null;
+            }
+        }
+    }
+
     // ── Preview picture of a file ────────────────────────────────────────────
 
     /// <summary>What the user chose as the preview picture of a file: none at all, or a picture (full path, not checked for existence).</summary>
@@ -975,12 +1040,17 @@ public static class LibraryStore
                 sub.ExecuteNonQuery();
         }
 
-        foreach (var table in new[] { "Folder", "FolderPrefs" })
+        foreach (var table in new[] { "Folder", "FolderPrefs", "LastOpened" })
         {
             using var folders = session.Command(connection, $"DELETE FROM {table} WHERE Path = $k OR (Path > $a AND Path < $b)",
                 ("$k", key), ("$a", below), ("$b", above));
             folders.ExecuteNonQuery();
         }
+
+        // The item itself, if it was the file opened last in its folder.
+        using (var last = session.Command(connection, "DELETE FROM LastOpened WHERE Path = $p AND Name = $n COLLATE NOCASE",
+                   ("$p", parentKey), ("$n", name)))
+            last.ExecuteNonQuery();
     }
 
     /// <summary>
@@ -1078,7 +1148,12 @@ public static class LibraryStore
             "SELECT Path, SortColumn, SortAscending, TreeSortColumn, TreeSortAscending FROM FolderPrefs WHERE Path = $k OR (Path > $a AND Path < $b)", p);
         var picks   = ReadAll(session, fromConnection,
             "SELECT Folder, Name, Picture FROM PreviewPick WHERE (Folder = $p AND Name = $n) OR Folder = $k OR (Folder > $a AND Folder < $b)", p);
-        if (files.Count == 0 && rated.Count == 0 && folders.Count == 0 && prefs.Count == 0 && picks.Count == 0) return;
+        var lasts   = ReadAll(session, fromConnection,
+            "SELECT Path, Name FROM LastOpened WHERE Path = $k OR (Path > $a AND Path < $b)", p);   // folders: the item and below
+        var lastOfItem = ReadAll(session, fromConnection,
+            "SELECT Path, Name FROM LastOpened WHERE Path = $p AND Name = $n COLLATE NOCASE", p);   // the item as a file of its folder
+        if (files.Count == 0 && rated.Count == 0 && folders.Count == 0 && prefs.Count == 0 && picks.Count == 0
+            && lasts.Count == 0 && lastOfItem.Count == 0) return;
 
         var toRoute = Resolve(to, create: true);
         if (toRoute == null) return;
@@ -1119,6 +1194,20 @@ public static class LibraryStore
             using var insert = session.Command(toConnection,
                 "INSERT OR REPLACE INTO Rated (Folder, Name, Rating, Expectation) VALUES ($f, $n, $r, $e)",
                 ("$f", folder), ("$n", name), ("$r", r[2]), ("$e", r[3]));
+            insert.ExecuteNonQuery();
+        }
+
+        foreach (var r in lasts)
+        {
+            using var insert = session.Command(toConnection,
+                "INSERT OR REPLACE INTO LastOpened (Path, Name) VALUES ($p, $n)", ("$p", Remap((string)r[0]!)), ("$n", r[1]));
+            insert.ExecuteNonQuery();
+        }
+
+        foreach (var r in lastOfItem)   // the file renamed or moved was the last opened one of its folder: the new folder remembers the new name
+        {
+            using var insert = session.Command(toConnection,
+                "INSERT OR REPLACE INTO LastOpened (Path, Name) VALUES ($p, $n)", ("$p", toParent), ("$n", toName));
             insert.ExecuteNonQuery();
         }
 
