@@ -141,7 +141,8 @@ namespace SwewolfMediaPlayer
         private const int CursorHideDelayMs = 3000;
         private static Cursor? _blankCursor;
         private bool _cursorHidden;
-        private Point _lastCursorPosition;
+        // Starts at the current position, so the pointer is hidden from the start until it moves or clicks.
+        private Point _lastCursorPosition = Cursor.Position;
         private long _lastCursorActivityTicks;
         private bool _fullScreen;
         private FormWindowState _windowStateBeforeFullScreen;
@@ -567,6 +568,13 @@ namespace SwewolfMediaPlayer
                 SetFullScreen(!_fullScreen);
                 return true;
             }
+            // X alone closes the player window (like Escape, in every view), except while typing in a visible text box
+            // (a hidden group box can still be the ActiveControl).
+            if (keyData == Keys.X && !(ActiveControl is TextBoxBase { Visible: true }))
+            {
+                Close();
+                return true;
+            }
             if (keyData == Keys.Escape && _fullScreen)
             {
                 SetFullScreen(false);
@@ -716,10 +724,15 @@ namespace SwewolfMediaPlayer
             grpControlPanel.Visible = _panelVisible && !fullScreen;
 
             // Changing the border style makes a new window, which shows the normal pointer again: forget that it was
-            // hidden, and count the change as activity, so the pointer is hidden again after the delay.
+            // hidden, and count the pointer as idle already, so it is hidden again at once (until it moves or clicks).
             _cursorHidden = false;
             videoView.Cursor = Cursors.Default;
-            _lastCursorActivityTicks = Environment.TickCount64;
+            _lastCursorPosition = Cursor.Position;
+            _lastCursorActivityTicks = Environment.TickCount64 - CursorHideDelayMs;
+
+            // A tooltip of a button that has just been hidden stays on the screen, as the mouse never leaves it.
+            toolTip.Active = false;
+            toolTip.Active = true;
         }
 
         // LibVLC raises its events on its own threads: hand the work over to the UI thread.
@@ -1317,6 +1330,12 @@ namespace SwewolfMediaPlayer
 
             bool canHide = _hideCursorWhenIdle && ActiveForm == this && !menuVideo.Visible && IsOver(videoView, position);
             SetCursorHidden(canHide && now - _lastCursorActivityTicks >= CursorHideDelayMs);
+            if (_cursorHidden && _blankCursor != null)
+            {
+                // Windows may put the normal pointer back without any movement (a new window after a full screen
+                // change, a tooltip going away): keep the blank one on for as long as the pointer should be hidden.
+                Cursor.Current = _blankCursor;
+            }
         }
 
         private void SetCursorHidden(bool hidden)
@@ -1328,6 +1347,9 @@ namespace SwewolfMediaPlayer
 
             _blankCursor ??= CreateBlankCursor();
             videoView.Cursor = hidden ? _blankCursor : Cursors.Default;
+            // A still pointer gets no new WM_SETCURSOR (e.g. right after a full screen change, which makes a
+            // new window), so the Cursor property alone changes nothing on screen: set the pointer itself too.
+            Cursor.Current = hidden ? _blankCursor : Cursors.Default;
             _cursorHidden = hidden;
         }
 
