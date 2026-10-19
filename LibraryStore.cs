@@ -18,6 +18,8 @@ public sealed record LibraryRoute(string DbFile, string Prefix, bool Relative, s
 /// what it knows.
 ///
 /// History:
+///   2026-10-18  A fixed drive with a folder .SweWolfFileExplorerData in its root counts as portable (VeraCrypt volume, any drive the bus
+///               type cannot identify): its data goes to the USB file there. MarkDrivePortable creates the folder (Hidden attribute).
 ///   2026-10-18  Schema 6: table LastOpened (per folder: the name of the file opened last, for "Jump to Last Opened File").
 ///               SetLastOpened / GetLastOpened; Forget and Move carry the rows. An older copy ignores the table.
 ///   2026-10-18  Schema 5: table PreviewPick (per file: the picture the user chose as its preview picture, or "none").
@@ -119,6 +121,17 @@ public static class LibraryStore
     /// <summary>Only for tests: treat a drive as another kind (2 removable, 3 fixed, 5 CD).</summary>
     public static void SetDriveTypeForTest(string root, uint type) => DriveTypes[root] = type;
 
+    /// <summary>
+    /// Marks a drive as portable by creating the hidden data folder in its root (see DriveTypeOf); false if that failed
+    /// (write-protected). From now on this run, and every later run of an app with this file, sends its data to that drive.
+    /// </summary>
+    public static bool MarkDrivePortable(string root)
+    {
+        if (!TryCreateUsbFolder(Path.Combine(root, UsbFolderName))) return false;
+        DriveTypes[root] = DriveRemovable;
+        return true;
+    }
+
     /// <summary>Only for tests: is this drive treated as removable (USB stick, USB hard disk, card)?</summary>
     public static bool IsPortableDrive(string root) => DriveTypeOf(root) == DriveRemovable;
 
@@ -129,6 +142,9 @@ public static class LibraryStore
             type = GetDriveTypeW(root);
             // An external USB hard disk reports itself as a fixed disk: only the bus it hangs on tells the truth.
             if (type == DriveFixed && IsOnPortableBus(root)) type = DriveRemovable;
+            // A drive the bus cannot identify (a VeraCrypt volume mounted from a file on a stick) is marked by the user (or by the
+            // TeraTool converter): the hidden data folder in its root says "this drive is portable".
+            if (type == DriveFixed && Directory.Exists(Path.Combine(root, UsbFolderName))) type = DriveRemovable;
             DriveTypes[root] = type;
         }
         return type;
