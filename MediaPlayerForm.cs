@@ -94,9 +94,13 @@ namespace SwewolfMediaPlayer
         {
             return _loadTask ??= Task.Run(() =>
             {
+                OpenTimingLog.Write("LibVLC load: start");
+                var watch = System.Diagnostics.Stopwatch.StartNew();
                 SidPluginSetup.ConfigurePluginPath();
                 Core.Initialize();
+                OpenTimingLog.Write($"LibVLC load: Core.Initialize done after {watch.ElapsedMilliseconds} ms");
                 _libVlc = new LibVLC();
+                OpenTimingLog.Write($"LibVLC load: engine created, total {watch.ElapsedMilliseconds} ms");
             });
         }
 
@@ -104,6 +108,8 @@ namespace SwewolfMediaPlayer
         private bool _isStream;   // a web address (e.g. an HLS stream) and not a file
         private MediaPlayer? _player;
         private Media? _media;
+        private System.Diagnostics.Stopwatch? _openWatch;   // timing log: runs from Play until the first time update
+        private long _lastUiTickTimestamp;   // timing log: when the 30 ms timer last ticked
         private long _lengthMs;
         private bool _vlcSeekable = true;   // LibVLC's own answer: false for a file it cannot jump in
         private long _knownLengthMs;   // SID files: from the song length database, as LibVLC does not know it
@@ -174,6 +180,39 @@ namespace SwewolfMediaPlayer
             Text = _isStream ? uri!.Host : Path.GetFileName(filePath);
             // A stream cannot be seeked or stepped back: the seek bar is of no use.
             ApplySeekState();
+            ShowLoading("Loading the video engine...");
+        }
+
+        // The first start after a while can take 20 seconds or more (Windows Defender scans the LibVLC files),
+        // so the video area says what is going on until the file plays. There is no setting for it yet.
+        private Label? _loadingLabel;
+
+        private void ShowLoading(string text)
+        {
+            if (_loadingLabel == null)
+            {
+                _loadingLabel = new Label
+                {
+                    Dock = DockStyle.Fill,
+                    BackColor = Color.Black,
+                    ForeColor = Color.Gainsboro,
+                    TextAlign = ContentAlignment.MiddleCenter,
+                    Font = new Font(Font.FontFamily, Font.Size * 1.4f),
+                    UseMnemonic = false,
+                };
+                Controls.Add(_loadingLabel);
+            }
+            _loadingLabel.Text = text;
+            _loadingLabel.Visible = true;
+            _loadingLabel.BringToFront();
+        }
+
+        private void HideLoading()
+        {
+            if (_loadingLabel != null)
+            {
+                _loadingLabel.Visible = false;
+            }
         }
 
         // A file dragged from Windows Explorer can be dropped anywhere in the window and is played
@@ -233,6 +272,7 @@ namespace SwewolfMediaPlayer
         protected override async void OnShown(EventArgs e)
         {
             base.OnShown(e);
+            OpenTimingLog.Write($"Player window shown, preload {(_loadTask == null ? "NOT started yet" : _loadTask.IsCompleted ? "already done" : "still running")}");
 
             if (_settings.StartFullScreenForVideo && !IsAudioFile(_filePath))
             {
@@ -248,6 +288,7 @@ namespace SwewolfMediaPlayer
                 _loadTask = null;   // allow a new try the next time
                 if (!IsDisposed)
                 {
+                    HideLoading();
                     MessageBox.Show(this, $"The video engine (LibVLC) could not be loaded.\n\n{ex.Message}", AppName,
                         MessageBoxButtons.OK, MessageBoxIcon.Error);
                     Close();
@@ -286,6 +327,8 @@ namespace SwewolfMediaPlayer
                     return;
                 }
             }
+            OpenTimingLog.Write("Engine and SID check ready, attaching the player");
+            ShowLoading("Opening the file...");
             AttachPlayer(engine);
             Application.AddMessageFilter(this);
 
@@ -294,6 +337,17 @@ namespace SwewolfMediaPlayer
             _rightClickTimer = new System.Windows.Forms.Timer { Interval = 30 };
             _rightClickTimer.Tick += (s, a) =>
             {
+                // This timer ticks every 30 ms, so a long gap means the UI thread was busy (window not responding).
+                long nowTicks = System.Diagnostics.Stopwatch.GetTimestamp();
+                if (_lastUiTickTimestamp != 0)
+                {
+                    long gapMs = (nowTicks - _lastUiTickTimestamp) * 1000 / System.Diagnostics.Stopwatch.Frequency;
+                    if (gapMs >= 500)
+                    {
+                        OpenTimingLog.Write($"UI thread was blocked for {gapMs} ms");
+                    }
+                }
+                _lastUiTickTimestamp = nowTicks;
                 CheckRightClick();
                 CheckLeftClick();
                 CheckCursorIdle();
@@ -311,10 +365,28 @@ namespace SwewolfMediaPlayer
         {
             _activeLib = lib;
             _player = new MediaPlayer(lib);
+            // Timing log: when LibVLC reports the first steps of opening (these events come on LibVLC's own threads).
+            _player.Opening += (s, a) => OpenTimingLog.Write($"LibVLC: Opening ({_openWatch?.ElapsedMilliseconds} ms after Play was called)");
+            _player.Playing += (s, a) =>
+            {
+                if (_openWatch is { IsRunning: true })
+                {
+                    OpenTimingLog.Write($"LibVLC: Playing, {_openWatch.ElapsedMilliseconds} ms after Play was called");
+                }
+            };
+            _player.TimeChanged += (s, a) =>
+            {
+                if (_openWatch is { IsRunning: true } && a.Time > 0)
+                {
+                    OpenTimingLog.Write($"LibVLC: first picture/time update (position {a.Time} ms), {_openWatch.ElapsedMilliseconds} ms after Play was called");
+                    _openWatch.Stop();
+                }
+            };
             // Without this the native video window swallows the mouse, and no right-click menu opens.
             _player.EnableMouseInput = false;
             _player.Playing += (s, a) => Post(() =>
             {
+                HideLoading();
                 if (_restoringEnd)
                 {
                     return;
@@ -381,20 +453,31 @@ namespace SwewolfMediaPlayer
                 return;
             }
 
+            OpenTimingLog.Write($"StartMedia: {OpenTimingLog.Describe(_filePath, _isStream)}{(restart ? " (restart)" : "")}");
+            var stepWatch = System.Diagnostics.Stopwatch.StartNew();
             _audioStateApplied = 0;
             _knownLengthMs = 0;
             ResetTunes();
             _vlcSeekable = true;
             ApplySeekState();
             ResetThumbnails();
+            OpenTimingLog.Write($"StartMedia: reset done, {stepWatch.ElapsedMilliseconds} ms");
+            stepWatch.Restart();
             ShowCoverArt();
             UpdateSaveFrameButton();
+            OpenTimingLog.Write($"StartMedia: cover art and save-frame button, {stepWatch.ElapsedMilliseconds} ms");
+            stepWatch.Restart();
             if (!restart)
             {
                 StartLibrary();   // forget what was counted for the last file; offer to resume
             }
+            // Includes the time the resume prompt waits for the user, if it is shown.
+            OpenTimingLog.Write($"StartMedia: library/resume, {stepWatch.ElapsedMilliseconds} ms");
+            stepWatch.Restart();
             _media = new Media(_activeLib, _filePath, _isStream ? FromType.FromLocation : FromType.FromPath);
+            _openWatch = System.Diagnostics.Stopwatch.StartNew();
             _player.Play(_media);
+            OpenTimingLog.Write($"StartMedia: Media created and Play called, {stepWatch.ElapsedMilliseconds} ms");
 
             if (!_isStream && SidPluginSetup.IsSidFile(_filePath))
             {

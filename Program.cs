@@ -10,6 +10,7 @@ namespace SwewolfMediaPlayer
         {
             // To customize application configuration such as set high DPI settings or default font,
             // see https://aka.ms/applicationconfiguration.
+            OpenTimingLog.Write($"Main: started, arguments: {string.Join(" ", args)}");
             ApplicationConfiguration.Initialize();
 
             // For testing a copy of the player without touching the real library file.
@@ -55,6 +56,8 @@ namespace SwewolfMediaPlayer
             {
                 if (MediaPlayerForm.TryGetStreamUri(path, out _) || File.Exists(path))
                 {
+                    // Load the video engine while the window is being made (the main window does the same).
+                    _ = MediaPlayerForm.PreloadAsync();
                     Application.Run(new MediaPlayerForm(Path.GetFullPath(path), string.IsNullOrEmpty(libraryPath) ? null : libraryPath) { Icon = LoadIcon() });
                     return;
                 }
