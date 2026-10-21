@@ -8,6 +8,8 @@
 //
 // History:
 //   2026-10-20  First version.
+//   2026-10-21  While the explorer runs a playlist the two buttons next to the seek bar (the tune buttons of SID files) skip tracks: they send "skip"
+//               (direction next / previous) and the explorer decides what plays; Page Up / Page Down (without tunes) and the media keys do the same.
 
 using System.Runtime.InteropServices;
 
@@ -37,9 +39,25 @@ namespace SwewolfMediaPlayer
             };
             pipe.ClientDisconnected += () =>
             {
-                try { if (!IsDisposed) BeginInvoke(() => _controlled = false); }
+                try { if (!IsDisposed) BeginInvoke(() => SetControlled(false)); }
                 catch (InvalidOperationException) { }
             };
+        }
+
+        /// <summary>True while the explorer runs a playlist in this window: the two buttons skip tracks instead of tunes.</summary>
+        internal bool TrackSkipping => _controlled && _pipe != null;
+
+        private void SetControlled(bool value)
+        {
+            if (_controlled == value) return;
+            _controlled = value;
+            RefreshNavButtons();
+        }
+
+        /// <summary>A button, Page Up / Page Down or a media key: the explorer is asked for the previous or next track (it decides what plays).</summary>
+        private void SkipTrack(int direction)
+        {
+            _pipe?.Send(new { @event = "skip", direction = direction > 0 ? "next" : "previous" });
         }
 
         /// <summary>Called when the engine is ready: a play command that arrived earlier is done now.</summary>
@@ -67,11 +85,11 @@ namespace SwewolfMediaPlayer
                     break;
 
                 case "release":
-                    _controlled = false;
+                    SetControlled(false);
                     break;
 
                 case "control":   // the explorer started this player with a file and now runs a playlist: the end of the file is only reported
-                    _controlled = true;
+                    SetControlled(true);
                     break;
 
                 case "front":
@@ -99,7 +117,7 @@ namespace SwewolfMediaPlayer
                 return;
             }
 
-            _controlled = command.Playlist;
+            SetControlled(command.Playlist);
             _noResumeOnce = command.NoResume;   // the explorer says: a file that follows another one in a playlist starts from the beginning
             await OpenAnotherAsync(path, command.LibraryPath ?? path);
             if (command.Front) BringToFrontNow();

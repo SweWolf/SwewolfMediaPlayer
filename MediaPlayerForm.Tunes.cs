@@ -8,6 +8,8 @@
 //   2026-10-16  First version.
 //   2026-10-16  The next tune starts by itself 3 seconds after a tune has played to its known length.
 //   2026-10-16  LayoutControlBar uses what the buttons were set to (_saveFrameShown, _tuneButtonsShown), not their Visible getter.
+//   2026-10-21  The same two buttons skip to the previous / next track while the explorer runs a playlist (MediaPlayerForm.Pipe.cs: TrackSkipping,
+//               SkipTrack); they are shown for any file then, and enabled at both ends (the explorer decides what comes next).
 
 using LibVLCSharp.Shared;
 
@@ -27,8 +29,33 @@ namespace SwewolfMediaPlayer
 
         private void InitTuneControls()
         {
-            btnPrevTune = NewTuneButton(IconKind.PreviousTune, "Previous Tune (Page Up)", () => ChangeTune(_tuneIndex - 1));
-            btnNextTune = NewTuneButton(IconKind.NextTune, "Next Tune (Page Down)", () => ChangeTune(_tuneIndex + 1));
+            btnPrevTune = NewTuneButton(IconKind.PreviousTune, "Previous Tune (Page Up)", () => NavButton(-1));
+            btnNextTune = NewTuneButton(IconKind.NextTune, "Next Tune (Page Down)", () => NavButton(+1));
+        }
+
+        // The two buttons: tunes of a SID file, or tracks of the explorer's playlist.
+        private void NavButton(int direction)
+        {
+            if (TrackSkipping) SkipTrack(direction);
+            else ChangeTune(_tuneIndex + direction);
+        }
+
+        // Called when the playlist of the explorer starts or ends: the buttons change meaning (and show for any file while it runs).
+        private void RefreshNavButtons()
+        {
+            if (btnPrevTune == null || btnNextTune == null) return;
+
+            ShowTuneControls(_tuneCount > 1);
+            toolTip.SetToolTip(btnPrevTune, TrackSkipping ? "Previous Track" : "Previous Tune (Page Up)");
+            toolTip.SetToolTip(btnNextTune, TrackSkipping ? "Next Track" : "Next Tune (Page Down)");
+            if (TrackSkipping)
+            {
+                btnPrevTune.Enabled = btnNextTune.Enabled = true;
+            }
+            else if (_tuneCount > 1)
+            {
+                ApplyTune();
+            }
         }
 
         private IconButton NewTuneButton(IconKind icon, string tip, Action click)
@@ -102,6 +129,7 @@ namespace SwewolfMediaPlayer
 
         private void ShowTuneControls(bool show)
         {
+            show |= TrackSkipping;   // while the explorer runs a playlist the buttons skip tracks, for any file
             if (btnPrevTune == null || btnNextTune == null || _tuneButtonsShown == show)
             {
                 return;
@@ -160,8 +188,11 @@ namespace SwewolfMediaPlayer
             if (_tuneCount > 1)
             {
                 Text = $"{TitleBase()} - Tune {_tuneIndex + 1} / {_tuneCount}";
-                btnPrevTune!.Enabled = _tuneIndex > 0;
-                btnNextTune!.Enabled = _tuneIndex < _tuneCount - 1;
+                if (!TrackSkipping)
+                {
+                    btnPrevTune!.Enabled = _tuneIndex > 0;
+                    btnNextTune!.Enabled = _tuneIndex < _tuneCount - 1;
+                }
             }
             UpdateTime(_player?.Time ?? 0);
         }

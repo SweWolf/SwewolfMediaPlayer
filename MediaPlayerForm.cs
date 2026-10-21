@@ -645,6 +645,11 @@ namespace SwewolfMediaPlayer
                 ChangeTune(_tuneIndex + (keyData == Keys.PageDown ? 1 : -1));
                 return true;
             }
+            if (keyData is Keys.PageUp or Keys.PageDown && TrackSkipping)
+            {
+                SkipTrack(keyData == Keys.PageDown ? 1 : -1);   // the explorer's playlist: previous / next track
+                return true;
+            }
             if (keyData is Keys.Left or Keys.Right && _paused && CanSeek)
             {
                 StepFrame(keyData == Keys.Right ? 1 : -1);
@@ -1768,6 +1773,10 @@ namespace SwewolfMediaPlayer
                             {
                                 TogglePlayPause();
                             }
+                        }
+                        else if (TrackSkipping)
+                        {
+                            SkipTrack(command == APPCOMMAND_MEDIA_PREVIOUSTRACK ? -1 : 1);
                         }
                         else if (_tuneCount > 1)
                         {
