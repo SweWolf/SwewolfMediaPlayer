@@ -220,6 +220,7 @@ namespace SwewolfMediaPlayer
             int next = _tuneIndex + 1;
             if (next >= _tuneCount)
             {
+                if (ReportEnded()) return;   // the explorer's playlist goes on: it sends the next file
                 if (_whenEnds == EndAction.ClosePlayer)
                 {
                     Close();

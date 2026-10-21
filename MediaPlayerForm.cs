@@ -224,9 +224,20 @@ namespace SwewolfMediaPlayer
 
         private async void MediaPlayerForm_DragDrop(object? sender, DragEventArgs e)
         {
-            MediaPlayer? player = _player;
-            if (player == null || _trimming || _restoringEnd
+            if (_player == null || _trimming || _restoringEnd
                 || e.Data?.GetData(DataFormats.FileDrop) is not string[] { Length: > 0 } files || !File.Exists(files[0]))
+            {
+                return;
+            }
+
+            await OpenAnotherAsync(files[0], files[0]);
+        }
+
+        // Plays another file in this window: a file dropped on it, or one the explorer sends through the pipe (MediaPlayerForm.Pipe.cs).
+        internal async Task OpenAnotherAsync(string path, string libraryPath)
+        {
+            MediaPlayer? player = _player;
+            if (player == null || _trimming || _restoringEnd)
             {
                 return;
             }
@@ -234,10 +245,10 @@ namespace SwewolfMediaPlayer
             EndPreview(false);
             Media? oldMedia = _media;
             _media = null;
-            _filePath = files[0];
-            _libraryPath = files[0];
-            _isStream = false;
-            Text = Path.GetFileName(_filePath);
+            _filePath = path;
+            _libraryPath = libraryPath;
+            _isStream = TryGetStreamUri(path, out Uri? uri);
+            Text = _isStream ? uri!.Host : Path.GetFileName(path);
             _vlcSeekable = true;
             ApplySeekState();
             txtStartAt.Clear();
@@ -357,6 +368,7 @@ namespace SwewolfMediaPlayer
 
             _player!.Volume = trkVolume.Value;
             StartMedia();
+            ProcessPendingPipeCommands();   // the explorer asked for another file while the engine was loading
         }
 
         // Makes the player (on the engine lib) and connects its events and the video window. Used when the window
@@ -586,6 +598,8 @@ namespace SwewolfMediaPlayer
             }
 
             SavePosition(true);   // before the player is released: where the user stopped
+            ReportClosed();
+            _pipe?.Dispose();
             EndPreview(false);
             _previewTimer?.Dispose();
             _previewTimer = null;
@@ -848,6 +862,14 @@ namespace SwewolfMediaPlayer
         {
             LibraryOnEnded();
             MediaPlayer? player = _player;
+
+            // The explorer is told. If it runs a playlist it sends the next file: the end actions below are not used.
+            if (!_previewing && ReportEnded())
+            {
+                ShowStopped();
+                return;
+            }
+
             if (player != null && !_previewing && _whenEnds == EndAction.ClosePlayer)
             {
                 // Closed from the message loop, not from inside the LibVLC event.

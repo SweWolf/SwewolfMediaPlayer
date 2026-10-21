@@ -67,6 +67,13 @@ namespace SwewolfMediaPlayer
             _lastSaveTicks = 0;
             _resumeAtMs = -1;
 
+            // The explorer's playlist (MediaPlayerForm.Pipe.cs) does not want a saved position, or a question about one, for this file.
+            if (_noResumeOnce)
+            {
+                _noResumeOnce = false;
+                return;
+            }
+
             if (!LibraryActive || _settings.ResumeWhenOpening == 2 || SidPluginSetup.IsSidFile(_filePath))
             {
                 return;

@@ -56,9 +56,24 @@ namespace SwewolfMediaPlayer
             {
                 if (MediaPlayerForm.TryGetStreamUri(path, out _) || File.Exists(path))
                 {
+                    // One player window per user: a second start with a file hands the file to the first one (through the pipe,
+                    // PlayerPipe.cs) and ends. If no player answers, this one goes on as a player of its own.
+                    using var oneWindow = new Mutex(true, PlayerPipe.MutexName, out bool first);
+                    if (!first && PlayerPipe.TrySend(new PipeCommand("play", Path.GetFullPath(path),
+                            string.IsNullOrEmpty(libraryPath) ? null : libraryPath, Front: true)))
+                    {
+                        OpenTimingLog.Write("Main: the file was handed to the player that is running");
+                        return;
+                    }
+
                     // Load the video engine while the window is being made (the main window does the same).
                     _ = MediaPlayerForm.PreloadAsync();
-                    Application.Run(new MediaPlayerForm(Path.GetFullPath(path), string.IsNullOrEmpty(libraryPath) ? null : libraryPath) { Icon = LoadIcon() });
+                    var window = new MediaPlayerForm(Path.GetFullPath(path), string.IsNullOrEmpty(libraryPath) ? null : libraryPath) { Icon = LoadIcon() };
+                    PlayerPipe? pipe = first ? new PlayerPipe() : null;
+                    window.AttachPipe(pipe);
+                    pipe?.Start();
+                    Application.Run(window);
+                    pipe?.Dispose();
                     return;
                 }
                 MessageBox.Show($"The file \"{path}\" does not exist.", "SweWolf Media Player",
