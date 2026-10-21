@@ -866,6 +866,7 @@ namespace SwewolfMediaPlayer
             // The explorer is told. If it runs a playlist it sends the next file: the end actions below are not used.
             if (!_previewing && ReportEnded())
             {
+                _ = Task.Run(player.Stop);   // let go of the file: the explorer may rename or move it at once
                 ShowStopped();
                 return;
             }
