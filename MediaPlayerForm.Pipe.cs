@@ -8,6 +8,7 @@
 //
 // History:
 //   2026-10-20  First version.
+//   2026-10-21  The play command's StartMs starts a file at that time (Demo Play); --start-at and --no-resume do the same for a file on the command line.
 //   2026-10-21  While the explorer runs a playlist the two buttons next to the seek bar (the tune buttons of SID files) skip tracks: they send "skip"
 //               (direction next / previous) and the explorer decides what plays; Page Up / Page Down (without tunes) and the media keys do the same.
 
@@ -20,7 +21,15 @@ namespace SwewolfMediaPlayer
         private PlayerPipe? _pipe;
         private bool _controlled;                         // a playlist of the explorer is running
         private bool _noResumeOnce;                       // the next StartLibrary does not offer or use a saved position
+        private long _startAtOnceMs;                      // the next StartLibrary starts the file at this time (the explorer's Demo Play)
         private PipeCommand? _pendingPlay;                // a play command that came before the video engine was ready
+
+        /// <summary>The first file of a player the explorer started (command line --start-at / --no-resume).</summary>
+        internal void SetFirstFileOptions(long startMs, bool noResume)
+        {
+            _startAtOnceMs = startMs;
+            _noResumeOnce = noResume;
+        }
 
         internal void AttachPipe(PlayerPipe? pipe)
         {
@@ -119,6 +128,7 @@ namespace SwewolfMediaPlayer
 
             SetControlled(command.Playlist);
             _noResumeOnce = command.NoResume;   // the explorer says: a file that follows another one in a playlist starts from the beginning
+            _startAtOnceMs = command.StartMs;   // Demo Play
             await OpenAnotherAsync(path, command.LibraryPath ?? path);
             if (command.Front) BringToFrontNow();
         }

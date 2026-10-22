@@ -173,6 +173,7 @@ namespace SwewolfMediaPlayer
             InitializeComponent();
             InitControlPanel();
             InitTuneControls();
+            InitBookmarkButton();
             StyleMenu(menuVideo);
             _filePath = filePath;
             _libraryPath = libraryPath ?? filePath;
@@ -663,6 +664,11 @@ namespace SwewolfMediaPlayer
             if (keyData == Keys.S)
             {
                 SaveFrame();
+                return true;
+            }
+            if (keyData == (Keys.Control | Keys.D))
+            {
+                AddBookmark();   // a bookmark for the file explorer (the usual key for it)
                 return true;
             }
             if (keyData == Keys.F || keyData == (Keys.Alt | Keys.Enter))
@@ -1899,7 +1905,7 @@ namespace SwewolfMediaPlayer
 
     // A button that draws its own icon, so it can be filled and take the colors of the dark theme.
     // BackColor is the button color, ForeColor the icon color.
-    internal enum IconKind { Play, Pause, Stop, Camera, Volume, Muted, PreviousTune, NextTune, More }
+    internal enum IconKind { Play, Pause, Stop, Camera, Volume, Muted, PreviousTune, NextTune, More, Bookmark }
 
     internal sealed class IconButton : Button
     {
@@ -1989,6 +1995,9 @@ namespace SwewolfMediaPlayer
                         g.FillEllipse(hole, R(0.30f, 0.34f, 0.40f, 0.40f));
                     }
                     g.FillEllipse(brush, R(0.38f, 0.42f, 0.24f, 0.24f));
+                    break;
+                case IconKind.Bookmark:   // a ribbon with a notch at the bottom
+                    g.FillPolygon(brush, new[] { P(0.17f, 0f), P(0.83f, 0f), P(0.83f, 1f), P(0.5f, 0.70f), P(0.17f, 1f) });
                     break;
                 case IconKind.Volume:
                 case IconKind.Muted:

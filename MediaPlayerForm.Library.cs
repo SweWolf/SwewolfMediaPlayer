@@ -37,6 +37,7 @@ namespace SwewolfMediaPlayer
         private long _lastSaveTicks;
         private long _resumeAtMs = -1;      // chosen when the file was opened, used when its length is known
         private long _resumeStoredLengthMs;
+        private bool _resumeIgnoreStoredLength;   // the start time was asked for by the explorer (Demo Play): it does not belong to a saved length
 
         private bool LibraryActive => !_isStream && _libraryPath.Length > 0;
 
@@ -66,6 +67,18 @@ namespace SwewolfMediaPlayer
             _savingPosition = false;
             _lastSaveTicks = 0;
             _resumeAtMs = -1;
+            _resumeIgnoreStoredLength = false;
+
+            // The explorer's Demo Play: start at this time, whatever was saved (no question).
+            long startAt = _startAtOnceMs;
+            _startAtOnceMs = 0;
+            if (startAt > 0)
+            {
+                _noResumeOnce = false;
+                _resumeAtMs = startAt;
+                _resumeIgnoreStoredLength = true;
+                return;
+            }
 
             // The explorer's playlist (MediaPlayerForm.Pipe.cs) does not want a saved position, or a question about one, for this file.
             if (_noResumeOnce)
@@ -115,6 +128,15 @@ namespace SwewolfMediaPlayer
 
             long target = _resumeAtMs;
             _resumeAtMs = -1;
+            if (_resumeIgnoreStoredLength)
+            {
+                _resumeIgnoreStoredLength = false;
+                if (target < _lengthMs - 1000)   // a file shorter than the start time plays from the beginning
+                {
+                    SeekTo(target);
+                }
+                return;
+            }
             if (Math.Abs(_lengthMs - _resumeStoredLengthMs) < 2000)
             {
                 SeekTo(target);

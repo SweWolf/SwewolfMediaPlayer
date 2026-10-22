@@ -41,8 +41,21 @@ namespace SwewolfMediaPlayer
             // explorer passes it when it has unpacked the file from an archive to play it.
             string? path = null;
             string? libraryPath = null;
+            long startAtMs = 0;       // --start-at <ms> / --no-resume: from the explorer's Demo Play and Intro Play
+            bool noResume = false;
             for (int i = 0; i < args.Length; i++)
             {
+                if (args[i].Equals("--no-resume", StringComparison.OrdinalIgnoreCase))
+                {
+                    noResume = true;
+                    continue;
+                }
+                if (args[i].Equals("--start-at", StringComparison.OrdinalIgnoreCase) && i + 1 < args.Length)
+                {
+                    long.TryParse(args[++i], out startAtMs);
+                    continue;
+                }
+
                 if (args[i].Equals("--library-path", StringComparison.OrdinalIgnoreCase) && i + 1 < args.Length)
                 {
                     libraryPath = args[++i].Trim().Trim('"');
@@ -60,7 +73,7 @@ namespace SwewolfMediaPlayer
                     // PlayerPipe.cs) and ends. If no player answers, this one goes on as a player of its own.
                     using var oneWindow = new Mutex(true, PlayerPipe.MutexName, out bool first);
                     if (!first && PlayerPipe.TrySend(new PipeCommand("play", Path.GetFullPath(path),
-                            string.IsNullOrEmpty(libraryPath) ? null : libraryPath, Front: true)))
+                            string.IsNullOrEmpty(libraryPath) ? null : libraryPath, StartMs: startAtMs, NoResume: noResume, Front: true)))
                     {
                         OpenTimingLog.Write("Main: the file was handed to the player that is running");
                         return;
@@ -69,6 +82,7 @@ namespace SwewolfMediaPlayer
                     // Load the video engine while the window is being made (the main window does the same).
                     _ = MediaPlayerForm.PreloadAsync();
                     var window = new MediaPlayerForm(Path.GetFullPath(path), string.IsNullOrEmpty(libraryPath) ? null : libraryPath) { Icon = LoadIcon() };
+                    window.SetFirstFileOptions(startAtMs, noResume);
                     PlayerPipe? pipe = first ? new PlayerPipe() : null;
                     window.AttachPipe(pipe);
                     pipe?.Start();

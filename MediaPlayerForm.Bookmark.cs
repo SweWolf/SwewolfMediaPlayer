@@ -1,0 +1,155 @@
+// MediaPlayerForm.Bookmark.cs: the Add Bookmark button (right of the camera button) and Ctrl+D.
+//
+// A bookmark is an ordinary Windows shortcut in the explorer's Bookmarks folder, %AppData%\SweWolfSoftware\SwewolfFileExplorer\Bookmarks
+// (the explorer shows it at the top of its folder tree and reads that folder again when its window comes to the front). The point where it
+// starts is written in the shortcut's Comment in plain words, "Start time: 0:12:34.500" (hours:minutes:seconds.thousandths): the explorer's
+// BookmarkStore.FormatStartTime / ParseStartTime read and write the same text (change both together).
+//
+// History:
+//   2026-10-21  First version. A question first (the file, a checkbox "Start Point 0:00:53", unchecked, as TeraTool had it).
+
+using System.Runtime.InteropServices;
+
+namespace SwewolfMediaPlayer
+{
+    public partial class MediaPlayerForm
+    {
+        private IconButton? btnBookmark;
+
+        private void InitBookmarkButton()
+        {
+            btnBookmark = new IconButton
+            {
+                BackColor = btnSaveFrame.BackColor,
+                FlatStyle = FlatStyle.Flat,
+                ForeColor = btnSaveFrame.ForeColor,
+                Icon = IconKind.Bookmark,
+                Name = "btnBookmark",
+                Size = btnSaveFrame.Size,
+                Top = btnSaveFrame.Top,
+                Left = btnSaveFrame.Right + 6,
+                TabStop = false,
+                UseVisualStyleBackColor = false,
+            };
+            toolTip.SetToolTip(btnBookmark, "Add Bookmark at This Point (Ctrl+D)");
+            btnBookmark.Click += (_, _) => AddBookmark();
+            pnlControls.Controls.Add(btnBookmark);
+            LayoutControlBar();
+        }
+
+        // Asks (as TeraTool did: the file, and a checkbox "Start Point 0:00:53", unchecked) and makes the shortcut.
+        // Without the start point: a bookmark of the file, named like the file. With it: named "<file> @ 12m34s", so several start
+        // points of one file can be kept, with the start point in the Comment.
+        private void AddBookmark()
+        {
+            if (_player == null || _isStream || _restoringEnd || !File.Exists(_filePath))
+            {
+                return;
+            }
+
+            string file = Path.GetFullPath(_filePath);
+            long ms = Math.Max(_player.Time, 0);   // the point when the key was pressed, not when the question is answered
+            TimeSpan t = TimeSpan.FromMilliseconds(ms);
+            string clock = t.TotalHours >= 1 ? $"{(int)t.TotalHours}:{t.Minutes:00}:{t.Seconds:00}" : $"{t.Minutes}:{t.Seconds:00}";
+
+            if (!AskBookmark(file, $"Start Point {clock}", out bool useStart))
+            {
+                return;
+            }
+
+            string name = Path.GetFileNameWithoutExtension(file);
+            foreach (char bad in Path.GetInvalidFileNameChars())
+            {
+                name = name.Replace(bad.ToString(), "");
+            }
+            name = name.Trim().Trim('.').Trim();
+            if (name.Length == 0)
+            {
+                name = "Bookmark";
+            }
+
+            string when = t.TotalHours >= 1 ? $"{(int)t.TotalHours}h{t.Minutes:00}m{t.Seconds:00}s" : $"{t.Minutes}m{t.Seconds:00}s";
+            string folder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+                "SweWolfSoftware", "SwewolfFileExplorer", "Bookmarks");
+
+            try
+            {
+                Directory.CreateDirectory(folder);
+                string lnk = Path.Combine(folder, useStart ? $"{name} @ {when}.lnk" : $"{name}.lnk");
+                if (File.Exists(lnk))
+                {
+                    ShowTitleMessage(useStart ? "That start point is bookmarked already" : "This file is bookmarked already");
+                    return;
+                }
+
+                Type type = Type.GetTypeFromProgID("WScript.Shell")!;
+                dynamic shell = Activator.CreateInstance(type)!;
+                dynamic link = shell.CreateShortcut(lnk);
+                link.TargetPath = file;
+                link.WorkingDirectory = Path.GetDirectoryName(file) ?? "";
+                if (useStart)
+                {
+                    link.Description = $"Start time: {(int)t.TotalHours}:{t.Minutes:00}:{t.Seconds:00}.{t.Milliseconds:000}";
+                }
+                link.Save();
+                Marshal.FinalReleaseComObject(link);
+                Marshal.FinalReleaseComObject(shell);
+
+                ShowTitleMessage(useStart ? $"Bookmark added at {clock}" : "Bookmark added");
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(this, $"The bookmark could not be made. {ex.Message}", AppName, MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            }
+        }
+
+        // The window title says something for a moment.
+        private void ShowTitleMessage(string text)
+        {
+            Text = text;
+            var restore = new System.Windows.Forms.Timer { Interval = 2500 };
+            restore.Tick += (_, _) =>
+            {
+                restore.Stop();
+                restore.Dispose();
+                Text = Path.GetFileName(_filePath);
+            };
+            restore.Start();
+        }
+
+        private bool AskBookmark(string file, string startPointText, out bool useStart)
+        {
+            using var dialog = new Form
+            {
+                Text = "Add Bookmark",
+                FormBorderStyle = FormBorderStyle.FixedDialog,
+                StartPosition = FormStartPosition.CenterParent,
+                MaximizeBox = false,
+                MinimizeBox = false,
+                ShowInTaskbar = false,
+                ClientSize = new Size(520, 150),
+                BackColor = Color.FromArgb(43, 43, 43),
+                ForeColor = Color.FromArgb(230, 230, 230),
+            };
+            var label = new Label { Text = file, AutoEllipsis = true, Left = 14, Top = 14, Width = 492, Height = 40 };
+            var check = new CheckBox { Text = startPointText, Left = 14, Top = 68, Width = 492, Checked = false };
+            var ok = new Button
+            {
+                Text = "OK", DialogResult = DialogResult.OK, Left = 14, Top = 106, Width = 240, Height = 30,
+                FlatStyle = FlatStyle.Flat, BackColor = Color.FromArgb(60, 60, 60),
+            };
+            var cancel = new Button
+            {
+                Text = "Cancel", DialogResult = DialogResult.Cancel, Left = 266, Top = 106, Width = 240, Height = 30,
+                FlatStyle = FlatStyle.Flat, BackColor = Color.FromArgb(60, 60, 60),
+            };
+            dialog.Controls.AddRange(new Control[] { label, check, ok, cancel });
+            dialog.AcceptButton = ok;
+            dialog.CancelButton = cancel;
+
+            bool accepted = dialog.ShowDialog(this) == DialogResult.OK;
+            useStart = accepted && check.Checked;
+            return accepted;
+        }
+    }
+}

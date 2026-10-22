@@ -170,6 +170,11 @@ namespace SwewolfMediaPlayer
                 btnSaveFrame.Left = x + gap;
                 x = btnSaveFrame.Right;
             }
+            if (btnBookmark != null)   // right of the camera button
+            {
+                btnBookmark.Left = x + gap;
+                x = btnBookmark.Right;
+            }
             if (_tuneButtonsShown)
             {
                 btnPrevTune.Left = x + gap;
