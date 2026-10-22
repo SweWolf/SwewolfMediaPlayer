@@ -641,6 +641,10 @@ namespace SwewolfMediaPlayer
                 TogglePlayPause();
                 return true;
             }
+            if (keyData == Keys.PageUp && (_tuneCount > 1 || TrackSkipping) && RestartIfPlayedAWhile())
+            {
+                return true;
+            }
             if (keyData is Keys.PageUp or Keys.PageDown && _tuneCount > 1)
             {
                 ChangeTune(_tuneIndex + (keyData == Keys.PageDown ? 1 : -1));
@@ -1779,6 +1783,10 @@ namespace SwewolfMediaPlayer
                             {
                                 TogglePlayPause();
                             }
+                        }
+                        else if (command == APPCOMMAND_MEDIA_PREVIOUSTRACK && (TrackSkipping || _tuneCount > 1) && RestartIfPlayedAWhile())
+                        {
+                            // back to the start of the file
                         }
                         else if (TrackSkipping)
                         {

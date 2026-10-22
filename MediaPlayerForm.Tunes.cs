@@ -8,6 +8,7 @@
 //   2026-10-16  First version.
 //   2026-10-16  The next tune starts by itself 3 seconds after a tune has played to its known length.
 //   2026-10-16  LayoutControlBar uses what the buttons were set to (_saveFrameShown, _tuneButtonsShown), not their Visible getter.
+//   2026-10-21  The back button, Page Up and the previous-track key first go to the start of the file or tune when it has played 3 seconds or more.
 //   2026-10-21  The same two buttons skip to the previous / next track while the explorer runs a playlist (MediaPlayerForm.Pipe.cs: TrackSkipping,
 //               SkipTrack); they are shown for any file then, and enabled at both ends (the explorer decides what comes next).
 
@@ -36,8 +37,21 @@ namespace SwewolfMediaPlayer
         // The two buttons: tunes of a SID file, or tracks of the explorer's playlist.
         private void NavButton(int direction)
         {
+            if (direction < 0 && RestartIfPlayedAWhile()) return;
             if (TrackSkipping) SkipTrack(direction);
             else ChangeTune(_tuneIndex + direction);
+        }
+
+        // The "back" button, Page Up and the previous-track media key: after more than 3 seconds of the file (or tune) they go back to its start,
+        // and only within the first 3 seconds do they go to the previous file or tune. True if it went back to the start.
+        private bool RestartIfPlayedAWhile()
+        {
+            if (_player == null || !CanSeek || _player.Time < 3000)
+            {
+                return false;
+            }
+            SeekTo(0);
+            return true;
         }
 
         // Called when the playlist of the explorer starts or ends: the buttons change meaning (and show for any file while it runs).
