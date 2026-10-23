@@ -15,6 +15,12 @@
     <Copyright>SweWolf Software</Copyright>
     <Authors>SweWolf</Authors>
     <Description>A media player with frame stepping, frame saving and trimming</Description>
+    <!-- 64-bit Windows on Intel/AMD only. Only the x64 LibVLC files are copied: fewer files for the virus scanner
+         to check at the first start, and a smaller download. (ARM PCs run the x64 program in emulation.) -->
+    <PlatformTarget>x64</PlatformTarget>
+    <VlcWindowsX64Enabled>true</VlcWindowsX64Enabled>
+    <VlcWindowsX86Enabled>false</VlcWindowsX86Enabled>
+    <VlcWindowsArm64Enabled>false</VlcWindowsArm64Enabled>
   </PropertyGroup>
 
   <ItemGroup>

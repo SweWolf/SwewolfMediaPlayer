@@ -203,13 +203,46 @@ namespace SwewolfMediaPlayer
                 };
                 Controls.Add(_loadingLabel);
             }
-            _loadingLabel.Text = text;
+            _loadingText = text;
+            ApplyLoadingText();
             _loadingLabel.Visible = true;
             _loadingLabel.BringToFront();
+
+            // Still waiting after a few seconds: say why (Windows checks the new files the first time).
+            if (_slowLoadTimer == null && !_slowLoadHint)
+            {
+                _slowLoadTimer = new System.Windows.Forms.Timer { Interval = SlowLoadHintDelayMs };
+                _slowLoadTimer.Tick += (s, a) =>
+                {
+                    _slowLoadTimer?.Stop();
+                    _slowLoadHint = true;
+                    ApplyLoadingText();
+                };
+                _slowLoadTimer.Start();
+            }
+        }
+
+        private const int SlowLoadHintDelayMs = 5000;
+        private System.Windows.Forms.Timer? _slowLoadTimer;
+        private bool _slowLoadHint;
+        private string _loadingText = "";
+
+        private void ApplyLoadingText()
+        {
+            if (_loadingLabel != null)
+            {
+                _loadingLabel.Text = _slowLoadHint
+                    ? _loadingText + "\n\nThe first start of a new version can take a few minutes,\nbecause Windows checks the program files. Later starts are much faster."
+                    : _loadingText;
+            }
         }
 
         private void HideLoading()
         {
+            _slowLoadTimer?.Stop();
+            _slowLoadTimer?.Dispose();
+            _slowLoadTimer = null;
+            _slowLoadHint = false;
             if (_loadingLabel != null)
             {
                 _loadingLabel.Visible = false;

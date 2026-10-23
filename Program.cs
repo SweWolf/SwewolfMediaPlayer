@@ -10,7 +10,7 @@ namespace SwewolfMediaPlayer
         {
             // To customize application configuration such as set high DPI settings or default font,
             // see https://aka.ms/applicationconfiguration.
-            OpenTimingLog.Write($"Main: started, arguments: {string.Join(" ", args)}");
+            OpenTimingLog.Write($"Main: started, program folder: {AppContext.BaseDirectory}, arguments: {string.Join(" ", args)}");
             ApplicationConfiguration.Initialize();
 
             // For testing a copy of the player without touching the real library file.
