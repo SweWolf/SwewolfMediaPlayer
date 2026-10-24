@@ -18,6 +18,8 @@ public sealed record LibraryRoute(string DbFile, string Prefix, bool Relative, s
 /// what it knows.
 ///
 /// History:
+///   2026-10-24  IsWebAddress is public; SetItemInfo has "create" (default false: the explorer never makes a library file just for this;
+///               an importer passes true).
 ///   2026-10-24  SetItemInfo keeps only http / https addresses of other computers ("about:internet" and localhost are not stored).
 ///   2026-10-24  Schema 8: table ItemInfo (per file: where it came from, HostUrl and ReferrerUrl, copied from the Mark of the Web when the
 ///               explorer shows the file, or written by an importer). SetItemInfo / GetItemInfo; Forget and Move carry the rows. An older
@@ -1038,23 +1040,26 @@ public static class LibraryStore
     }
 
     /// <summary>
+    /// Only real web addresses are worth keeping: not "about:internet" (Edge, when it does not know the address) and not this computer's
+    /// own server (localhost, 127.x.x.x, ::1: a local program such as Pinokio or a Gradio page, not a download from the internet).
+    /// </summary>
+    public static bool IsWebAddress(string? url)
+    {
+        if (!Uri.TryCreate(url, UriKind.Absolute, out var uri) || (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps)) return false;
+        var host = uri.Host;
+        return !(host.Equals("localhost", StringComparison.OrdinalIgnoreCase) || host.EndsWith(".localhost", StringComparison.OrdinalIgnoreCase)
+                 || (System.Net.IPAddress.TryParse(host, out var ip) && System.Net.IPAddress.IsLoopback(ip)));
+    }
+
+    /// <summary>
     /// Remembers where a file came from. An empty value never replaces a stored one (the Mark of the Web may carry only the site, or
-    /// nothing, after the file was edited). Never creates a file on a removable drive: it writes only where the library file exists
+    /// nothing, after the file was edited). Unless create is true it never makes a library file (on a removable drive too): it writes only where the library file exists
     /// already. Returns true if the row is there afterwards.
     /// </summary>
-    public static bool SetItemInfo(string filePath, string? hostUrl, string? referrerUrl)
+    public static bool SetItemInfo(string filePath, string? hostUrl, string? referrerUrl, bool create = false)
     {
-        // Only real web addresses are worth keeping: not "about:internet" (Edge, when it does not know the address) and not this computer's
-        // own server (localhost, 127.x.x.x, ::1: a local program such as Pinokio or a Gradio page, not a download from the internet).
-        static bool IsWeb(string? url)
-        {
-            if (!Uri.TryCreate(url, UriKind.Absolute, out var uri) || (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps)) return false;
-            var host = uri.Host;
-            return !(host.Equals("localhost", StringComparison.OrdinalIgnoreCase) || host.EndsWith(".localhost", StringComparison.OrdinalIgnoreCase)
-                     || (System.Net.IPAddress.TryParse(host, out var ip) && System.Net.IPAddress.IsLoopback(ip)));
-        }
-        if (!IsWeb(hostUrl?.Trim())) hostUrl = null;
-        if (!IsWeb(referrerUrl?.Trim())) referrerUrl = null;
+        if (!IsWebAddress(hostUrl?.Trim())) hostUrl = null;
+        if (!IsWebAddress(referrerUrl?.Trim())) referrerUrl = null;
         if (hostUrl == null && referrerUrl == null) return false;
 
         var path = filePath.TrimEnd('\\', '/');
@@ -1065,10 +1070,10 @@ public static class LibraryStore
         {
             try
             {
-                var route = Resolve(folder, create: false);
+                var route = Resolve(folder, create: create);
                 if (route == null) return false;
 
-                using var connection = Open(route, create: false);
+                using var connection = Open(route, create: create);
                 if (connection == null) return false;
 
                 var (parentKey, name) = RatedKey(route, path);
