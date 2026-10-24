@@ -14,6 +14,7 @@
 //   2026-10-16  ResumeWhenOpening (Yes / Ask / No); SaveResumePoint has two values now (the old "none" is the new No).
 //   2026-10-16  ResumeRewindSeconds (default 10).
 //   2026-10-23  ShowTuneList (on by default).
+//   2026-10-23  CoverPictureSize (Medium by default).
 
 using System.Text.Json;
 
@@ -44,6 +45,9 @@ namespace SwewolfMediaPlayer
 
         // The saved position is this many seconds before the point where the user stopped (0 = the exact point).
         public int ResumeRewindSeconds { get; set; } = 10;
+
+        // How large the cover picture of a music file is shown: 0 = Medium (75 percent of what fits, as in TeraTool), 1 = Maximum.
+        public int CoverPictureSize { get; set; }
 
         // Whether the list of tunes is shown on the right while a SID file with several tunes plays.
         public bool ShowTuneList { get; set; } = true;

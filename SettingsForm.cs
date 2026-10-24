@@ -7,6 +7,7 @@
 //   2026-10-16  Resume (Yes / Ask / No) is its own drop-down; the length box is hidden, not disabled, when it does not apply.
 //   2026-10-16  Move the Resume Point Back by N seconds (default 10).
 //   2026-10-16  Resume = No hides the other settings of the group.
+//   2026-10-23  Cover Picture Size for Music Files (Medium / Maximum) in the Player group.
 
 namespace SwewolfMediaPlayer
 {
@@ -36,6 +37,7 @@ namespace SwewolfMediaPlayer
             nudAudioMinutes.Visible = showLength;
             lblMinutes.Visible = showLength;
 
+            grpResume.Top = grpPlayer.Bottom + 12;
             grpResume.Height = !resumeOn ? 82 : showLength ? 224 : 186;
             grpUpdate.Top = grpResume.Bottom + 12;
 
@@ -49,6 +51,7 @@ namespace SwewolfMediaPlayer
             chkStartFullScreen.Checked = settings.StartFullScreenForVideo;
             chkSeekThumbnails.Checked = settings.ShowSeekBarThumbnails;
             cboNewVersionCheck.SelectedItem = settings.CheckForUpdatesOnStartup ? "Yes" : "No";
+            cboCoverSize.SelectedIndex = Math.Clamp(settings.CoverPictureSize, 0, 1);
             cboResumeMode.SelectedIndex = Math.Clamp(settings.ResumeWhenOpening, 0, 2);
             cboSaveResume.SelectedIndex = Math.Clamp(settings.SaveResumePoint, 0, 1);
             nudRewind.Value = Math.Clamp(settings.ResumeRewindSeconds, (int)nudRewind.Minimum, (int)nudRewind.Maximum);
@@ -73,6 +76,7 @@ namespace SwewolfMediaPlayer
             settings.StartFullScreenForVideo = chkStartFullScreen.Checked;
             settings.ShowSeekBarThumbnails = chkSeekThumbnails.Checked;
             settings.CheckForUpdatesOnStartup = cboNewVersionCheck.SelectedItem?.ToString() != "No";
+            settings.CoverPictureSize = Math.Max(0, cboCoverSize.SelectedIndex);
             settings.ResumeWhenOpening = Math.Max(0, cboResumeMode.SelectedIndex);
             settings.SaveResumePoint = Math.Max(0, cboSaveResume.SelectedIndex);
             settings.ResumeRewindSeconds = (int)nudRewind.Value;

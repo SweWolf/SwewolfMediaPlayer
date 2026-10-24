@@ -35,6 +35,10 @@ namespace SwewolfMediaPlayer
             cboWhenEnds.Items.AddRange(new object[] { "Show the Last Frame", "Show a Black Screen", "Repeat", "Close Player" });
             _whenEnds = Enum.IsDefined((EndAction)_settings.WhenVideoEnds) ? (EndAction)_settings.WhenVideoEnds : EndAction.LastFrame;
             cboWhenEnds.SelectedIndex = (int)_whenEnds;
+
+            picCover.SizeChanged += (_, _) => ApplyCoverSize();
+            picCover.VisibleChanged += (_, _) => ApplyCoverSize();
+            ApplyCoverSize();
         }
 
         private void cboWhenEnds_SelectedIndexChanged(object? sender, EventArgs e)

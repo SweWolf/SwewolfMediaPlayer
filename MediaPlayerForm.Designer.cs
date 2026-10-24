@@ -46,7 +46,7 @@ namespace SwewolfMediaPlayer
             btnTrim = new Button();
             menuVideo = new ContextMenuStrip(components);
             videoView = new LibVLCSharp.WinForms.VideoView();
-            picCover = new PictureBox();
+            picCover = new CoverBox();
             pnlControls = new Panel();
             trkSeek = new JumpTrackBar();
             lblTime = new Label();
@@ -514,7 +514,7 @@ namespace SwewolfMediaPlayer
         #endregion
 
         private LibVLCSharp.WinForms.VideoView videoView;
-        private PictureBox picCover;
+        private CoverBox picCover;
         private ToolTip toolTip;
         private ContextMenuStrip menuVideo;
         private Panel pnlControls;
