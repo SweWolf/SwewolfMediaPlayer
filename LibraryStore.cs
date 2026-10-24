@@ -18,6 +18,7 @@ public sealed record LibraryRoute(string DbFile, string Prefix, bool Relative, s
 /// what it knows.
 ///
 /// History:
+///   2026-10-24  SetItemInfo keeps only http / https addresses ("about:internet" and the like are not stored).
 ///   2026-10-24  Schema 8: table ItemInfo (per file: where it came from, HostUrl and ReferrerUrl, copied from the Mark of the Web when the
 ///               explorer shows the file, or written by an importer). SetItemInfo / GetItemInfo; Forget and Move carry the rows. An older
 ///               copy ignores the table.
@@ -1043,8 +1044,10 @@ public static class LibraryStore
     /// </summary>
     public static bool SetItemInfo(string filePath, string? hostUrl, string? referrerUrl)
     {
-        if (string.IsNullOrWhiteSpace(hostUrl)) hostUrl = null;
-        if (string.IsNullOrWhiteSpace(referrerUrl)) referrerUrl = null;
+        // Only real web addresses are worth keeping: Edge writes "about:internet" when it does not know the address.
+        static bool IsWeb(string? url) => url != null && (url.StartsWith("http://", StringComparison.OrdinalIgnoreCase) || url.StartsWith("https://", StringComparison.OrdinalIgnoreCase));
+        if (!IsWeb(hostUrl?.Trim())) hostUrl = null;
+        if (!IsWeb(referrerUrl?.Trim())) referrerUrl = null;
         if (hostUrl == null && referrerUrl == null) return false;
 
         var path = filePath.TrimEnd('\\', '/');
