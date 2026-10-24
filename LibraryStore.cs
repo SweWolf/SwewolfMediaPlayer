@@ -18,7 +18,7 @@ public sealed record LibraryRoute(string DbFile, string Prefix, bool Relative, s
 /// what it knows.
 ///
 /// History:
-///   2026-10-24  SetItemInfo keeps only http / https addresses ("about:internet" and the like are not stored).
+///   2026-10-24  SetItemInfo keeps only http / https addresses of other computers ("about:internet" and localhost are not stored).
 ///   2026-10-24  Schema 8: table ItemInfo (per file: where it came from, HostUrl and ReferrerUrl, copied from the Mark of the Web when the
 ///               explorer shows the file, or written by an importer). SetItemInfo / GetItemInfo; Forget and Move carry the rows. An older
 ///               copy ignores the table.
@@ -1044,8 +1044,15 @@ public static class LibraryStore
     /// </summary>
     public static bool SetItemInfo(string filePath, string? hostUrl, string? referrerUrl)
     {
-        // Only real web addresses are worth keeping: Edge writes "about:internet" when it does not know the address.
-        static bool IsWeb(string? url) => url != null && (url.StartsWith("http://", StringComparison.OrdinalIgnoreCase) || url.StartsWith("https://", StringComparison.OrdinalIgnoreCase));
+        // Only real web addresses are worth keeping: not "about:internet" (Edge, when it does not know the address) and not this computer's
+        // own server (localhost, 127.x.x.x, ::1: a local program such as Pinokio or a Gradio page, not a download from the internet).
+        static bool IsWeb(string? url)
+        {
+            if (!Uri.TryCreate(url, UriKind.Absolute, out var uri) || (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps)) return false;
+            var host = uri.Host;
+            return !(host.Equals("localhost", StringComparison.OrdinalIgnoreCase) || host.EndsWith(".localhost", StringComparison.OrdinalIgnoreCase)
+                     || (System.Net.IPAddress.TryParse(host, out var ip) && System.Net.IPAddress.IsLoopback(ip)));
+        }
         if (!IsWeb(hostUrl?.Trim())) hostUrl = null;
         if (!IsWeb(referrerUrl?.Trim())) referrerUrl = null;
         if (hostUrl == null && referrerUrl == null) return false;
