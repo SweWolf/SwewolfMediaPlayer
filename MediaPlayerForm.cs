@@ -71,6 +71,7 @@
 //   2026-10-16  Read marks and resume points in the library shared with SweWolf File Explorer
 //               (MediaPlayerForm.Library.cs, LibraryStore.cs); the constructor takes an optional library path.
 //   2026-10-23  Music files show artist, title and album in the top left corner (MediaPlayerForm.TrackInfo.cs).
+//   2026-10-23  A music file without cover art of its own shows the picture of its folder (FolderCoverFinder.cs, the explorer's rules).
 //   2026-10-23  SID files: tune names from HVSC's STIL (SidTuneTitles.cs) and a tune list on the right (MediaPlayerForm.TuneList.cs).
 
 using System.ComponentModel;
@@ -585,28 +586,53 @@ namespace SwewolfMediaPlayer
                 return;
             }
 
+            // A visualization takes the place of the cover art.
+            bool wantPicture = ActiveVisualization() == null;
             try
             {
                 using TagLib.File tags = TagLib.File.Create(_filePath);
                 ShowTrackInfo(tags.Tag.FirstPerformer ?? tags.Tag.FirstAlbumArtist, tags.Tag.Title, tags.Tag.Album);
 
-                // A visualization takes the place of the cover art.
-                if (ActiveVisualization() != null || tags.Tag.Pictures.Length == 0)
+                if (wantPicture && tags.Tag.Pictures.Length > 0)
                 {
+                    // Prefer the front cover; otherwise take the first picture.
+                    TagLib.IPicture picture = tags.Tag.Pictures.FirstOrDefault(p => p.Type == TagLib.PictureType.FrontCover) ?? tags.Tag.Pictures[0];
+                    using MemoryStream stream = new(picture.Data.Data);
+                    using Image loaded = Image.FromStream(stream);
+                    picCover.Image = new Bitmap(loaded);   // a copy: the stream is closed when this method ends
+                    picCover.Visible = true;
                     return;
                 }
-
-                // Prefer the front cover; otherwise take the first picture.
-                TagLib.IPicture picture = tags.Tag.Pictures.FirstOrDefault(p => p.Type == TagLib.PictureType.FrontCover) ?? tags.Tag.Pictures[0];
-                using MemoryStream stream = new(picture.Data.Data);
-                using Image loaded = Image.FromStream(stream);
-                picCover.Image = new Bitmap(loaded);   // a copy: the stream is closed when this method ends
-                picCover.Visible = true;
             }
             catch (Exception)
             {
-                // No readable tags or picture: leave the black video area as it was.
+                // No readable tags or picture: the folder's picture is tried, else the black video area stays.
             }
+
+            if (wantPicture)
+            {
+                _ = ShowFolderCoverAsync(_filePath);
+            }
+        }
+
+        // The file has no cover art of its own: show the picture of its folder (FolderCoverFinder, the same as the explorer shows).
+        // Looked for in the background: the folder may be on a slow drive.
+        private async Task ShowFolderCoverAsync(string path)
+        {
+            Bitmap? cover = await Task.Run(() => FolderCoverFinder.Find(path, AudioExtensions));
+            if (cover == null)
+            {
+                return;
+            }
+            if (IsDisposed || path != _filePath || picCover.Image != null || ActiveVisualization() != null)
+            {
+                cover.Dispose();   // another file or a visualization came meanwhile
+                return;
+            }
+
+            picCover.Image = cover;
+            picCover.Visible = true;
+            UpdateSaveFrameButton();
         }
 
         // LibVLC creates its audio output when playback starts and can ignore a volume or mute set
