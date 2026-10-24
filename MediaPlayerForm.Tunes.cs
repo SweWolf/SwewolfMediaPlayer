@@ -11,6 +11,7 @@
 //   2026-10-21  The back button, Page Up and the previous-track key first go to the start of the file or tune when it has played 3 seconds or more.
 //   2026-10-21  The same two buttons skip to the previous / next track while the explorer runs a playlist (MediaPlayerForm.Pipe.cs: TrackSkipping,
 //               SkipTrack); they are shown for any file then, and enabled at both ends (the explorer decides what comes next).
+//   2026-10-23  Tune names from HVSC's STIL in the window title and the Tune menu; a list of the tunes on the right (MediaPlayerForm.TuneList.cs).
 
 using LibVLCSharp.Shared;
 
@@ -101,6 +102,7 @@ namespace SwewolfMediaPlayer
             _restoreTune = -1;
             _tuneLengths = null;
             ShowTuneControls(false);
+            ResetSidInfo();
             Text = TitleBase();
         }
 
@@ -206,13 +208,14 @@ namespace SwewolfMediaPlayer
             _knownLengthMs = _tuneLengths != null && _tuneIndex < _tuneLengths.Length ? _tuneLengths[_tuneIndex] ?? 0 : 0;
             if (_tuneCount > 1)
             {
-                Text = $"{TitleBase()} - Tune {_tuneIndex + 1} / {_tuneCount}";
+                Text = $"{TitleBase()} - Tune {_tuneIndex + 1} / {_tuneCount}{(TuneTitle(_tuneIndex) is { } name ? " - " + name : "")}";
                 if (!TrackSkipping)
                 {
                     btnPrevTune!.Enabled = _tuneIndex > 0;
                     btnNextTune!.Enabled = _tuneIndex < _tuneCount - 1;
                 }
             }
+            RefreshSidInfo();
             UpdateTime(_player?.Time ?? 0);
         }
 
@@ -271,12 +274,12 @@ namespace SwewolfMediaPlayer
             if (next >= _tuneCount)
             {
                 if (ReportEnded()) return;   // the explorer's playlist goes on: it sends the next file
-                if (_whenEnds == EndAction.ClosePlayer)
+                if (EffectiveEndAction == EndAction.ClosePlayer)
                 {
                     Close();
                     return;
                 }
-                if (_whenEnds != EndAction.Repeat)
+                if (EffectiveEndAction != EndAction.Repeat)
                 {
                     return;   // stays paused at the end of the last tune
                 }
@@ -295,11 +298,14 @@ namespace SwewolfMediaPlayer
             }
 
             ToolStripMenuItem tunes = new("Tune");
+            bool listShown = _settings.ShowTuneList;
+            tunes.DropDownItems.Add(TrackItem("Show Tune List", listShown, () => SetTuneListShown(!listShown)));
+            tunes.DropDownItems.Add(new ToolStripSeparator());
             for (int i = 0; i < _tuneCount; i++)
             {
                 int index = i;
                 long? length = _tuneLengths != null && i < _tuneLengths.Length ? _tuneLengths[i] : null;
-                string text = length is > 0 ? $"Tune {i + 1}   ({FormatTime(length.Value, false)})" : $"Tune {i + 1}";
+                string text = length is > 0 ? $"{TuneText(i)}   ({FormatTime(length.Value, false)})" : TuneText(i);
                 tunes.DropDownItems.Add(TrackItem(text, index == _tuneIndex, () => ChangeTune(index)));
             }
             menuVideo.Items.Add(tunes);

@@ -8,6 +8,7 @@
 //   2026-10-13  First version: "When the Video Ends" (last frame, black screen, repeat).
 //   2026-10-13  "When the Video Ends" is remembered between runs (AppSettings.cs).
 //   2026-10-15  New option "Close Player": the window closes when the video ends.
+//   2026-10-23  While the Trim group box is open, the end action is always the last frame (EffectiveEndAction).
 
 namespace SwewolfMediaPlayer
 {
@@ -24,6 +25,10 @@ namespace SwewolfMediaPlayer
         private bool _panelVisible;
         private EndAction _whenEnds = EndAction.LastFrame;
         private readonly AppSettings _settings = AppSettings.Load();
+
+        // While the Trim group box is open the player never closes, repeats or goes black at the end:
+        // it stays on the last frame, so the user can go on trimming. The chosen option is kept as it was.
+        private EndAction EffectiveEndAction => _trimVisible ? EndAction.LastFrame : _whenEnds;
 
         private void InitControlPanel()
         {

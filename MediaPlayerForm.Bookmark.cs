@@ -7,6 +7,7 @@
 //
 // History:
 //   2026-10-21  First version. A question first (the file, a checkbox "Start Point 0:00:53", unchecked, as TeraTool had it).
+//   2026-10-23  SID files: no Start Point checkbox (a SID file cannot be jumped in), the question is shorter.
 
 using System.Runtime.InteropServices;
 
@@ -52,7 +53,8 @@ namespace SwewolfMediaPlayer
             TimeSpan t = TimeSpan.FromMilliseconds(ms);
             string clock = t.TotalHours >= 1 ? $"{(int)t.TotalHours}:{t.Minutes:00}:{t.Seconds:00}" : $"{t.Minutes}:{t.Seconds:00}";
 
-            if (!AskBookmark(file, $"Start Point {clock}", out bool useStart))
+            // SID music has no start point (it cannot be jumped in): the question has no checkbox.
+            if (!AskBookmark(file, SidPluginSetup.IsSidFile(_filePath) ? null : $"Start Point {clock}", out bool useStart))
             {
                 return;
             }
@@ -117,8 +119,10 @@ namespace SwewolfMediaPlayer
             restore.Start();
         }
 
-        private bool AskBookmark(string file, string startPointText, out bool useStart)
+        // startPointText null: no checkbox, and the buttons move up to close the gap.
+        private bool AskBookmark(string file, string? startPointText, out bool useStart)
         {
+            int buttonsTop = startPointText == null ? 68 : 106;
             using var dialog = new Form
             {
                 Text = "Add Bookmark",
@@ -127,20 +131,20 @@ namespace SwewolfMediaPlayer
                 MaximizeBox = false,
                 MinimizeBox = false,
                 ShowInTaskbar = false,
-                ClientSize = new Size(520, 150),
+                ClientSize = new Size(520, buttonsTop + 44),
                 BackColor = Color.FromArgb(43, 43, 43),
                 ForeColor = Color.FromArgb(230, 230, 230),
             };
             var label = new Label { Text = file, AutoEllipsis = true, Left = 14, Top = 14, Width = 492, Height = 40 };
-            var check = new CheckBox { Text = startPointText, Left = 14, Top = 68, Width = 492, Checked = false };
+            var check = new CheckBox { Text = startPointText, Visible = startPointText != null, Left = 14, Top = 68, Width = 492, Checked = false };
             var ok = new Button
             {
-                Text = "OK", DialogResult = DialogResult.OK, Left = 14, Top = 106, Width = 240, Height = 30,
+                Text = "OK", DialogResult = DialogResult.OK, Left = 14, Top = buttonsTop, Width = 240, Height = 30,
                 FlatStyle = FlatStyle.Flat, BackColor = Color.FromArgb(60, 60, 60),
             };
             var cancel = new Button
             {
-                Text = "Cancel", DialogResult = DialogResult.Cancel, Left = 266, Top = 106, Width = 240, Height = 30,
+                Text = "Cancel", DialogResult = DialogResult.Cancel, Left = 266, Top = buttonsTop, Width = 240, Height = 30,
                 FlatStyle = FlatStyle.Flat, BackColor = Color.FromArgb(60, 60, 60),
             };
             dialog.Controls.AddRange(new Control[] { label, check, ok, cancel });

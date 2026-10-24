@@ -70,6 +70,8 @@
 //               and S did not save a frame (the Visible getter is false then): _saveFrameShown, _tuneButtonsShown.
 //   2026-10-16  Read marks and resume points in the library shared with SweWolf File Explorer
 //               (MediaPlayerForm.Library.cs, LibraryStore.cs); the constructor takes an optional library path.
+//   2026-10-23  Music files show artist, title and album in the top left corner (MediaPlayerForm.TrackInfo.cs).
+//   2026-10-23  SID files: tune names from HVSC's STIL (SidTuneTitles.cs) and a tune list on the right (MediaPlayerForm.TuneList.cs).
 
 using System.ComponentModel;
 using System.Drawing.Drawing2D;
@@ -528,6 +530,7 @@ namespace SwewolfMediaPlayer
             if (!_isStream && SidPluginSetup.IsSidFile(_filePath))
             {
                 _ = ShowSidLengthAsync(_filePath);
+                _ = LoadSidInfoAsync(_filePath);
             }
         }
 
@@ -576,8 +579,8 @@ namespace SwewolfMediaPlayer
             picCover.Visible = false;
             old?.Dispose();
 
-            // A visualization takes the place of the cover art.
-            if (_isStream || ActiveVisualization() != null || !AudioExtensions.Contains(Path.GetExtension(_filePath), StringComparer.OrdinalIgnoreCase))
+            HideTrackInfo();
+            if (_isStream || !AudioExtensions.Contains(Path.GetExtension(_filePath), StringComparer.OrdinalIgnoreCase))
             {
                 return;
             }
@@ -585,7 +588,10 @@ namespace SwewolfMediaPlayer
             try
             {
                 using TagLib.File tags = TagLib.File.Create(_filePath);
-                if (tags.Tag.Pictures.Length == 0)
+                ShowTrackInfo(tags.Tag.FirstPerformer ?? tags.Tag.FirstAlbumArtist, tags.Tag.Title, tags.Tag.Album);
+
+                // A visualization takes the place of the cover art.
+                if (ActiveVisualization() != null || tags.Tag.Pictures.Length == 0)
                 {
                     return;
                 }
@@ -919,7 +925,7 @@ namespace SwewolfMediaPlayer
                 return;
             }
 
-            if (player != null && !_previewing && _whenEnds == EndAction.ClosePlayer)
+            if (player != null && !_previewing && EffectiveEndAction == EndAction.ClosePlayer)
             {
                 // Closed from the message loop, not from inside the LibVLC event.
                 BeginInvoke(Close);
@@ -933,12 +939,12 @@ namespace SwewolfMediaPlayer
             }
 
             // The Control Panel decides what happens at the end (not while a preview plays).
-            if (!_previewing && _whenEnds == EndAction.Repeat)
+            if (!_previewing && EffectiveEndAction == EndAction.Repeat)
             {
                 RestartPlayback();
                 return;
             }
-            if (!_previewing && _whenEnds == EndAction.BlackScreen)
+            if (!_previewing && EffectiveEndAction == EndAction.BlackScreen)
             {
                 _ = Task.Run(player.Stop);
                 ShowStopped();
