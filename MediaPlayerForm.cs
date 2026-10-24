@@ -235,7 +235,7 @@ namespace SwewolfMediaPlayer
             if (_loadingLabel != null)
             {
                 _loadingLabel.Text = _slowLoadHint
-                    ? _loadingText + "\n\nThe first start of a new version can take a few minutes,\nbecause Windows checks the program files. Later starts are much faster."
+                    ? _loadingText + "\n\nStarting is taking longer than usual.\nYour security software is probably checking the program files. This is normal after an update,\nand the next start is usually much faster."
                     : _loadingText;
             }
         }
