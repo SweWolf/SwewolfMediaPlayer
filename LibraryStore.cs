@@ -18,6 +18,9 @@ public sealed record LibraryRoute(string DbFile, string Prefix, bool Relative, s
 /// what it knows.
 ///
 /// History:
+///   2026-10-24  Schema 8: table ItemInfo (per file: where it came from, HostUrl and ReferrerUrl, copied from the Mark of the Web when the
+///               explorer shows the file, or written by an importer). SetItemInfo / GetItemInfo; Forget and Move carry the rows. An older
+///               copy ignores the table.
 ///   2026-10-19  Schema 7: table FolderPicture (per folder: the name of the picture file in it that the user chose as the picture of
 ///               the folder). SetFolderPicture / GetFolderPicture; Forget and Move carry the rows. An older copy ignores the table.
 ///   2026-10-18A fixed drive with a folder .SweWolfFileExplorerData in its root counts as portable (VeraCrypt volume, any drive the bus
@@ -46,7 +49,7 @@ public static class LibraryStore
 {
     public const string UsbFolderName = ".SweWolfFileExplorerData";
     public const string DbFileName = "library.db";
-    private const int SchemaVersion = 7;
+    private const int SchemaVersion = 8;
 
     /// <summary>One thing at a time on the database files (inside this app).</summary>
     public static readonly object Gate = new();
@@ -493,6 +496,13 @@ public static class LibraryStore
                 CREATE TABLE IF NOT EXISTS LastOpened (
                     Path TEXT NOT NULL COLLATE NOCASE PRIMARY KEY,
                     Name TEXT NOT NULL
+                ) WITHOUT ROWID;
+                CREATE TABLE IF NOT EXISTS ItemInfo (
+                    Folder      TEXT NOT NULL COLLATE NOCASE,
+                    Name        TEXT NOT NULL COLLATE NOCASE,
+                    HostUrl     TEXT,
+                    ReferrerUrl TEXT,
+                    PRIMARY KEY (Folder, Name)
                 ) WITHOUT ROWID;
                 CREATE TABLE IF NOT EXISTS PreviewPick (
                     Folder  TEXT NOT NULL COLLATE NOCASE,
@@ -989,6 +999,100 @@ public static class LibraryStore
         }
     }
 
+    // ── Where a file came from ───────────────────────────────────────────────
+
+    /// <summary>Where a file was downloaded from (the address of the file) and the page that linked to it; either may be null.</summary>
+    public sealed record ItemInfoRow(string? HostUrl, string? ReferrerUrl);
+
+    /// <summary>What the library remembers about where a file came from, or null if nothing (or nothing can be read). Creates nothing.</summary>
+    public static ItemInfoRow? GetItemInfo(string filePath)
+    {
+        var path = filePath.TrimEnd('\\', '/');
+        var folder = Path.GetDirectoryName(path);
+        if (string.IsNullOrEmpty(folder)) return null;
+
+        lock (Gate)
+        {
+            try
+            {
+                var route = Resolve(folder, create: false);
+                if (route == null) return null;
+
+                using var connection = Open(route, create: false);
+                if (connection == null) return null;
+
+                var (parentKey, name) = RatedKey(route, path);
+                using var command = Command(connection, "SELECT HostUrl, ReferrerUrl FROM ItemInfo WHERE Folder = $f AND Name = $n",
+                    ("$f", parentKey), ("$n", name));
+                using var reader = command.ExecuteReader();
+                if (!reader.Read()) return null;
+                return new ItemInfoRow(reader.IsDBNull(0) ? null : reader.GetString(0), reader.IsDBNull(1) ? null : reader.GetString(1));
+            }
+            catch (Exception ex)
+            {
+                RepairAfter(ex, path);
+                return null;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Remembers where a file came from. An empty value never replaces a stored one (the Mark of the Web may carry only the site, or
+    /// nothing, after the file was edited). Never creates a file on a removable drive: it writes only where the library file exists
+    /// already. Returns true if the row is there afterwards.
+    /// </summary>
+    public static bool SetItemInfo(string filePath, string? hostUrl, string? referrerUrl)
+    {
+        if (string.IsNullOrWhiteSpace(hostUrl)) hostUrl = null;
+        if (string.IsNullOrWhiteSpace(referrerUrl)) referrerUrl = null;
+        if (hostUrl == null && referrerUrl == null) return false;
+
+        var path = filePath.TrimEnd('\\', '/');
+        var folder = Path.GetDirectoryName(path);
+        if (string.IsNullOrEmpty(folder)) return false;
+
+        lock (Gate)
+        {
+            try
+            {
+                var route = Resolve(folder, create: false);
+                if (route == null) return false;
+
+                using var connection = Open(route, create: false);
+                if (connection == null) return false;
+
+                var (parentKey, name) = RatedKey(route, path);
+                string? oldHost = null, oldReferrer = null;
+                using (var read = Command(connection, "SELECT HostUrl, ReferrerUrl FROM ItemInfo WHERE Folder = $f AND Name = $n",
+                           ("$f", parentKey), ("$n", name)))
+                using (var reader = read.ExecuteReader())
+                {
+                    if (reader.Read())
+                    {
+                        oldHost     = reader.IsDBNull(0) ? null : reader.GetString(0);
+                        oldReferrer = reader.IsDBNull(1) ? null : reader.GetString(1);
+                    }
+                }
+
+                var newHost     = hostUrl ?? oldHost;
+                var newReferrer = referrerUrl ?? oldReferrer;
+                if (newHost == oldHost && newReferrer == oldReferrer && (oldHost != null || oldReferrer != null)) return true;   // nothing new
+
+                using var write = Command(connection,
+                    "INSERT INTO ItemInfo (Folder, Name, HostUrl, ReferrerUrl) VALUES ($f, $n, $h, $r) "
+                    + "ON CONFLICT(Folder, Name) DO UPDATE SET HostUrl = $h, ReferrerUrl = $r",
+                    ("$f", parentKey), ("$n", name), ("$h", newHost), ("$r", newReferrer));
+                write.ExecuteNonQuery();
+                return true;
+            }
+            catch (Exception ex)
+            {
+                RepairAfter(ex, path);
+                return false;
+            }
+        }
+    }
+
     // ── Sort order of a folder ───────────────────────────────────────────────
 
     /// <summary>
@@ -1114,7 +1218,7 @@ public static class LibraryStore
     {
         var (below, above) = SubtreeRange(key);
 
-        foreach (var table in new[] { "File", "Rated", "PreviewPick" })
+        foreach (var table in new[] { "File", "Rated", "PreviewPick", "ItemInfo" })
         {
             using (var item = session.Command(connection, $"DELETE FROM {table} WHERE Folder = $p AND Name = $n", ("$p", parentKey), ("$n", name)))
                 item.ExecuteNonQuery();
@@ -1234,6 +1338,8 @@ public static class LibraryStore
             "SELECT Path, SortColumn, SortAscending, TreeSortColumn, TreeSortAscending FROM FolderPrefs WHERE Path = $k OR (Path > $a AND Path < $b)", p);
         var picks   = ReadAll(session, fromConnection,
             "SELECT Folder, Name, Picture FROM PreviewPick WHERE (Folder = $p AND Name = $n) OR Folder = $k OR (Folder > $a AND Folder < $b)", p);
+        var infos   = ReadAll(session, fromConnection,
+            "SELECT Folder, Name, HostUrl, ReferrerUrl FROM ItemInfo WHERE (Folder = $p AND Name = $n) OR Folder = $k OR (Folder > $a AND Folder < $b)", p);
         var lasts   = ReadAll(session, fromConnection,
             "SELECT Path, Name FROM LastOpened WHERE Path = $k OR (Path > $a AND Path < $b)", p);   // folders: the item and below
         var lastOfItem = ReadAll(session, fromConnection,
@@ -1242,7 +1348,7 @@ public static class LibraryStore
             "SELECT Path, Name FROM FolderPicture WHERE Path = $k OR (Path > $a AND Path < $b)", p);
         var folderPicOfItem = ReadAll(session, fromConnection,
             "SELECT Path, Name FROM FolderPicture WHERE Path = $p AND Name = $n COLLATE NOCASE", p);
-        if (files.Count == 0 && rated.Count == 0 && folders.Count == 0 && prefs.Count == 0 && picks.Count == 0
+        if (files.Count == 0 && rated.Count == 0 && folders.Count == 0 && prefs.Count == 0 && picks.Count == 0 && infos.Count == 0
             && lasts.Count == 0 && lastOfItem.Count == 0 && folderPics.Count == 0 && folderPicOfItem.Count == 0) return;
 
         var toRoute = Resolve(to, create: true);
@@ -1284,6 +1390,15 @@ public static class LibraryStore
             using var insert = session.Command(toConnection,
                 "INSERT OR REPLACE INTO Rated (Folder, Name, Rating, Expectation) VALUES ($f, $n, $r, $e)",
                 ("$f", folder), ("$n", name), ("$r", r[2]), ("$e", r[3]));
+            insert.ExecuteNonQuery();
+        }
+
+        foreach (var r in infos)
+        {
+            var (folder, name) = IsTheItem(r[0], r[1]) ? (toParent, toName) : (Remap((string)r[0]!), (string)r[1]!);
+            using var insert = session.Command(toConnection,
+                "INSERT OR REPLACE INTO ItemInfo (Folder, Name, HostUrl, ReferrerUrl) VALUES ($f, $n, $h, $r)",
+                ("$f", folder), ("$n", name), ("$h", r[2]), ("$r", r[3]));
             insert.ExecuteNonQuery();
         }
 
