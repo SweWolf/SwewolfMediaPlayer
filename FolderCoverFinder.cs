@@ -6,14 +6,15 @@
 //   1. A picture in the folder with a cover-like name, best first: Folder, Cover, Front, Poster, AlbumArt (also
 //      Windows Media Player's AlbumArt_{...}_Large), Album, Thumb, Thumbnail, or a name equal to the folder's
 //      (or ending in "cover"). Hidden files count: Folder.jpg is usually hidden.
-//   2. The cover embedded in the first music files of the folder (up to MaxMusicFilesTried of them).
 // Not copied from the explorer: the folder's own icon from desktop.ini and pictures inside archives. There is no
-// "first picture of the folder" fallback on purpose: in a folder of photos it would be a random one.
+// "first picture of the folder" fallback on purpose: in a folder of photos it would be a random one. And a cover
+// is never taken from another music file: the folder may be a Downloads folder, not an album.
 // Safe to call from a background thread. Any problem (no access, damaged picture) gives null.
 //
 // When the explorer's rules change, change them here too.
 //
 // History:
+//   2026-10-25  No more cover from other music files of the folder (step 2 removed; Find has no musicExtensions).
 //   2026-10-23  First version.
 
 namespace SwewolfMediaPlayer
@@ -25,13 +26,11 @@ namespace SwewolfMediaPlayer
         // The picture types System.Drawing can read.
         private static readonly string[] ImageExtensions = { ".jpg", ".jpeg", ".jfif", ".png", ".gif", ".bmp", ".tif", ".tiff" };
 
-        private const int MaxMusicFilesTried = 5;
-
         private static readonly System.Text.RegularExpressions.Regex WmpArt =
             new(@"^AlbumArt_(\{[0-9A-Fa-f-]+\})_(Large|Small)$", System.Text.RegularExpressions.RegexOptions.Compiled);
 
-        // The picture for the folder of musicFile, or null. musicExtensions: the file types whose tags may hold a cover.
-        public static Bitmap? Find(string musicFile, string[] musicExtensions)
+        // The picture for the folder of musicFile, or null.
+        public static Bitmap? Find(string musicFile)
         {
             try
             {
@@ -75,17 +74,6 @@ namespace SwewolfMediaPlayer
                     }
                 }
 
-                // 2. The cover embedded in a music file of the folder.
-                var music = files.Where(f => musicExtensions.Contains(Path.GetExtension(f), StringComparer.OrdinalIgnoreCase))
-                    .OrderBy(f => Path.GetFileName(f), StringComparer.OrdinalIgnoreCase)
-                    .Take(MaxMusicFilesTried);
-                foreach (string song in music)
-                {
-                    if (EmbeddedCover(song) is { } cover)
-                    {
-                        return cover;
-                    }
-                }
             }
             catch (Exception)
             {
@@ -102,26 +90,6 @@ namespace SwewolfMediaPlayer
             {
                 using Image loaded = Image.FromFile(file);
                 return new Bitmap(loaded);   // a copy: the file is not kept open
-            }
-            catch (Exception)
-            {
-                return null;
-            }
-        }
-
-        private static Bitmap? EmbeddedCover(string song)
-        {
-            try
-            {
-                using TagLib.File tags = TagLib.File.Create(song);
-                if (tags.Tag.Pictures.Length == 0)
-                {
-                    return null;
-                }
-                TagLib.IPicture picture = tags.Tag.Pictures.FirstOrDefault(p => p.Type == TagLib.PictureType.FrontCover) ?? tags.Tag.Pictures[0];
-                using MemoryStream stream = new(picture.Data.Data);
-                using Image loaded = Image.FromStream(stream);
-                return new Bitmap(loaded);
             }
             catch (Exception)
             {

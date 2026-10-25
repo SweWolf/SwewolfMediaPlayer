@@ -619,7 +619,7 @@ namespace SwewolfMediaPlayer
         // Looked for in the background: the folder may be on a slow drive.
         private async Task ShowFolderCoverAsync(string path)
         {
-            Bitmap? cover = await Task.Run(() => FolderCoverFinder.Find(path, AudioExtensions));
+            Bitmap? cover = await Task.Run(() => FolderCoverFinder.Find(path));
             if (cover == null)
             {
                 return;
