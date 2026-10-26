@@ -54,6 +54,14 @@ Code: `MediaPlayerForm.Chapters.cs` (plus the hooks in `MediaPlayerForm.cs` and 
 
 - **Steps:** 0.25x, 0.5x, 0.75x, 1x, 1.25x, 1.5x, 2x, 3x, 4x.
 - **Keys:** `]` faster, `[` slower, `\` back to 1x (the mpv convention). `+` and `-` are an alternative.
+- **Control (decided 2026-10-26):** not a slider (the exact speeds are hard to read from it) and not in the Control Panel.
+  It goes in the **main control bar**, with the other controls for what plays now: a small box that shows the speed
+  ("1x", "1.5x") and an up / down arrow pair on its right, stacked like a spin box. Each click moves one step in the
+  list above. Up = faster, down = slower. Keep the list ordered so that the arrows go the way people expect.
+  - WinForms `DomainUpDown` has exactly this behavior (list of text items, arrows). Its arrows are drawn by Windows
+    and stay light in the dark theme, so a self-drawn control like `IconButton` / `CloseXButton` is probably needed.
+  - Open: where it sits in the bar (near the time label?) and whether it is hidden when the file cannot use it
+    (SID files).
 - **Menu:** a **Speed** submenu in the right-click menu with a check mark on the current rate (no "..." on it).
 - **Decided:** the speed is **not remembered**. It resets to 1x whenever a new file starts. So no "Remember Playback Speed"
   setting. Reset it in the new-file path (`StartMedia`, next to `ResetTunes` and `ResetChapters`).

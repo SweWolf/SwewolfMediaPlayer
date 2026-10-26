@@ -9,6 +9,7 @@
 //   2026-10-13  "When the Video Ends" is remembered between runs (AppSettings.cs).
 //   2026-10-15  New option "Close Player": the window closes when the video ends.
 //   2026-10-23  While the Trim group box is open, the end action is always the last frame (EffectiveEndAction).
+//   2026-10-26  A small X in the upper right corner closes the group box (CloseXButton.cs); the Trim group box has one too.
 
 namespace SwewolfMediaPlayer
 {
@@ -56,6 +57,11 @@ namespace SwewolfMediaPlayer
         private void mnuShowControlPanel_Click(object? sender, EventArgs e)
         {
             SetPanelVisible(!_panelVisible);
+        }
+
+        private void btnCloseControlPanel_Click(object? sender, EventArgs e)
+        {
+            SetPanelVisible(false);
         }
 
         private void SetPanelVisible(bool visible)

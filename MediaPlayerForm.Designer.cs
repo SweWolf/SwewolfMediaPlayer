@@ -44,6 +44,8 @@ namespace SwewolfMediaPlayer
             txtFadeOut = new TextBox();
             btnPreview = new Button();
             btnTrim = new Button();
+            btnCloseTrim = new CloseXButton();
+            btnCloseControlPanel = new CloseXButton();
             menuVideo = new ContextMenuStrip(components);
             videoView = new LibVLCSharp.WinForms.VideoView();
             picCover = new CoverBox();
@@ -247,7 +249,7 @@ namespace SwewolfMediaPlayer
             btnPreview.FlatAppearance.BorderColor = Color.FromArgb(96, 96, 96);
             btnPreview.FlatStyle = FlatStyle.Flat;
             btnPreview.ForeColor = Color.FromArgb(230, 230, 230);
-            btnPreview.Location = new Point(1006, 24);
+            btnPreview.Location = new Point(978, 24);
             btnPreview.Name = "btnPreview";
             btnPreview.Size = new Size(80, 25);
             btnPreview.TabIndex = 10;
@@ -263,7 +265,7 @@ namespace SwewolfMediaPlayer
             btnTrim.FlatAppearance.BorderColor = Color.FromArgb(96, 96, 96);
             btnTrim.FlatStyle = FlatStyle.Flat;
             btnTrim.ForeColor = Color.FromArgb(230, 230, 230);
-            btnTrim.Location = new Point(1092, 24);
+            btnTrim.Location = new Point(1064, 24);
             btnTrim.Name = "btnTrim";
             btnTrim.Size = new Size(74, 25);
             btnTrim.TabIndex = 11;
@@ -271,6 +273,28 @@ namespace SwewolfMediaPlayer
             toolTip.SetToolTip(btnTrim, "Trim the file with SplitMediaFiles. The original file is kept.");
             btnTrim.UseVisualStyleBackColor = false;
             btnTrim.Click += btnTrim_Click;
+            //
+            // btnCloseTrim
+            //
+            btnCloseTrim.Anchor = AnchorStyles.Top | AnchorStyles.Right;
+            btnCloseTrim.Location = new Point(1154, 9);
+            btnCloseTrim.Name = "btnCloseTrim";
+            btnCloseTrim.Size = new Size(22, 20);
+            btnCloseTrim.TabIndex = 12;
+            toolTip.SetToolTip(btnCloseTrim, "Close Trim");
+            btnCloseTrim.UseVisualStyleBackColor = false;
+            btnCloseTrim.Click += btnCloseTrim_Click;
+            //
+            // btnCloseControlPanel
+            //
+            btnCloseControlPanel.Anchor = AnchorStyles.Top | AnchorStyles.Right;
+            btnCloseControlPanel.Location = new Point(1154, 9);
+            btnCloseControlPanel.Name = "btnCloseControlPanel";
+            btnCloseControlPanel.Size = new Size(22, 20);
+            btnCloseControlPanel.TabIndex = 2;
+            toolTip.SetToolTip(btnCloseControlPanel, "Close Control Panel");
+            btnCloseControlPanel.UseVisualStyleBackColor = false;
+            btnCloseControlPanel.Click += btnCloseControlPanel_Click;
             // 
             // menuVideo
             // 
@@ -387,6 +411,7 @@ namespace SwewolfMediaPlayer
             grpControlPanel.ContextMenuStrip = menuControls;
             grpControlPanel.Controls.Add(lblWhenEnds);
             grpControlPanel.Controls.Add(cboWhenEnds);
+            grpControlPanel.Controls.Add(btnCloseControlPanel);
             grpControlPanel.Dock = DockStyle.Bottom;
             grpControlPanel.Location = new Point(0, 518);
             grpControlPanel.Name = "grpControlPanel";
@@ -433,6 +458,7 @@ namespace SwewolfMediaPlayer
             grpTrim.Controls.Add(txtFadeOut);
             grpTrim.Controls.Add(btnPreview);
             grpTrim.Controls.Add(btnTrim);
+            grpTrim.Controls.Add(btnCloseTrim);
             grpTrim.Dock = DockStyle.Bottom;
             grpTrim.Location = new Point(0, 580);
             grpTrim.Name = "grpTrim";
@@ -539,6 +565,8 @@ namespace SwewolfMediaPlayer
         private TextBox txtFadeOut;
         private Button btnPreview;
         private Button btnTrim;
+        private CloseXButton btnCloseTrim;
+        private CloseXButton btnCloseControlPanel;
         private ContextMenuStrip menuControls;
         private ContextMenuStrip menuSaveFrame;
         private ToolStripMenuItem mnuSetPreviewPicture;

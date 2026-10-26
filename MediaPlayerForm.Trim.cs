@@ -18,6 +18,7 @@
 //   2026-10-12  The Now buttons use the position the seek bar was dragged to while stopped.
 //   2026-10-12  Trim asks: Replace the File (-overwrite, as before) or Save as a New File (SplitMediaFiles
 //               opens with the values filled in and the player does not wait).
+//   2026-10-26  A small X (CloseXButton.cs) in the upper right corner closes the group box; Preview and Trim moved 28 px to the left.
 
 using System.ComponentModel;
 using System.Diagnostics;
@@ -68,6 +69,11 @@ namespace SwewolfMediaPlayer
         private void mnuShowTrim_Click(object? sender, EventArgs e)
         {
             SetTrimVisible(!_trimVisible);
+        }
+
+        private void btnCloseTrim_Click(object? sender, EventArgs e)
+        {
+            SetTrimVisible(false);
         }
 
         private void SetTrimVisible(bool visible)
