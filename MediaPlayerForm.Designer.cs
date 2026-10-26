@@ -44,6 +44,7 @@ namespace SwewolfMediaPlayer
             txtFadeOut = new TextBox();
             btnPreview = new Button();
             btnTrim = new Button();
+            chkShowSubtitles = new CheckBox();
             btnCloseTrim = new CloseXButton();
             btnCloseControlPanel = new CloseXButton();
             menuVideo = new ContextMenuStrip(components);
@@ -291,7 +292,7 @@ namespace SwewolfMediaPlayer
             btnCloseControlPanel.Location = new Point(1154, 9);
             btnCloseControlPanel.Name = "btnCloseControlPanel";
             btnCloseControlPanel.Size = new Size(22, 20);
-            btnCloseControlPanel.TabIndex = 2;
+            btnCloseControlPanel.TabIndex = 3;
             toolTip.SetToolTip(btnCloseControlPanel, "Close Control Panel");
             btnCloseControlPanel.UseVisualStyleBackColor = false;
             btnCloseControlPanel.Click += btnCloseControlPanel_Click;
@@ -350,7 +351,7 @@ namespace SwewolfMediaPlayer
             trkSeek.Location = new Point(152, 12);
             trkSeek.Maximum = 1000;
             trkSeek.Name = "trkSeek";
-            trkSeek.Size = new Size(638, 32);
+            trkSeek.Size = new Size(608, 32);
             trkSeek.TabIndex = 3;
             trkSeek.TickStyle = TickStyle.None;
             trkSeek.Scroll += trkSeek_Scroll;
@@ -364,9 +365,9 @@ namespace SwewolfMediaPlayer
             lblTime.Anchor = AnchorStyles.Top | AnchorStyles.Right;
             lblTime.ContextMenuStrip = menuControls;
             lblTime.ForeColor = Color.FromArgb(230, 230, 230);
-            lblTime.Location = new Point(798, 12);
+            lblTime.Location = new Point(838, 12);
             lblTime.Name = "lblTime";
-            lblTime.Size = new Size(160, 32);
+            lblTime.Size = new Size(120, 32);
             lblTime.TabIndex = 4;
             lblTime.Text = "0:00 / 0:00";
             lblTime.TextAlign = ContentAlignment.MiddleRight;
@@ -411,6 +412,7 @@ namespace SwewolfMediaPlayer
             grpControlPanel.ContextMenuStrip = menuControls;
             grpControlPanel.Controls.Add(lblWhenEnds);
             grpControlPanel.Controls.Add(cboWhenEnds);
+            grpControlPanel.Controls.Add(chkShowSubtitles);
             grpControlPanel.Controls.Add(btnCloseControlPanel);
             grpControlPanel.Dock = DockStyle.Bottom;
             grpControlPanel.Location = new Point(0, 518);
@@ -442,6 +444,20 @@ namespace SwewolfMediaPlayer
             cboWhenEnds.TabIndex = 1;
             toolTip.SetToolTip(cboWhenEnds, "What the player does when a video has played to its end");
             cboWhenEnds.SelectedIndexChanged += cboWhenEnds_SelectedIndexChanged;
+            //
+            // chkShowSubtitles
+            //
+            chkShowSubtitles.AutoSize = true;
+            chkShowSubtitles.Checked = true;
+            chkShowSubtitles.CheckState = CheckState.Checked;
+            chkShowSubtitles.Location = new Point(352, 27);
+            chkShowSubtitles.Name = "chkShowSubtitles";
+            chkShowSubtitles.Size = new Size(110, 19);
+            chkShowSubtitles.TabIndex = 2;
+            chkShowSubtitles.Text = "Show Subtitles";
+            toolTip.SetToolTip(chkShowSubtitles, "Show the subtitles of a video (C). Remembered for the next time.");
+            chkShowSubtitles.UseVisualStyleBackColor = true;
+            chkShowSubtitles.CheckedChanged += chkShowSubtitles_CheckedChanged;
             // 
             // grpTrim
             // 
@@ -575,5 +591,6 @@ namespace SwewolfMediaPlayer
         private GroupBox grpControlPanel;
         private Label lblWhenEnds;
         private ComboBox cboWhenEnds;
+        private CheckBox chkShowSubtitles;
     }
 }

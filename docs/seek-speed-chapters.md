@@ -9,7 +9,8 @@ Only the chapters part is built so far. Skip and speed are still to do.
 | --- | --- |
 | Chapters (buttons, keys P and N, menu) | **Done**, committed 2026-10-25 (`8c7cbf6`) |
 | Skip back / forward (10 s, 30 s) | To do |
-| Playback speed | To do |
+| Playback speed (box with arrows, keys + - Backspace) | **Done**, 2026-10-26 (`SpeedBox.cs`, `MediaPlayerForm.Speed.cs`) |
+| Show Subtitles check box in the Control Panel | **Done**, 2026-10-26 (remembered, on by default; the C key switches it) |
 | Settings for the skip lengths | To do |
 | `docs/help.md` shortcut section | To do (there is no help file in this repo yet) |
 
@@ -50,7 +51,15 @@ Code: `MediaPlayerForm.Chapters.cs` (plus the hooks in `MediaPlayerForm.cs` and 
 - Open: the exact lengths and keys. The proposal above is the VLC / YouTube convention; the user has not decided.
 - Check: PageUp / PageDown are taken (tune and track skipping), and Left / Right are used for frame stepping while paused.
 
-## To do: playback speed
+## Done: playback speed (built 2026-10-26)
+
+What was built: the box sits left of the time label (the seek bar is 30 px shorter); arrows, mouse wheel and the keys
+`+` / `-` (also `]` / `[`) step through the list, Backspace or a double click on the text goes back to 1x; a speed other than 1x
+is shown in blue. The box is off for streams and SID files. Every new file and the trim preview start at 1x.
+The `[ ] \` keys of the original plan need AltGr on a Swedish keyboard, hence `+`, `-` and Backspace.
+Tested: at 4x the clock advanced about 14 s in 3.3 s. Not built: a Speed submenu in the right-click menu.
+
+Original plan (kept for the details):
 
 - **Steps:** 0.25x, 0.5x, 0.75x, 1x, 1.25x, 1.5x, 2x, 3x, 4x.
 - **Keys:** `]` faster, `[` slower, `\` back to 1x (the mpv convention). `+` and `-` are an alternative.

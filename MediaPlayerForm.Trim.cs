@@ -302,6 +302,7 @@ namespace SwewolfMediaPlayer
                 }
             }
 
+            ResetSpeed();   // the preview is timed for normal speed
             player.Time = _previewStartMs;
             _stepTimeMs = -1;
             player.SetPause(false);

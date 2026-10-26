@@ -15,6 +15,7 @@
 //   2026-10-16  ResumeRewindSeconds (default 10).
 //   2026-10-23  ShowTuneList (on by default).
 //   2026-10-23  CoverPictureSize (Medium by default).
+//   2026-10-26  ShowSubtitles (on by default).
 
 using System.Text.Json;
 
@@ -51,6 +52,9 @@ namespace SwewolfMediaPlayer
 
         // Whether the list of tunes is shown on the right while a SID file with several tunes plays.
         public bool ShowTuneList { get; set; } = true;
+
+        // Whether subtitles are shown (the "Show Subtitles" check box of the Control Panel; on by default).
+        public bool ShowSubtitles { get; set; } = true;
 
         // Whether the main window asks GitHub for a newer version when it starts.
         public bool CheckForUpdatesOnStartup { get; set; } = true;

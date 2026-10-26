@@ -75,6 +75,8 @@
 //   2026-10-23  SID files: tune names from HVSC's STIL (SidTuneTitles.cs) and a tune list on the right (MediaPlayerForm.TuneList.cs).
 //   2026-10-25  Chapters: previous / next buttons, keys P and N, a Chapters menu; only for files that have chapters (MediaPlayerForm.Chapters.cs).
 //   2026-10-25  Icons: chapters have a bar and one triangle (as in VLC); previous / next tune and track have a bar and two triangles.
+//   2026-10-26  Playback speed box left of the time, keys + - Backspace (SpeedBox.cs, MediaPlayerForm.Speed.cs); the seek bar is 30 px shorter.
+//   2026-10-26  The C key switches the "Show Subtitles" check box of the Control Panel (remembered); the setting is applied to each file (CheckSubtitles).
 
 using System.ComponentModel;
 using System.Drawing.Drawing2D;
@@ -180,6 +182,7 @@ namespace SwewolfMediaPlayer
             InitTuneControls();
             InitBookmarkButton();
             InitChapterControls();
+            InitSpeedBox();
             StyleMenu(menuVideo);
             _filePath = filePath;
             _libraryPath = libraryPath ?? filePath;
@@ -511,6 +514,8 @@ namespace SwewolfMediaPlayer
             _knownLengthMs = 0;
             ResetTunes();
             ResetChapters();
+            ResetSpeed();
+            _subtitlesApplied = false;
             _vlcSeekable = true;
             ApplySeekState();
             ResetThumbnails();
@@ -567,6 +572,10 @@ namespace SwewolfMediaPlayer
         private void ApplySeekState()
         {
             trkSeek.Enabled = CanSeek;
+            if (speedBox != null)
+            {
+                speedBox.Enabled = CanSeek;
+            }
         }
 
         // Audio files do not open in full screen mode, even when the setting asks for it for video.
@@ -734,6 +743,25 @@ namespace SwewolfMediaPlayer
             {
                 GoToChapter(keyData == Keys.N ? 1 : -1);
                 return true;
+            }
+            // + / -: faster / slower (] and [ too), Backspace: normal speed; not while typing in a text box.
+            if (SpeedAvailable && !(ActiveControl is TextBoxBase { Visible: true }))
+            {
+                if (keyData is Keys.Oemplus or Keys.Add or Keys.OemCloseBrackets)
+                {
+                    StepSpeed(+1);
+                    return true;
+                }
+                if (keyData is Keys.OemMinus or Keys.Subtract or Keys.OemOpenBrackets)
+                {
+                    StepSpeed(-1);
+                    return true;
+                }
+                if (keyData == Keys.Back)
+                {
+                    ResetSpeed();
+                    return true;
+                }
             }
             if (keyData == Keys.C)
             {
@@ -1583,6 +1611,8 @@ namespace SwewolfMediaPlayer
 
             CheckTunes();
             CheckChapters();
+            CheckSpeed();
+            CheckSubtitles();
             TrackLibrary();
 
             if (_isStream && !_videoCheckDone && _player.IsPlaying)
@@ -1752,27 +1782,8 @@ namespace SwewolfMediaPlayer
                 return;
             }
 
-            if (_player.Spu >= 0)
-            {
-                _lastSubtitleTrack = _player.Spu;
-                _player.SetSpu(-1);
-                return;
-            }
-
-            var tracks = _player.SpuDescription;
-            if (_lastSubtitleTrack >= 0 && tracks.Any(t => t.Id == _lastSubtitleTrack))
-            {
-                _player.SetSpu(_lastSubtitleTrack);
-            }
-            else
-            {
-                // Track id -1 is the "disabled" entry in the list.
-                var first = tracks.FirstOrDefault(t => t.Id >= 0);
-                if (first.Id >= 0)
-                {
-                    _player.SetSpu(first.Id);
-                }
-            }
+            // Through the "Show Subtitles" check box in the Control Panel, so the choice is remembered.
+            SetShowSubtitles(_player.Spu < 0);
         }
 
         private void btnStop_Click(object? sender, EventArgs e)
