@@ -73,6 +73,8 @@
 //   2026-10-23  Music files show artist, title and album in the top left corner (MediaPlayerForm.TrackInfo.cs).
 //   2026-10-23  A music file without cover art of its own shows the picture of its folder (FolderCoverFinder.cs, the explorer's rules).
 //   2026-10-23  SID files: tune names from HVSC's STIL (SidTuneTitles.cs) and a tune list on the right (MediaPlayerForm.TuneList.cs).
+//   2026-10-25  Chapters: previous / next buttons, keys P and N, a Chapters menu; only for files that have chapters (MediaPlayerForm.Chapters.cs).
+//   2026-10-25  Icons: chapters have a bar and one triangle (as in VLC); previous / next tune and track have a bar and two triangles.
 
 using System.ComponentModel;
 using System.Drawing.Drawing2D;
@@ -177,6 +179,7 @@ namespace SwewolfMediaPlayer
             InitControlPanel();
             InitTuneControls();
             InitBookmarkButton();
+            InitChapterControls();
             StyleMenu(menuVideo);
             _filePath = filePath;
             _libraryPath = libraryPath ?? filePath;
@@ -507,6 +510,7 @@ namespace SwewolfMediaPlayer
             _audioStateApplied = 0;
             _knownLengthMs = 0;
             ResetTunes();
+            ResetChapters();
             _vlcSeekable = true;
             ApplySeekState();
             ResetThumbnails();
@@ -723,6 +727,12 @@ namespace SwewolfMediaPlayer
             if (keyData is Keys.Left or Keys.Right && _paused && CanSeek)
             {
                 StepFrame(keyData == Keys.Right ? 1 : -1);
+                return true;
+            }
+            // N / P: next / previous chapter, only for a file that has chapters (and not while typing in a text box).
+            if (keyData is Keys.N or Keys.P && ChaptersAvailable && !(ActiveControl is TextBoxBase { Visible: true }))
+            {
+                GoToChapter(keyData == Keys.N ? 1 : -1);
                 return true;
             }
             if (keyData == Keys.C)
@@ -1572,6 +1582,7 @@ namespace SwewolfMediaPlayer
             }
 
             CheckTunes();
+            CheckChapters();
             TrackLibrary();
 
             if (_isStream && !_videoCheckDone && _player.IsPlaying)
@@ -1695,6 +1706,7 @@ namespace SwewolfMediaPlayer
             subtitles.Enabled = subtitles.DropDownItems.Count > 1;
             menuVideo.Items.Add(subtitles);
             AddTuneMenu();
+            AddChapterMenu();
             AddVisualizationMenu();
 
             // WinForms sets Cancel when the menu has no items yet, which is the case here.
@@ -1978,7 +1990,7 @@ namespace SwewolfMediaPlayer
 
     // A button that draws its own icon, so it can be filled and take the colors of the dark theme.
     // BackColor is the button color, ForeColor the icon color.
-    internal enum IconKind { Play, Pause, Stop, Camera, Volume, Muted, PreviousTune, NextTune, More, Bookmark }
+    internal enum IconKind { Play, Pause, Stop, Camera, Volume, Muted, PreviousTune, NextTune, More, Bookmark, PreviousChapter, NextChapter }
 
     internal sealed class IconButton : Button
     {
@@ -2046,7 +2058,7 @@ namespace SwewolfMediaPlayer
                 case IconKind.Stop:
                     g.FillRectangle(brush, R(0.08f, 0.08f, 0.84f, 0.84f));
                     break;
-                case IconKind.PreviousTune:
+                case IconKind.PreviousChapter:   // a bar and one triangle, as VLC draws the chapter buttons
                     g.FillRectangle(brush, R(0.08f, 0.05f, 0.14f, 0.90f));
                     g.FillPolygon(brush, new[] { P(0.95f, 0.05f), P(0.95f, 0.95f), P(0.30f, 0.5f) });
                     break;
@@ -2056,9 +2068,19 @@ namespace SwewolfMediaPlayer
                         g.FillEllipse(brush, R(cx - 0.12f, 0.38f, 0.24f, 0.24f));
                     }
                     break;
-                case IconKind.NextTune:
+                case IconKind.NextChapter:
                     g.FillRectangle(brush, R(0.78f, 0.05f, 0.14f, 0.90f));
                     g.FillPolygon(brush, new[] { P(0.05f, 0.05f), P(0.05f, 0.95f), P(0.70f, 0.5f) });
+                    break;
+                case IconKind.PreviousTune:   // a bar and two triangles: previous tune / track
+                    g.FillRectangle(brush, R(0.0f, 0.05f, 0.12f, 0.90f));
+                    g.FillPolygon(brush, new[] { P(0.55f, 0.05f), P(0.55f, 0.95f), P(0.15f, 0.5f) });
+                    g.FillPolygon(brush, new[] { P(0.98f, 0.05f), P(0.98f, 0.95f), P(0.58f, 0.5f) });
+                    break;
+                case IconKind.NextTune:
+                    g.FillRectangle(brush, R(0.88f, 0.05f, 0.12f, 0.90f));
+                    g.FillPolygon(brush, new[] { P(0.02f, 0.05f), P(0.02f, 0.95f), P(0.42f, 0.5f) });
+                    g.FillPolygon(brush, new[] { P(0.45f, 0.05f), P(0.45f, 0.95f), P(0.85f, 0.5f) });
                     break;
                 case IconKind.Camera:
                     g.FillRectangle(brush, R(0.30f, 0.05f, 0.40f, 0.25f));

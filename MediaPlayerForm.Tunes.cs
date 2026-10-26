@@ -12,6 +12,7 @@
 //   2026-10-21  The same two buttons skip to the previous / next track while the explorer runs a playlist (MediaPlayerForm.Pipe.cs: TrackSkipping,
 //               SkipTrack); they are shown for any file then, and enabled at both ends (the explorer decides what comes next).
 //   2026-10-23  Tune names from HVSC's STIL in the window title and the Tune menu; a list of the tunes on the right (MediaPlayerForm.TuneList.cs).
+//   2026-10-25  LayoutControlBar also places the chapter buttons (MediaPlayerForm.Chapters.cs), right of the tune buttons.
 
 using LibVLCSharp.Shared;
 
@@ -196,6 +197,12 @@ namespace SwewolfMediaPlayer
                 btnPrevTune.Left = x + gap;
                 btnNextTune.Left = btnPrevTune.Right + gap;
                 x = btnNextTune.Right;
+            }
+            if (_chapterButtonsShown && btnPrevChapter != null && btnNextChapter != null)
+            {
+                btnPrevChapter.Left = x + gap;
+                btnNextChapter.Left = btnPrevChapter.Right + gap;
+                x = btnNextChapter.Right;
             }
 
             int left = x + LogicalToDeviceUnits(8);
