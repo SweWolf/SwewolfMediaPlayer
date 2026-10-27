@@ -78,6 +78,7 @@
 //   2026-10-26  Playback speed box left of the time, keys + - Backspace (SpeedBox.cs, MediaPlayerForm.Speed.cs); the seek bar is 30 px shorter.
 //   2026-10-26  The audio and subtitle track chosen for a file are remembered in the library and used the next time (MediaPlayerForm.Tracks.cs);
 //               "Turn On Subtitles When a Video Opens" in Tools > Settings decides for files with no choice of their own.
+//   2026-10-27  Setting "Show Track Menus Only When There Is a Choice": the track menus of the right-click menu are left out when there is nothing to choose.
 //   2026-10-27  Right-click menu: Video Track (files with several video streams), between Audio Track and Subtitle Track as in VLC.
 
 using System.ComponentModel;
@@ -1718,7 +1719,12 @@ namespace SwewolfMediaPlayer
                 audio.DropDownItems.Add(TrackItem(track.Name, id == currentAudio, () => ChooseAudio(id)));
             }
             audio.Enabled = audio.DropDownItems.Count > 0;
-            menuVideo.Items.Add(audio);
+            // Setting: a track menu is only shown when there is a choice (subtitles: one track is enough, they can be turned off).
+            bool onlyWithChoice = AppSettings.Load().TrackMenusOnlyWithChoice;
+            if (!onlyWithChoice || audio.DropDownItems.Count > 1)
+            {
+                menuVideo.Items.Add(audio);
+            }
 
             // A file with several pictures (angles, e.g. an MKV with two video streams); the order is the one of VLC: audio, video, subtitle.
             ToolStripMenuItem video = new("Video Track");
@@ -1729,7 +1735,10 @@ namespace SwewolfMediaPlayer
                 video.DropDownItems.Add(TrackItem(track.Name, id == currentVideo, () => ChooseVideo(id)));
             }
             video.Enabled = video.DropDownItems.Count > 0;
-            menuVideo.Items.Add(video);
+            if (!onlyWithChoice || video.DropDownItems.Count > 1)
+            {
+                menuVideo.Items.Add(video);
+            }
 
             ToolStripMenuItem subtitles = new("Subtitle Track");
             int currentSpu = player.Spu;
@@ -1740,7 +1749,10 @@ namespace SwewolfMediaPlayer
                 subtitles.DropDownItems.Add(TrackItem(track.Name, id == currentSpu, () => ChooseSubtitle(id)));
             }
             subtitles.Enabled = subtitles.DropDownItems.Count > 1;
-            menuVideo.Items.Add(subtitles);
+            if (!onlyWithChoice || subtitles.DropDownItems.Count > 1)   // the first item is "Disable"
+            {
+                menuVideo.Items.Add(subtitles);
+            }
             AddDefaultTracksMenuItem();
             AddTuneMenu();
             AddChapterMenu();

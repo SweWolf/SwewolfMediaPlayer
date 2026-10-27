@@ -16,6 +16,7 @@
 //   2026-10-23  ShowTuneList (on by default).
 //   2026-10-23  CoverPictureSize (Medium by default).
 //   2026-10-26  ShowSubtitles (on by default): the default for videos with no choice of their own.
+//   2026-10-27  TrackMenusOnlyWithChoice (off by default).
 
 using System.Text.Json;
 
@@ -56,6 +57,10 @@ namespace SwewolfMediaPlayer
         // Whether a video shows its subtitles when it is opened for the first time (Tools > Settings, "Turn On Subtitles When a Video Opens"; on by default).
         // What the user chose for a file in the right-click menu is remembered for that file and wins (the library, TrackChoice).
         public bool ShowSubtitles { get; set; } = true;
+
+        // Whether the right-click menu shows Audio Track and Video Track only for a file with more than one of them, and Subtitle Track only for a
+        // file with at least one (one is enough: the menu also turns subtitles off). Off by default: the menus are always there, greyed out when empty.
+        public bool TrackMenusOnlyWithChoice { get; set; }
 
         // Whether the main window asks GitHub for a newer version when it starts.
         public bool CheckForUpdatesOnStartup { get; set; } = true;

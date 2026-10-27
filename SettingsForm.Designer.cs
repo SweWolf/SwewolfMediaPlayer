@@ -19,6 +19,7 @@ namespace SwewolfMediaPlayer
             chkStartFullScreen = new CheckBox();
             chkSeekThumbnails = new CheckBox();
             chkShowSubtitles = new CheckBox();
+            chkTrackMenus = new CheckBox();
             lblCoverSize = new Label();
             cboCoverSize = new ComboBox();
             grpResume = new GroupBox();
@@ -55,11 +56,12 @@ namespace SwewolfMediaPlayer
             grpPlayer.Controls.Add(chkStartFullScreen);
             grpPlayer.Controls.Add(chkSeekThumbnails);
             grpPlayer.Controls.Add(chkShowSubtitles);
+            grpPlayer.Controls.Add(chkTrackMenus);
             grpPlayer.Controls.Add(lblCoverSize);
             grpPlayer.Controls.Add(cboCoverSize);
             grpPlayer.Location = new Point(12, 12);
             grpPlayer.Name = "grpPlayer";
-            grpPlayer.Size = new Size(360, 158);
+            grpPlayer.Size = new Size(360, 184);
             grpPlayer.TabIndex = 0;
             grpPlayer.TabStop = false;
             grpPlayer.Text = "Player";
@@ -97,12 +99,23 @@ namespace SwewolfMediaPlayer
             toolTip.SetToolTip(chkShowSubtitles, "Show the subtitles of a video the first time you open it. A choice you make in the right-click menu (or with the C key) is remembered for that video and used instead.");
             chkShowSubtitles.UseVisualStyleBackColor = true;
             //
+            // chkTrackMenus
+            //
+            chkTrackMenus.AutoSize = true;
+            chkTrackMenus.Location = new Point(10, 102);
+            chkTrackMenus.Name = "chkTrackMenus";
+            chkTrackMenus.Size = new Size(300, 19);
+            chkTrackMenus.TabIndex = 3;
+            chkTrackMenus.Text = "Show Track Menus Only When There Is a &Choice";
+            toolTip.SetToolTip(chkTrackMenus, "In the right-click menu, show Audio Track and Video Track\r\nonly for a file that has more than one of them, and\r\nSubtitle Track only for a file that has at least one\r\n(subtitles can also be turned off there).\r\nWhen this is off, the three menus are always shown,\r\nand greyed out when the file has none.");
+            chkTrackMenus.UseVisualStyleBackColor = true;
+            //
             // lblCoverSize
             //
             lblCoverSize.AutoSize = true;
-            lblCoverSize.Location = new Point(10, 106);
+            lblCoverSize.Location = new Point(10, 132);
             lblCoverSize.Name = "lblCoverSize";
-            lblCoverSize.TabIndex = 3;
+            lblCoverSize.TabIndex = 4;
             lblCoverSize.Text = "Cover Picture Si&ze for Music Files";
             //
             // cboCoverSize
@@ -110,10 +123,10 @@ namespace SwewolfMediaPlayer
             cboCoverSize.DropDownStyle = ComboBoxStyle.DropDownList;
             cboCoverSize.FormattingEnabled = true;
             cboCoverSize.Items.AddRange(new object[] { "Medium", "Maximum" });
-            cboCoverSize.Location = new Point(10, 124);
+            cboCoverSize.Location = new Point(10, 150);
             cboCoverSize.Name = "cboCoverSize";
             cboCoverSize.Size = new Size(218, 23);
-            cboCoverSize.TabIndex = 4;
+            cboCoverSize.TabIndex = 5;
             toolTip.SetToolTip(cboCoverSize, "How large the cover picture of a music file is shown: Medium is 75 percent of the largest size that fits the window, Maximum fills the video area.");
             //
             // grpResume
@@ -317,6 +330,7 @@ namespace SwewolfMediaPlayer
         private CheckBox chkStartFullScreen;
         private CheckBox chkSeekThumbnails;
         private CheckBox chkShowSubtitles;
+        private CheckBox chkTrackMenus;
         private Label lblCoverSize;
         private ComboBox cboCoverSize;
         private GroupBox grpResume;

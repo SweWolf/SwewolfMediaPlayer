@@ -8,6 +8,7 @@
 //   2026-10-16  Move the Resume Point Back by N seconds (default 10).
 //   2026-10-16  Resume = No hides the other settings of the group.
 //   2026-10-23  Cover Picture Size for Music Files (Medium / Maximum) in the Player group.
+//   2026-10-27  Show Track Menus Only When There Is a Choice in the Player group.
 //   2026-10-26  "Turn On Subtitles When a Video Opens" (the default for videos with no choice of their own) in the Player group.
 
 namespace SwewolfMediaPlayer
@@ -52,6 +53,7 @@ namespace SwewolfMediaPlayer
             chkStartFullScreen.Checked = settings.StartFullScreenForVideo;
             chkSeekThumbnails.Checked = settings.ShowSeekBarThumbnails;
             chkShowSubtitles.Checked = settings.ShowSubtitles;
+            chkTrackMenus.Checked = settings.TrackMenusOnlyWithChoice;
             cboNewVersionCheck.SelectedItem = settings.CheckForUpdatesOnStartup ? "Yes" : "No";
             cboCoverSize.SelectedIndex = Math.Clamp(settings.CoverPictureSize, 0, 1);
             cboResumeMode.SelectedIndex = Math.Clamp(settings.ResumeWhenOpening, 0, 2);
@@ -78,6 +80,7 @@ namespace SwewolfMediaPlayer
             settings.StartFullScreenForVideo = chkStartFullScreen.Checked;
             settings.ShowSeekBarThumbnails = chkSeekThumbnails.Checked;
             settings.ShowSubtitles = chkShowSubtitles.Checked;
+            settings.TrackMenusOnlyWithChoice = chkTrackMenus.Checked;
             settings.CheckForUpdatesOnStartup = cboNewVersionCheck.SelectedItem?.ToString() != "No";
             settings.CoverPictureSize = Math.Max(0, cboCoverSize.SelectedIndex);
             settings.ResumeWhenOpening = Math.Max(0, cboResumeMode.SelectedIndex);
