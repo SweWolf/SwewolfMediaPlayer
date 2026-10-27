@@ -91,9 +91,9 @@ namespace SwewolfMediaPlayer
             chkShowSubtitles.AutoSize = true;
             chkShowSubtitles.Location = new Point(10, 76);
             chkShowSubtitles.Name = "chkShowSubtitles";
-            chkShowSubtitles.Size = new Size(190, 19);
+            chkShowSubtitles.Size = new Size(240, 19);
             chkShowSubtitles.TabIndex = 2;
-            chkShowSubtitles.Text = "Show Subtitles by &Default";
+            chkShowSubtitles.Text = "Turn On Subtitles When a &Video Opens";
             toolTip.SetToolTip(chkShowSubtitles, "Show the subtitles of a video the first time you open it. A choice you make in the right-click menu (or with the C key) is remembered for that video and used instead.");
             chkShowSubtitles.UseVisualStyleBackColor = true;
             //

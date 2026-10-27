@@ -53,7 +53,7 @@ namespace SwewolfMediaPlayer
         // Whether the list of tunes is shown on the right while a SID file with several tunes plays.
         public bool ShowTuneList { get; set; } = true;
 
-        // Whether a video shows its subtitles when it is opened for the first time (Tools > Settings, "Show Subtitles by Default"; on by default).
+        // Whether a video shows its subtitles when it is opened for the first time (Tools > Settings, "Turn On Subtitles When a Video Opens"; on by default).
         // What the user chose for a file in the right-click menu is remembered for that file and wins (the library, TrackChoice).
         public bool ShowSubtitles { get; set; } = true;
 

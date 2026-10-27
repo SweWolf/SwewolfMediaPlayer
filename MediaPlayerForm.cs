@@ -77,7 +77,7 @@
 //   2026-10-25  Icons: chapters have a bar and one triangle (as in VLC); previous / next tune and track have a bar and two triangles.
 //   2026-10-26  Playback speed box left of the time, keys + - Backspace (SpeedBox.cs, MediaPlayerForm.Speed.cs); the seek bar is 30 px shorter.
 //   2026-10-26  The audio and subtitle track chosen for a file are remembered in the library and used the next time (MediaPlayerForm.Tracks.cs);
-//               "Show Subtitles by Default" in Tools > Settings decides for files with no choice of their own.
+//               "Turn On Subtitles When a Video Opens" in Tools > Settings decides for files with no choice of their own.
 
 using System.ComponentModel;
 using System.Drawing.Drawing2D;

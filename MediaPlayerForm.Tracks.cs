@@ -3,7 +3,7 @@
 // - What the user chooses in the right-click menu (or with the C key) is remembered for that file in the library (LibraryStore,
 //   table TrackChoice) and used the next time it opens. A choice is only saved when it changes something: picking the track that
 //   already plays saves nothing. What the program does by itself (the saved choice, the default) is never saved.
-// - A file with no choice of its own follows the setting "Show Subtitles by Default" (Tools > Settings); LibVLC picks the audio track.
+// - A file with no choice of its own follows the setting "Turn On Subtitles When a Video Opens" (Tools > Settings); LibVLC picks the audio track.
 // - A track is saved as its place in the list and its name, and found again by the name first.
 // - "Use Default Tracks" in the menu forgets the choice of the file and goes back to the defaults.
 // - Nothing is saved for streams, SID music and files without a library path.

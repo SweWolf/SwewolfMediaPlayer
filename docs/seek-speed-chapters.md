@@ -102,7 +102,7 @@ Original plan (kept for the details):
 
 ## Tracks per file (built 2026-10-27)
 
-- **Setting:** Tools > Settings > Player > "Show Subtitles by Default" (on by default). It only decides for a video that has no choice of its own.
+- **Setting:** Tools > Settings > Player > "Turn On Subtitles When a Video Opens" (on by default). It only decides for a video that has no choice of its own.
 - **Remembered:** an audio or subtitle track chosen in the right-click menu (and the C key for subtitles) is saved for that file in the
   library database, table `TrackChoice` (schema 9; columns AudioIndex, AudioName, SubtitleOff, SubtitleIndex, SubtitleName). It is used
   the next time the file opens. A track is found again by its name first, then by its place in the list.

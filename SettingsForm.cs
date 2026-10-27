@@ -8,7 +8,7 @@
 //   2026-10-16  Move the Resume Point Back by N seconds (default 10).
 //   2026-10-16  Resume = No hides the other settings of the group.
 //   2026-10-23  Cover Picture Size for Music Files (Medium / Maximum) in the Player group.
-//   2026-10-26  Show Subtitles by Default in the Player group.
+//   2026-10-26  "Turn On Subtitles When a Video Opens" (the default for videos with no choice of their own) in the Player group.
 
 namespace SwewolfMediaPlayer
 {
