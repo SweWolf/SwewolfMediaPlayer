@@ -1,6 +1,6 @@
 // MediaPlayerForm.Tracks.cs: the audio track and the subtitle track of a file.
 //
-// - What the user chooses in the right-click menu (or with the C key) is remembered for that file in the library (LibraryStore,
+// - What the user chooses in the right-click menu (audio, video, subtitles; or with the C key) is remembered for that file in the library (LibraryStore,
 //   table TrackChoice) and used the next time it opens. A choice is only saved when it changes something: picking the track that
 //   already plays saves nothing. What the program does by itself (the saved choice, the default) is never saved.
 // - A file with no choice of its own follows the setting "Turn On Subtitles When a Video Opens" (Tools > Settings); LibVLC picks the audio track.
@@ -12,6 +12,8 @@
 //
 // History:
 //   2026-10-26  First version.
+//   2026-10-27  Video track from the menu (ChooseVideo), remembered like the others (schema 10); it jumps to the same position so the new
+//               picture starts at once. Use Default Tracks resets it too.
 //   2026-10-27  Use Default Tracks also changes a subtitle track that is on: it goes to the track LibVLC chose, or else the first one.
 
 using LibVLCSharp.Shared;
@@ -24,6 +26,8 @@ namespace SwewolfMediaPlayer
         private LibraryStore.TrackChoiceRow? _savedTracks;   // the choice of the file that plays, null = none
         private bool _audioApplied;      // the saved audio choice has been looked at for the file that plays
         private bool _subtitleApplied;   // the same for the subtitles (or the default)
+        private bool _videoApplied;      // the same for the video track
+        private int _defaultVideoId = -1;   // the video track LibVLC chose by itself
         private int _defaultAudioId = -1;   // the audio track LibVLC chose by itself
         private int _vlcSubtitleId = -1;    // the subtitle track LibVLC chose by itself (-1 = none, the file has no default track)
         private bool _vlcSubtitleSeen;
@@ -36,6 +40,8 @@ namespace SwewolfMediaPlayer
         {
             _audioApplied = false;
             _subtitleApplied = false;
+            _videoApplied = false;
+            _defaultVideoId = -1;
             _defaultAudioId = -1;
             _vlcSubtitleId = -1;
             _vlcSubtitleSeen = false;
@@ -70,14 +76,14 @@ namespace SwewolfMediaPlayer
         private void CheckTracks()
         {
             MediaPlayer? player = _player;
-            if ((_audioApplied && _subtitleApplied) || player == null || !player.IsPlaying)
+            if ((_audioApplied && _subtitleApplied && _videoApplied) || player == null || !player.IsPlaying)
             {
                 return;
             }
 
             if (_isStream || SidPluginSetup.IsSidFile(_filePath))
             {
-                _audioApplied = _subtitleApplied = true;
+                _audioApplied = _subtitleApplied = _videoApplied = true;
                 return;
             }
 
@@ -86,9 +92,34 @@ namespace SwewolfMediaPlayer
             {
                 ApplyAudioChoice(player, time);
             }
+            if (!_videoApplied)
+            {
+                ApplyVideoChoice(player, time);
+            }
             if (!_subtitleApplied)
             {
                 ApplySubtitleChoice(player, time);
+            }
+        }
+
+        private void ApplyVideoChoice(MediaPlayer player, long time)
+        {
+            var tracks = RealTracks(player.VideoTrackDescription);
+            if (tracks.Count == 0)
+            {
+                _videoApplied = time > 3000;
+                return;
+            }
+
+            _videoApplied = true;
+            _defaultVideoId = player.VideoTrack;
+            if (_savedTracks is { HasVideo: true } saved)
+            {
+                int id = FindTrackId(tracks, saved.VideoIndex, saved.VideoName);
+                if (id >= 0 && id != player.VideoTrack)
+                {
+                    SwitchVideoTrack(player, id);
+                }
             }
         }
 
@@ -216,6 +247,42 @@ namespace SwewolfMediaPlayer
             }
         }
 
+        // A video track (picture) from the menu. Choosing the track that plays changes nothing and saves nothing.
+        private void ChooseVideo(int id)
+        {
+            MediaPlayer? player = _player;
+            if (player == null || id == player.VideoTrack)
+            {
+                return;
+            }
+
+            SwitchVideoTrack(player, id);
+            if (!TracksSaveable)
+            {
+                return;
+            }
+
+            var tracks = RealTracks(player.VideoTrackDescription);
+            int index = tracks.FindIndex(t => t.Id == id);
+            if (index >= 0)
+            {
+                LibraryStore.SetVideoChoice(_libraryPath, index, tracks[index].Name);
+                _savedTracks = LibraryStore.GetTrackChoice(_libraryPath);
+            }
+        }
+
+        // The new picture can only start at a key frame of its own stream, and until then the screen is black (a long wait in a file
+        // with few key frames): jumping to where the video is now makes the player start the new stream from the key frame before it.
+        private void SwitchVideoTrack(MediaPlayer player, int id)
+        {
+            long now = Math.Max(player.Time, 0);
+            player.SetVideoTrack(id);
+            if (CanSeek)
+            {
+                SeekTo(now);
+            }
+        }
+
         // A subtitle track from the menu or the C key; id -1 = no subtitles. The same track (or off when it is off) saves nothing.
         private void ChooseSubtitle(int id)
         {
@@ -274,10 +341,14 @@ namespace SwewolfMediaPlayer
             LibraryStore.ClearTrackChoice(_libraryPath);
             _savedTracks = null;
 
-            // Back to what LibVLC chose for the audio, and to the setting for the subtitles.
+            // Back to what LibVLC chose for the audio and the video, and to the setting for the subtitles.
             if (_defaultAudioId >= 0 && player.AudioTrack != _defaultAudioId)
             {
                 player.SetAudioTrack(_defaultAudioId);
+            }
+            if (_defaultVideoId >= 0 && player.VideoTrack != _defaultVideoId)
+            {
+                SwitchVideoTrack(player, _defaultVideoId);
             }
             _showSubtitlesByDefault = AppSettings.Load().ShowSubtitles;
             if (_showSubtitlesByDefault)

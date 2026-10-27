@@ -104,7 +104,7 @@ Original plan (kept for the details):
 
 - **Setting:** Tools > Settings > Player > "Turn On Subtitles When a Video Opens" (on by default). It only decides for a video that has no choice of its own.
 - **Remembered:** an audio or subtitle track chosen in the right-click menu (and the C key for subtitles) is saved for that file in the
-  library database, table `TrackChoice` (schema 9; columns AudioIndex, AudioName, SubtitleOff, SubtitleIndex, SubtitleName). It is used
+  library database, table `TrackChoice` (schema 9, 10 added VideoIndex and VideoName; columns AudioIndex, AudioName, SubtitleOff, SubtitleIndex, SubtitleName). It is used
   the next time the file opens. A track is found again by its name first, then by its place in the list.
 - **Not saved:** what the program does by itself, and a choice that changes nothing (the track that already plays). Nothing for streams, SID
   music or files without a library path.
@@ -113,3 +113,13 @@ Original plan (kept for the details):
   the rows), and `docs/library-db.md` there should list the table. Not done: the explorer's repo was not touched.
 - Tested with a clip that has two audio and two subtitle tracks: the choice was saved, used again after a restart, and "Use Default Tracks"
   removed it. Not tested: an older explorer opening a database with schema 9.
+
+## Video tracks (built 2026-10-27)
+
+- The right-click menu has **Video Track** between Audio Track and Subtitle Track (the order of VLC), for files with several video streams
+  (angles). Test file: `D:\Test\Video\sample_multi_video.mkv` (two streams, "Angle 1 (Counter)" and "Angle 2 (Color Bars)").
+- A new picture can only start at a key frame of its own stream, so the screen stayed black after the switch. `ChooseVideo` jumps to the same
+  position right after switching, and the new picture shows at once.
+- Remembered per file like the audio and the subtitles (library schema 10: `TrackChoice` got `VideoIndex` and `VideoName`; an existing table
+  gets the columns added). Used again when the file opens; "Use Default Tracks" resets it too. Tested with the file above: saved, restored
+  after a restart, and reset.

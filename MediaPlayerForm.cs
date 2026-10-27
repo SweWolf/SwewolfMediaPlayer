@@ -78,6 +78,7 @@
 //   2026-10-26  Playback speed box left of the time, keys + - Backspace (SpeedBox.cs, MediaPlayerForm.Speed.cs); the seek bar is 30 px shorter.
 //   2026-10-26  The audio and subtitle track chosen for a file are remembered in the library and used the next time (MediaPlayerForm.Tracks.cs);
 //               "Turn On Subtitles When a Video Opens" in Tools > Settings decides for files with no choice of their own.
+//   2026-10-27  Right-click menu: Video Track (files with several video streams), between Audio Track and Subtitle Track as in VLC.
 
 using System.ComponentModel;
 using System.Drawing.Drawing2D;
@@ -1718,6 +1719,17 @@ namespace SwewolfMediaPlayer
             }
             audio.Enabled = audio.DropDownItems.Count > 0;
             menuVideo.Items.Add(audio);
+
+            // A file with several pictures (angles, e.g. an MKV with two video streams); the order is the one of VLC: audio, video, subtitle.
+            ToolStripMenuItem video = new("Video Track");
+            int currentVideo = player.VideoTrack;
+            foreach (TrackDescription track in player.VideoTrackDescription.Where(t => t.Id >= 0))
+            {
+                int id = track.Id;
+                video.DropDownItems.Add(TrackItem(track.Name, id == currentVideo, () => ChooseVideo(id)));
+            }
+            video.Enabled = video.DropDownItems.Count > 0;
+            menuVideo.Items.Add(video);
 
             ToolStripMenuItem subtitles = new("Subtitle Track");
             int currentSpu = player.Spu;

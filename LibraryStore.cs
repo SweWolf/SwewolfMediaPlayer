@@ -18,6 +18,8 @@ public sealed record LibraryRoute(string DbFile, string Prefix, bool Relative, s
 /// what it knows.
 ///
 /// History:
+///   2026-10-27  Schema 10: TrackChoice also keeps the video track (VideoIndex, VideoName; for files with several pictures, e.g. angles).
+///               SetVideoChoice; an existing table gets the two columns added. An older copy ignores them.
 ///   2026-10-26  Schema 9: table TrackChoice (per file: the audio track and the subtitle track the user chose in the player, written as the
 ///               place in the list and the name of the track). GetTrackChoice / SetAudioChoice / SetSubtitleChoice / ClearTrackChoice; Forget
 ///               and Move carry the rows. An older copy ignores the table.
@@ -55,7 +57,7 @@ public static class LibraryStore
 {
     public const string UsbFolderName = ".SweWolfFileExplorerData";
     public const string DbFileName = "library.db";
-    private const int SchemaVersion = 9;
+    private const int SchemaVersion = 10;
 
     /// <summary>One thing at a time on the database files (inside this app).</summary>
     public static readonly object Gate = new();
@@ -524,6 +526,8 @@ public static class LibraryStore
                     SubtitleOff   INTEGER,
                     SubtitleIndex INTEGER,
                     SubtitleName  TEXT,
+                    VideoIndex    INTEGER,
+                    VideoName     TEXT,
                     PRIMARY KEY (Folder, Name)
                 ) WITHOUT ROWID;";
             create.ExecuteNonQuery();
@@ -536,6 +540,18 @@ public static class LibraryStore
                 {
                     using var add = connection.CreateCommand();
                     add.CommandText = $"ALTER TABLE File ADD COLUMN {column} INTEGER";
+                    add.ExecuteNonQuery();
+                }
+            }
+
+            // Schema 9 had no VideoIndex and VideoName in TrackChoice.
+            foreach (var (column, type) in new[] { ("VideoIndex", "INTEGER"), ("VideoName", "TEXT") })
+            {
+                using var has = Command(connection, "SELECT COUNT(*) FROM pragma_table_info('TrackChoice') WHERE name = $n", ("$n", column));
+                if (Convert.ToInt32(has.ExecuteScalar()) == 0)
+                {
+                    using var add = connection.CreateCommand();
+                    add.CommandText = $"ALTER TABLE TrackChoice ADD COLUMN {column} {type}";
                     add.ExecuteNonQuery();
                 }
             }
@@ -1018,12 +1034,14 @@ public static class LibraryStore
     // ── Audio and subtitle track of a file ───────────────────────────────────
 
     /// <summary>
-    /// What the user chose in the player. A track is written as its place in the list of the file's tracks and its name (the player
+    /// What the user chose in the player (audio, video, subtitles). A track is written as its place in the list of the file's tracks and its name (the player
     /// looks for the name first). Null: nothing chosen for that kind. For the subtitles, SubtitleOff means "no subtitles"
     /// (then there is no track).
     /// </summary>
-    public sealed record TrackChoiceRow(int? AudioIndex, string? AudioName, bool SubtitleOff, int? SubtitleIndex, string? SubtitleName)
+    public sealed record TrackChoiceRow(int? AudioIndex, string? AudioName, bool SubtitleOff, int? SubtitleIndex, string? SubtitleName,
+        int? VideoIndex, string? VideoName)
     {
+        public bool HasVideo => VideoIndex != null || VideoName != null;
         public bool HasAudio => AudioIndex != null || AudioName != null;
         public bool HasSubtitle => SubtitleOff || SubtitleIndex != null || SubtitleName != null;
     }
@@ -1047,7 +1065,7 @@ public static class LibraryStore
 
                 var (parentKey, name) = RatedKey(route, path);
                 using var command = Command(connection,
-                    "SELECT AudioIndex, AudioName, SubtitleOff, SubtitleIndex, SubtitleName FROM TrackChoice WHERE Folder = $f AND Name = $n",
+                    "SELECT AudioIndex, AudioName, SubtitleOff, SubtitleIndex, SubtitleName, VideoIndex, VideoName FROM TrackChoice WHERE Folder = $f AND Name = $n",
                     ("$f", parentKey), ("$n", name));
                 using var reader = command.ExecuteReader();
                 if (!reader.Read()) return null;
@@ -1057,7 +1075,9 @@ public static class LibraryStore
                     reader.IsDBNull(1) ? null : reader.GetString(1),
                     !reader.IsDBNull(2) && reader.GetInt32(2) != 0,
                     reader.IsDBNull(3) ? null : reader.GetInt32(3),
-                    reader.IsDBNull(4) ? null : reader.GetString(4));
+                    reader.IsDBNull(4) ? null : reader.GetString(4),
+                    reader.IsDBNull(5) ? null : reader.GetInt32(5),
+                    reader.IsDBNull(6) ? null : reader.GetString(6));
             }
             catch (Exception ex)
             {
@@ -1070,6 +1090,10 @@ public static class LibraryStore
     /// <summary>Saves the audio track the user chose for a file. False if it could not be saved (a write-protected drive).</summary>
     public static bool SetAudioChoice(string filePath, int index, string? trackName) =>
         SetTrackColumns(filePath, "AudioIndex = $v1, AudioName = $v2", ("$v1", index), ("$v2", trackName));
+
+    /// <summary>Saves the video track (picture) the user chose for a file. False if it could not be saved.</summary>
+    public static bool SetVideoChoice(string filePath, int index, string? trackName) =>
+        SetTrackColumns(filePath, "VideoIndex = $v1, VideoName = $v2", ("$v1", index), ("$v2", trackName));
 
     /// <summary>
     /// Saves the subtitles the user chose for a file: off (index and name are ignored), or a track. False if it could not be saved.
@@ -1498,7 +1522,7 @@ public static class LibraryStore
         var infos   = ReadAll(session, fromConnection,
             "SELECT Folder, Name, HostUrl, ReferrerUrl FROM ItemInfo WHERE (Folder = $p AND Name = $n) OR Folder = $k OR (Folder > $a AND Folder < $b)", p);
         var tracks  = ReadAll(session, fromConnection,
-            "SELECT Folder, Name, AudioIndex, AudioName, SubtitleOff, SubtitleIndex, SubtitleName FROM TrackChoice WHERE (Folder = $p AND Name = $n) OR Folder = $k OR (Folder > $a AND Folder < $b)", p);
+            "SELECT Folder, Name, AudioIndex, AudioName, SubtitleOff, SubtitleIndex, SubtitleName, VideoIndex, VideoName FROM TrackChoice WHERE (Folder = $p AND Name = $n) OR Folder = $k OR (Folder > $a AND Folder < $b)", p);
         var lasts   = ReadAll(session, fromConnection,
             "SELECT Path, Name FROM LastOpened WHERE Path = $k OR (Path > $a AND Path < $b)", p);   // folders: the item and below
         var lastOfItem = ReadAll(session, fromConnection,
@@ -1565,8 +1589,8 @@ public static class LibraryStore
         {
             var (folder, name) = IsTheItem(r[0], r[1]) ? (toParent, toName) : (Remap((string)r[0]!), (string)r[1]!);
             using var insert = session.Command(toConnection,
-                "INSERT OR REPLACE INTO TrackChoice (Folder, Name, AudioIndex, AudioName, SubtitleOff, SubtitleIndex, SubtitleName) VALUES ($f, $n, $ai, $an, $so, $si, $sn)",
-                ("$f", folder), ("$n", name), ("$ai", r[2]), ("$an", r[3]), ("$so", r[4]), ("$si", r[5]), ("$sn", r[6]));
+                "INSERT OR REPLACE INTO TrackChoice (Folder, Name, AudioIndex, AudioName, SubtitleOff, SubtitleIndex, SubtitleName, VideoIndex, VideoName) VALUES ($f, $n, $ai, $an, $so, $si, $sn, $vi, $vn)",
+                ("$f", folder), ("$n", name), ("$ai", r[2]), ("$an", r[3]), ("$so", r[4]), ("$si", r[5]), ("$sn", r[6]), ("$vi", r[7]), ("$vn", r[8]));
             insert.ExecuteNonQuery();
         }
 
