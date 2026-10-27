@@ -18,6 +18,7 @@ namespace SwewolfMediaPlayer
             grpPlayer = new GroupBox();
             chkStartFullScreen = new CheckBox();
             chkSeekThumbnails = new CheckBox();
+            chkShowSubtitles = new CheckBox();
             lblCoverSize = new Label();
             cboCoverSize = new ComboBox();
             grpResume = new GroupBox();
@@ -53,11 +54,12 @@ namespace SwewolfMediaPlayer
             //
             grpPlayer.Controls.Add(chkStartFullScreen);
             grpPlayer.Controls.Add(chkSeekThumbnails);
+            grpPlayer.Controls.Add(chkShowSubtitles);
             grpPlayer.Controls.Add(lblCoverSize);
             grpPlayer.Controls.Add(cboCoverSize);
             grpPlayer.Location = new Point(12, 12);
             grpPlayer.Name = "grpPlayer";
-            grpPlayer.Size = new Size(360, 132);
+            grpPlayer.Size = new Size(360, 158);
             grpPlayer.TabIndex = 0;
             grpPlayer.TabStop = false;
             grpPlayer.Text = "Player";
@@ -84,12 +86,23 @@ namespace SwewolfMediaPlayer
             toolTip.SetToolTip(chkSeekThumbnails, "Show a small picture of the video at the pointer while you point at the seek bar. Video files only. It needs FFmpeg (ffmpeg.exe in the program folder or in the PATH); without it nothing is shown.");
             chkSeekThumbnails.UseVisualStyleBackColor = true;
             //
+            // chkShowSubtitles
+            //
+            chkShowSubtitles.AutoSize = true;
+            chkShowSubtitles.Location = new Point(10, 76);
+            chkShowSubtitles.Name = "chkShowSubtitles";
+            chkShowSubtitles.Size = new Size(190, 19);
+            chkShowSubtitles.TabIndex = 2;
+            chkShowSubtitles.Text = "Show Subtitles by &Default";
+            toolTip.SetToolTip(chkShowSubtitles, "Show the subtitles of a video the first time you open it. A choice you make in the right-click menu (or with the C key) is remembered for that video and used instead.");
+            chkShowSubtitles.UseVisualStyleBackColor = true;
+            //
             // lblCoverSize
             //
             lblCoverSize.AutoSize = true;
-            lblCoverSize.Location = new Point(10, 80);
+            lblCoverSize.Location = new Point(10, 106);
             lblCoverSize.Name = "lblCoverSize";
-            lblCoverSize.TabIndex = 2;
+            lblCoverSize.TabIndex = 3;
             lblCoverSize.Text = "Cover Picture Si&ze for Music Files";
             //
             // cboCoverSize
@@ -97,10 +110,10 @@ namespace SwewolfMediaPlayer
             cboCoverSize.DropDownStyle = ComboBoxStyle.DropDownList;
             cboCoverSize.FormattingEnabled = true;
             cboCoverSize.Items.AddRange(new object[] { "Medium", "Maximum" });
-            cboCoverSize.Location = new Point(10, 98);
+            cboCoverSize.Location = new Point(10, 124);
             cboCoverSize.Name = "cboCoverSize";
             cboCoverSize.Size = new Size(218, 23);
-            cboCoverSize.TabIndex = 3;
+            cboCoverSize.TabIndex = 4;
             toolTip.SetToolTip(cboCoverSize, "How large the cover picture of a music file is shown: Medium is 75 percent of the largest size that fits the window, Maximum fills the video area.");
             //
             // grpResume
@@ -303,6 +316,7 @@ namespace SwewolfMediaPlayer
         private GroupBox grpPlayer;
         private CheckBox chkStartFullScreen;
         private CheckBox chkSeekThumbnails;
+        private CheckBox chkShowSubtitles;
         private Label lblCoverSize;
         private ComboBox cboCoverSize;
         private GroupBox grpResume;

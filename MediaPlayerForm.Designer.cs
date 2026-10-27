@@ -44,7 +44,6 @@ namespace SwewolfMediaPlayer
             txtFadeOut = new TextBox();
             btnPreview = new Button();
             btnTrim = new Button();
-            chkShowSubtitles = new CheckBox();
             btnCloseTrim = new CloseXButton();
             btnCloseControlPanel = new CloseXButton();
             menuVideo = new ContextMenuStrip(components);
@@ -292,7 +291,7 @@ namespace SwewolfMediaPlayer
             btnCloseControlPanel.Location = new Point(1154, 9);
             btnCloseControlPanel.Name = "btnCloseControlPanel";
             btnCloseControlPanel.Size = new Size(22, 20);
-            btnCloseControlPanel.TabIndex = 3;
+            btnCloseControlPanel.TabIndex = 2;
             toolTip.SetToolTip(btnCloseControlPanel, "Close Control Panel");
             btnCloseControlPanel.UseVisualStyleBackColor = false;
             btnCloseControlPanel.Click += btnCloseControlPanel_Click;
@@ -412,7 +411,6 @@ namespace SwewolfMediaPlayer
             grpControlPanel.ContextMenuStrip = menuControls;
             grpControlPanel.Controls.Add(lblWhenEnds);
             grpControlPanel.Controls.Add(cboWhenEnds);
-            grpControlPanel.Controls.Add(chkShowSubtitles);
             grpControlPanel.Controls.Add(btnCloseControlPanel);
             grpControlPanel.Dock = DockStyle.Bottom;
             grpControlPanel.Location = new Point(0, 518);
@@ -444,20 +442,6 @@ namespace SwewolfMediaPlayer
             cboWhenEnds.TabIndex = 1;
             toolTip.SetToolTip(cboWhenEnds, "What the player does when a video has played to its end");
             cboWhenEnds.SelectedIndexChanged += cboWhenEnds_SelectedIndexChanged;
-            //
-            // chkShowSubtitles
-            //
-            chkShowSubtitles.AutoSize = true;
-            chkShowSubtitles.Checked = true;
-            chkShowSubtitles.CheckState = CheckState.Checked;
-            chkShowSubtitles.Location = new Point(352, 27);
-            chkShowSubtitles.Name = "chkShowSubtitles";
-            chkShowSubtitles.Size = new Size(110, 19);
-            chkShowSubtitles.TabIndex = 2;
-            chkShowSubtitles.Text = "Show Subtitles";
-            toolTip.SetToolTip(chkShowSubtitles, "Show the subtitles of a video (C). Remembered for the next time.");
-            chkShowSubtitles.UseVisualStyleBackColor = true;
-            chkShowSubtitles.CheckedChanged += chkShowSubtitles_CheckedChanged;
             // 
             // grpTrim
             // 
@@ -591,6 +575,5 @@ namespace SwewolfMediaPlayer
         private GroupBox grpControlPanel;
         private Label lblWhenEnds;
         private ComboBox cboWhenEnds;
-        private CheckBox chkShowSubtitles;
     }
 }

@@ -10,7 +10,8 @@ Only the chapters part is built so far. Skip and speed are still to do.
 | Chapters (buttons, keys P and N, menu) | **Done**, committed 2026-10-25 (`8c7cbf6`) |
 | Skip back / forward (10 s, 30 s) | To do |
 | Playback speed (box with arrows, keys + - Backspace) | **Done**, 2026-10-26 (`SpeedBox.cs`, `MediaPlayerForm.Speed.cs`) |
-| Show Subtitles check box in the Control Panel | **Done**, 2026-10-26 (remembered, on by default; the C key switches it) |
+| Show Subtitles check box in the Control Panel | Built 2026-10-26, **removed 2026-10-27**: replaced by the default in Tools > Settings and the tracks per file (below) |
+| Audio and subtitle track remembered per file | **Done**, 2026-10-27 (`MediaPlayerForm.Tracks.cs`, library table `TrackChoice`) |
 | Settings for the skip lengths | To do |
 | `docs/help.md` shortcut section | To do (there is no help file in this repo yet) |
 
@@ -98,3 +99,17 @@ Original plan (kept for the details):
 - A file played before shows the resume prompt: use a new copy of the file.
 - Announce by voice before and after a test that takes over the screen (see the global CLAUDE.md).
 - Build the Release version after every change.
+
+## Tracks per file (built 2026-10-27)
+
+- **Setting:** Tools > Settings > Player > "Show Subtitles by Default" (on by default). It only decides for a video that has no choice of its own.
+- **Remembered:** an audio or subtitle track chosen in the right-click menu (and the C key for subtitles) is saved for that file in the
+  library database, table `TrackChoice` (schema 9; columns AudioIndex, AudioName, SubtitleOff, SubtitleIndex, SubtitleName). It is used
+  the next time the file opens. A track is found again by its name first, then by its place in the list.
+- **Not saved:** what the program does by itself, and a choice that changes nothing (the track that already plays). Nothing for streams, SID
+  music or files without a library path.
+- **Menu:** "Use Default Tracks" forgets the choice of the file (enabled only when there is one) and goes back to the default.
+- **Explorer:** `LibraryStore.cs` is shared; the explorer's copy is the master and needs the same change (new table, `Forget` and `Move` carry
+  the rows), and `docs/library-db.md` there should list the table. Not done: the explorer's repo was not touched.
+- Tested with a clip that has two audio and two subtitle tracks: the choice was saved, used again after a restart, and "Use Default Tracks"
+  removed it. Not tested: an older explorer opening a database with schema 9.

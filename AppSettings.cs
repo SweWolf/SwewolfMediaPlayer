@@ -15,7 +15,7 @@
 //   2026-10-16  ResumeRewindSeconds (default 10).
 //   2026-10-23  ShowTuneList (on by default).
 //   2026-10-23  CoverPictureSize (Medium by default).
-//   2026-10-26  ShowSubtitles (on by default).
+//   2026-10-26  ShowSubtitles (on by default): the default for videos with no choice of their own.
 
 using System.Text.Json;
 
@@ -53,7 +53,8 @@ namespace SwewolfMediaPlayer
         // Whether the list of tunes is shown on the right while a SID file with several tunes plays.
         public bool ShowTuneList { get; set; } = true;
 
-        // Whether subtitles are shown (the "Show Subtitles" check box of the Control Panel; on by default).
+        // Whether a video shows its subtitles when it is opened for the first time (Tools > Settings, "Show Subtitles by Default"; on by default).
+        // What the user chose for a file in the right-click menu is remembered for that file and wins (the library, TrackChoice).
         public bool ShowSubtitles { get; set; } = true;
 
         // Whether the main window asks GitHub for a newer version when it starts.

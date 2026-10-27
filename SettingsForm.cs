@@ -8,6 +8,7 @@
 //   2026-10-16  Move the Resume Point Back by N seconds (default 10).
 //   2026-10-16  Resume = No hides the other settings of the group.
 //   2026-10-23  Cover Picture Size for Music Files (Medium / Maximum) in the Player group.
+//   2026-10-26  Show Subtitles by Default in the Player group.
 
 namespace SwewolfMediaPlayer
 {
@@ -50,6 +51,7 @@ namespace SwewolfMediaPlayer
             AppSettings settings = AppSettings.Load();
             chkStartFullScreen.Checked = settings.StartFullScreenForVideo;
             chkSeekThumbnails.Checked = settings.ShowSeekBarThumbnails;
+            chkShowSubtitles.Checked = settings.ShowSubtitles;
             cboNewVersionCheck.SelectedItem = settings.CheckForUpdatesOnStartup ? "Yes" : "No";
             cboCoverSize.SelectedIndex = Math.Clamp(settings.CoverPictureSize, 0, 1);
             cboResumeMode.SelectedIndex = Math.Clamp(settings.ResumeWhenOpening, 0, 2);
@@ -75,6 +77,7 @@ namespace SwewolfMediaPlayer
             AppSettings settings = AppSettings.Load();
             settings.StartFullScreenForVideo = chkStartFullScreen.Checked;
             settings.ShowSeekBarThumbnails = chkSeekThumbnails.Checked;
+            settings.ShowSubtitles = chkShowSubtitles.Checked;
             settings.CheckForUpdatesOnStartup = cboNewVersionCheck.SelectedItem?.ToString() != "No";
             settings.CoverPictureSize = Math.Max(0, cboCoverSize.SelectedIndex);
             settings.ResumeWhenOpening = Math.Max(0, cboResumeMode.SelectedIndex);

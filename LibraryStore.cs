@@ -18,6 +18,9 @@ public sealed record LibraryRoute(string DbFile, string Prefix, bool Relative, s
 /// what it knows.
 ///
 /// History:
+///   2026-10-26  Schema 9: table TrackChoice (per file: the audio track and the subtitle track the user chose in the player, written as the
+///               place in the list and the name of the track). GetTrackChoice / SetAudioChoice / SetSubtitleChoice / ClearTrackChoice; Forget
+///               and Move carry the rows. An older copy ignores the table.
 ///   2026-10-24  IsWebAddress is public; SetItemInfo has "create" (default false: the explorer never makes a library file just for this;
 ///               an importer passes true).
 ///   2026-10-24  SetItemInfo keeps only http / https addresses of other computers ("about:internet" and localhost are not stored).
@@ -52,7 +55,7 @@ public static class LibraryStore
 {
     public const string UsbFolderName = ".SweWolfFileExplorerData";
     public const string DbFileName = "library.db";
-    private const int SchemaVersion = 8;
+    private const int SchemaVersion = 9;
 
     /// <summary>One thing at a time on the database files (inside this app).</summary>
     public static readonly object Gate = new();
@@ -511,6 +514,16 @@ public static class LibraryStore
                     Folder  TEXT NOT NULL COLLATE NOCASE,
                     Name    TEXT NOT NULL COLLATE NOCASE,
                     Picture TEXT NOT NULL,
+                    PRIMARY KEY (Folder, Name)
+                ) WITHOUT ROWID;
+                CREATE TABLE IF NOT EXISTS TrackChoice (
+                    Folder        TEXT NOT NULL COLLATE NOCASE,
+                    Name          TEXT NOT NULL COLLATE NOCASE,
+                    AudioIndex    INTEGER,
+                    AudioName     TEXT,
+                    SubtitleOff   INTEGER,
+                    SubtitleIndex INTEGER,
+                    SubtitleName  TEXT,
                     PRIMARY KEY (Folder, Name)
                 ) WITHOUT ROWID;";
             create.ExecuteNonQuery();
@@ -1002,6 +1015,135 @@ public static class LibraryStore
         }
     }
 
+    // ── Audio and subtitle track of a file ───────────────────────────────────
+
+    /// <summary>
+    /// What the user chose in the player. A track is written as its place in the list of the file's tracks and its name (the player
+    /// looks for the name first). Null: nothing chosen for that kind. For the subtitles, SubtitleOff means "no subtitles"
+    /// (then there is no track).
+    /// </summary>
+    public sealed record TrackChoiceRow(int? AudioIndex, string? AudioName, bool SubtitleOff, int? SubtitleIndex, string? SubtitleName)
+    {
+        public bool HasAudio => AudioIndex != null || AudioName != null;
+        public bool HasSubtitle => SubtitleOff || SubtitleIndex != null || SubtitleName != null;
+    }
+
+    /// <summary>The tracks the user chose for a file, or null if there is nothing (then the player follows its settings).</summary>
+    public static TrackChoiceRow? GetTrackChoice(string filePath)
+    {
+        var path = filePath.TrimEnd('\\', '/');
+        var folder = Path.GetDirectoryName(path);
+        if (string.IsNullOrEmpty(folder)) return null;
+
+        lock (Gate)
+        {
+            try
+            {
+                var route = Resolve(folder, create: false);
+                if (route == null) return null;
+
+                using var connection = Open(route, create: false);
+                if (connection == null) return null;
+
+                var (parentKey, name) = RatedKey(route, path);
+                using var command = Command(connection,
+                    "SELECT AudioIndex, AudioName, SubtitleOff, SubtitleIndex, SubtitleName FROM TrackChoice WHERE Folder = $f AND Name = $n",
+                    ("$f", parentKey), ("$n", name));
+                using var reader = command.ExecuteReader();
+                if (!reader.Read()) return null;
+
+                return new TrackChoiceRow(
+                    reader.IsDBNull(0) ? null : reader.GetInt32(0),
+                    reader.IsDBNull(1) ? null : reader.GetString(1),
+                    !reader.IsDBNull(2) && reader.GetInt32(2) != 0,
+                    reader.IsDBNull(3) ? null : reader.GetInt32(3),
+                    reader.IsDBNull(4) ? null : reader.GetString(4));
+            }
+            catch (Exception ex)
+            {
+                RepairAfter(ex, path);
+                return null;
+            }
+        }
+    }
+
+    /// <summary>Saves the audio track the user chose for a file. False if it could not be saved (a write-protected drive).</summary>
+    public static bool SetAudioChoice(string filePath, int index, string? trackName) =>
+        SetTrackColumns(filePath, "AudioIndex = $v1, AudioName = $v2", ("$v1", index), ("$v2", trackName));
+
+    /// <summary>
+    /// Saves the subtitles the user chose for a file: off (index and name are ignored), or a track. False if it could not be saved.
+    /// </summary>
+    public static bool SetSubtitleChoice(string filePath, bool off, int index, string? trackName) =>
+        SetTrackColumns(filePath, "SubtitleOff = $v1, SubtitleIndex = $v2, SubtitleName = $v3",
+            ("$v1", off ? 1 : 0), ("$v2", off ? null : index), ("$v3", off ? null : trackName));
+
+    /// <summary>Forgets what the user chose for a file (back to the settings of the player). Never creates a database file.</summary>
+    public static bool ClearTrackChoice(string filePath)
+    {
+        var path = filePath.TrimEnd('\\', '/');
+        var folder = Path.GetDirectoryName(path);
+        if (string.IsNullOrEmpty(folder)) return false;
+
+        lock (Gate)
+        {
+            try
+            {
+                var route = Resolve(folder, create: false);
+                if (route == null) return true;
+
+                using var connection = Open(route, create: false);
+                if (connection == null) return true;
+
+                var (parentKey, name) = RatedKey(route, path);
+                using var command = Command(connection, "DELETE FROM TrackChoice WHERE Folder = $f AND Name = $n",
+                    ("$f", parentKey), ("$n", name));
+                command.ExecuteNonQuery();
+                return true;
+            }
+            catch (Exception ex)
+            {
+                RepairAfter(ex, path);
+                return false;
+            }
+        }
+    }
+
+    // Writes some columns of the row of the file (the row is made when it is not there yet).
+    private static bool SetTrackColumns(string filePath, string assignments, params (string Name, object? Value)[] values)
+    {
+        var path = filePath.TrimEnd('\\', '/');
+        var folder = Path.GetDirectoryName(path);
+        if (string.IsNullOrEmpty(folder)) return false;
+
+        lock (Gate)
+        {
+            try
+            {
+                var route = Resolve(folder, create: true);
+                if (route == null) return false;
+
+                using var connection = Open(route, create: true);
+                if (connection == null) return false;
+
+                var (parentKey, name) = RatedKey(route, path);
+                using (var insert = Command(connection, "INSERT OR IGNORE INTO TrackChoice (Folder, Name) VALUES ($f, $n)",
+                           ("$f", parentKey), ("$n", name)))
+                    insert.ExecuteNonQuery();
+
+                var parameters = values.Concat(new (string, object?)[] { ("$f", parentKey), ("$n", name) }).ToArray();
+                using var update = Command(connection, $"UPDATE TrackChoice SET {assignments} WHERE Folder = $f AND Name = $n", parameters);
+                update.ExecuteNonQuery();
+                return true;
+            }
+            catch (Exception ex)
+            {
+                RepairAfter(ex, path);
+                return false;
+            }
+        }
+    }
+
     // ── Where a file came from ───────────────────────────────────────────────
 
     /// <summary>Where a file was downloaded from (the address of the file) and the page that linked to it; either may be null.</summary>
@@ -1233,7 +1375,7 @@ public static class LibraryStore
     {
         var (below, above) = SubtreeRange(key);
 
-        foreach (var table in new[] { "File", "Rated", "PreviewPick", "ItemInfo" })
+        foreach (var table in new[] { "File", "Rated", "PreviewPick", "ItemInfo", "TrackChoice" })
         {
             using (var item = session.Command(connection, $"DELETE FROM {table} WHERE Folder = $p AND Name = $n", ("$p", parentKey), ("$n", name)))
                 item.ExecuteNonQuery();
@@ -1355,6 +1497,8 @@ public static class LibraryStore
             "SELECT Folder, Name, Picture FROM PreviewPick WHERE (Folder = $p AND Name = $n) OR Folder = $k OR (Folder > $a AND Folder < $b)", p);
         var infos   = ReadAll(session, fromConnection,
             "SELECT Folder, Name, HostUrl, ReferrerUrl FROM ItemInfo WHERE (Folder = $p AND Name = $n) OR Folder = $k OR (Folder > $a AND Folder < $b)", p);
+        var tracks  = ReadAll(session, fromConnection,
+            "SELECT Folder, Name, AudioIndex, AudioName, SubtitleOff, SubtitleIndex, SubtitleName FROM TrackChoice WHERE (Folder = $p AND Name = $n) OR Folder = $k OR (Folder > $a AND Folder < $b)", p);
         var lasts   = ReadAll(session, fromConnection,
             "SELECT Path, Name FROM LastOpened WHERE Path = $k OR (Path > $a AND Path < $b)", p);   // folders: the item and below
         var lastOfItem = ReadAll(session, fromConnection,
@@ -1364,7 +1508,7 @@ public static class LibraryStore
         var folderPicOfItem = ReadAll(session, fromConnection,
             "SELECT Path, Name FROM FolderPicture WHERE Path = $p AND Name = $n COLLATE NOCASE", p);
         if (files.Count == 0 && rated.Count == 0 && folders.Count == 0 && prefs.Count == 0 && picks.Count == 0 && infos.Count == 0
-            && lasts.Count == 0 && lastOfItem.Count == 0 && folderPics.Count == 0 && folderPicOfItem.Count == 0) return;
+            && tracks.Count == 0 && lasts.Count == 0 && lastOfItem.Count == 0 && folderPics.Count == 0 && folderPicOfItem.Count == 0) return;
 
         var toRoute = Resolve(to, create: true);
         if (toRoute == null) return;
@@ -1414,6 +1558,15 @@ public static class LibraryStore
             using var insert = session.Command(toConnection,
                 "INSERT OR REPLACE INTO ItemInfo (Folder, Name, HostUrl, ReferrerUrl) VALUES ($f, $n, $h, $r)",
                 ("$f", folder), ("$n", name), ("$h", r[2]), ("$r", r[3]));
+            insert.ExecuteNonQuery();
+        }
+
+        foreach (var r in tracks)
+        {
+            var (folder, name) = IsTheItem(r[0], r[1]) ? (toParent, toName) : (Remap((string)r[0]!), (string)r[1]!);
+            using var insert = session.Command(toConnection,
+                "INSERT OR REPLACE INTO TrackChoice (Folder, Name, AudioIndex, AudioName, SubtitleOff, SubtitleIndex, SubtitleName) VALUES ($f, $n, $ai, $an, $so, $si, $sn)",
+                ("$f", folder), ("$n", name), ("$ai", r[2]), ("$an", r[3]), ("$so", r[4]), ("$si", r[5]), ("$sn", r[6]));
             insert.ExecuteNonQuery();
         }
 

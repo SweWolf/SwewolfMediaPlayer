@@ -76,7 +76,8 @@
 //   2026-10-25  Chapters: previous / next buttons, keys P and N, a Chapters menu; only for files that have chapters (MediaPlayerForm.Chapters.cs).
 //   2026-10-25  Icons: chapters have a bar and one triangle (as in VLC); previous / next tune and track have a bar and two triangles.
 //   2026-10-26  Playback speed box left of the time, keys + - Backspace (SpeedBox.cs, MediaPlayerForm.Speed.cs); the seek bar is 30 px shorter.
-//   2026-10-26  The C key switches the "Show Subtitles" check box of the Control Panel (remembered); the setting is applied to each file (CheckSubtitles).
+//   2026-10-26  The audio and subtitle track chosen for a file are remembered in the library and used the next time (MediaPlayerForm.Tracks.cs);
+//               "Show Subtitles by Default" in Tools > Settings decides for files with no choice of their own.
 
 using System.ComponentModel;
 using System.Drawing.Drawing2D;
@@ -515,7 +516,7 @@ namespace SwewolfMediaPlayer
             ResetTunes();
             ResetChapters();
             ResetSpeed();
-            _subtitlesApplied = false;
+            ResetTracks();
             _vlcSeekable = true;
             ApplySeekState();
             ResetThumbnails();
@@ -1612,7 +1613,7 @@ namespace SwewolfMediaPlayer
             CheckTunes();
             CheckChapters();
             CheckSpeed();
-            CheckSubtitles();
+            CheckTracks();
             TrackLibrary();
 
             if (_isStream && !_videoCheckDone && _player.IsPlaying)
@@ -1713,28 +1714,22 @@ namespace SwewolfMediaPlayer
             foreach (TrackDescription track in player.AudioTrackDescription.Where(t => t.Id >= 0))
             {
                 int id = track.Id;
-                audio.DropDownItems.Add(TrackItem(track.Name, id == currentAudio, () => player.SetAudioTrack(id)));
+                audio.DropDownItems.Add(TrackItem(track.Name, id == currentAudio, () => ChooseAudio(id)));
             }
             audio.Enabled = audio.DropDownItems.Count > 0;
             menuVideo.Items.Add(audio);
 
             ToolStripMenuItem subtitles = new("Subtitle Track");
             int currentSpu = player.Spu;
-            subtitles.DropDownItems.Add(TrackItem("Disable", currentSpu < 0, () =>
-            {
-                if (player.Spu >= 0)
-                {
-                    _lastSubtitleTrack = player.Spu;
-                }
-                player.SetSpu(-1);
-            }));
+            subtitles.DropDownItems.Add(TrackItem("Disable", currentSpu < 0, () => ChooseSubtitle(-1)));
             foreach (TrackDescription track in player.SpuDescription.Where(t => t.Id >= 0))
             {
                 int id = track.Id;
-                subtitles.DropDownItems.Add(TrackItem(track.Name, id == currentSpu, () => player.SetSpu(id)));
+                subtitles.DropDownItems.Add(TrackItem(track.Name, id == currentSpu, () => ChooseSubtitle(id)));
             }
             subtitles.Enabled = subtitles.DropDownItems.Count > 1;
             menuVideo.Items.Add(subtitles);
+            AddDefaultTracksMenuItem();
             AddTuneMenu();
             AddChapterMenu();
             AddVisualizationMenu();
@@ -1774,16 +1769,27 @@ namespace SwewolfMediaPlayer
             }
         }
 
-        // Switches the subtitles off, or back on (the track that was on, or else the first one).
+        // The C key: switches the subtitles off, or back on (the track that was on, or else the first one). Like a choice in the menu,
+        // it is remembered for the file (MediaPlayerForm.Tracks.cs).
         private void ToggleSubtitles()
         {
-            if (_player == null)
+            MediaPlayer? player = _player;
+            if (player == null)
             {
                 return;
             }
 
-            // Through the "Show Subtitles" check box in the Control Panel, so the choice is remembered.
-            SetShowSubtitles(_player.Spu < 0);
+            if (player.Spu >= 0)
+            {
+                ChooseSubtitle(-1);
+                return;
+            }
+
+            int id = FirstSubtitleToTurnOn(player);
+            if (id >= 0)
+            {
+                ChooseSubtitle(id);
+            }
         }
 
         private void btnStop_Click(object? sender, EventArgs e)
