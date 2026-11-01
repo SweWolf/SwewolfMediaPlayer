@@ -722,6 +722,12 @@ namespace SwewolfMediaPlayer
                 TogglePlayPause();
                 return true;
             }
+            // K (as on YouTube) and the Pause key also toggle play / pause; K not while typing in a text box.
+            if (keyData == Keys.Pause || keyData == Keys.K && !(ActiveControl is TextBoxBase { Visible: true }))
+            {
+                TogglePlayPause();
+                return true;
+            }
             if (keyData == Keys.PageUp && (_tuneCount > 1 || TrackSkipping) && RestartIfPlayedAWhile())
             {
                 return true;
