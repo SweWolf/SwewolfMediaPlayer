@@ -55,6 +55,8 @@ namespace SwewolfMediaPlayer
             menuControls = new ContextMenuStrip(components);
             menuSaveFrame = new ContextMenuStrip(components);
             mnuSetPreviewPicture = new ToolStripMenuItem();
+            sepSaveFrame = new ToolStripSeparator();
+            mnuSaveWithoutAsking = new ToolStripMenuItem();
             mnuShowTrim = new ToolStripMenuItem();
             mnuShowControlPanel = new ToolStripMenuItem();
             grpControlPanel = new GroupBox();
@@ -380,7 +382,7 @@ namespace SwewolfMediaPlayer
             //
             // menuSaveFrame (right-click on the camera button)
             //
-            menuSaveFrame.Items.AddRange(new ToolStripItem[] { mnuSetPreviewPicture });
+            menuSaveFrame.Items.AddRange(new ToolStripItem[] { mnuSetPreviewPicture, sepSaveFrame, mnuSaveWithoutAsking });
             menuSaveFrame.Name = "menuSaveFrame";
             menuSaveFrame.Size = new Size(210, 26);
             menuSaveFrame.Opening += menuSaveFrame_Opening;
@@ -391,6 +393,18 @@ namespace SwewolfMediaPlayer
             mnuSetPreviewPicture.Size = new Size(209, 22);
             mnuSetPreviewPicture.Text = "Set as Preview Picture...";
             mnuSetPreviewPicture.Click += mnuSetPreviewPicture_Click;
+            //
+            // sepSaveFrame
+            //
+            sepSaveFrame.Name = "sepSaveFrame";
+            sepSaveFrame.Size = new Size(206, 6);
+            //
+            // mnuSaveWithoutAsking
+            //
+            mnuSaveWithoutAsking.Name = "mnuSaveWithoutAsking";
+            mnuSaveWithoutAsking.Size = new Size(209, 22);
+            mnuSaveWithoutAsking.Text = "Save Without Asking for a Folder";
+            mnuSaveWithoutAsking.Click += mnuSaveWithoutAsking_Click;
             //
             // mnuShowTrim
             // 
@@ -570,6 +584,8 @@ namespace SwewolfMediaPlayer
         private ContextMenuStrip menuControls;
         private ContextMenuStrip menuSaveFrame;
         private ToolStripMenuItem mnuSetPreviewPicture;
+        private ToolStripSeparator sepSaveFrame;
+        private ToolStripMenuItem mnuSaveWithoutAsking;
         private ToolStripMenuItem mnuShowTrim;
         private ToolStripMenuItem mnuShowControlPanel;
         private GroupBox grpControlPanel;

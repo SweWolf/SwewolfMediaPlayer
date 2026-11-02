@@ -125,6 +125,7 @@ namespace SwewolfMediaPlayer
         private long _knownLengthMs;   // SID files: from the song length database, as LibVLC does not know it
         private bool _seeking;
         private string? _lastSaveFolder;
+        private string? _quietSaveFolder;   // set: pictures are saved here without a dialog
         private int _lastSubtitleTrack = -1;
         private bool _paused;
         private bool _restoringEnd;   // true while OnEndReached starts the video again to show its last frame
@@ -1227,41 +1228,48 @@ namespace SwewolfMediaPlayer
             string stamp = $"{(int)t.TotalHours}-{t.Minutes:00}-{t.Seconds:00}-{t.Milliseconds:000}";
 
             string folder = _isStream ? "" : Path.GetDirectoryName(Path.GetFullPath(_filePath)) ?? "";
-            using var dialog = new SaveFileDialog
-            {
-                Title = asPreviewPicture ? "Set as Preview Picture" : "Save Frame as PNG",
-                Filter = "PNG Image|*.png",
-                DefaultExt = "png",
-                FileName = asPreviewPicture
-                    ? $"{Path.GetFileNameWithoutExtension(_filePath)}-poster.png"
-                    : $"{(_isStream ? "stream" : Path.GetFileNameWithoutExtension(_filePath))}_{stamp}{(atEnd ? "_last" : "")}.png",
-                InitialDirectory = asPreviewPicture ? folder : _lastSaveFolder ?? (_isStream ? null : folder),
-                OverwritePrompt = true
-            };
+            string suggested = asPreviewPicture
+                ? $"{Path.GetFileNameWithoutExtension(_filePath)}-poster.png"
+                : $"{(_isStream ? "stream" : Path.GetFileNameWithoutExtension(_filePath))}_{stamp}{(atEnd ? "_last" : "")}.png";
 
-            if (dialog.ShowDialog(this) != DialogResult.OK)
+            string? fileName = asPreviewPicture ? null : QuietSavePath(suggested);
+            if (fileName == null)
             {
-                return;
-            }
+                using var dialog = new SaveFileDialog
+                {
+                    Title = asPreviewPicture ? "Set as Preview Picture" : "Save Frame as PNG",
+                    Filter = "PNG Image|*.png",
+                    DefaultExt = "png",
+                    FileName = suggested,
+                    InitialDirectory = asPreviewPicture ? folder : _lastSaveFolder ?? (_isStream ? null : folder),
+                    OverwritePrompt = true
+                };
 
-            if (!asPreviewPicture)
-            {
-                _lastSaveFolder = Path.GetDirectoryName(dialog.FileName);
+                if (dialog.ShowDialog(this) != DialogResult.OK)
+                {
+                    return;
+                }
+                fileName = dialog.FileName;
+
+                if (!asPreviewPicture)
+                {
+                    _lastSaveFolder = Path.GetDirectoryName(fileName);
+                }
             }
 
             // A hidden poster (the explorer makes them hidden) cannot be written over as it is: the user has just agreed to
             // replace it, so the attribute goes first and comes back with the new picture.
             if (asPreviewPicture)
             {
-                ClearHidden(dialog.FileName);
+                ClearHidden(fileName);
             }
             DateTime started = DateTime.UtcNow;
 
             if (atEnd)
             {
-                if (await SaveLastFrameWithFfmpegAsync(dialog.FileName))
+                if (await SaveLastFrameWithFfmpegAsync(fileName))
                 {
-                    if (asPreviewPicture) await FinishPreviewPictureAsync(dialog.FileName, started);
+                    if (asPreviewPicture) await FinishPreviewPictureAsync(fileName, started);
                     return;
                 }
                 if (IsDisposed || _player == null)
@@ -1270,23 +1278,23 @@ namespace SwewolfMediaPlayer
                 }
 
                 // FFmpeg is not available, or failed: save what the player can show instead.
-                if (_player.TakeSnapshot(0, dialog.FileName, 0, 0))
+                if (_player.TakeSnapshot(0, fileName, 0, 0))
                 {
-                    if (asPreviewPicture) await FinishPreviewPictureAsync(dialog.FileName, started);
+                    if (asPreviewPicture) await FinishPreviewPictureAsync(fileName, started);
                     MessageBox.Show(this, "FFmpeg was not found or could not read the video, so the frame closest to the end that the player can show was saved instead. It may be one or two frames before the very last one.", AppName,
                         MessageBoxButtons.OK, MessageBoxIcon.Information);
                     return;
                 }
             }
-            else if (_player.TakeSnapshot(0, dialog.FileName, 0, 0))
+            else if (_player.TakeSnapshot(0, fileName, 0, 0))
             {
-                if (asPreviewPicture) await FinishPreviewPictureAsync(dialog.FileName, started);
+                if (asPreviewPicture) await FinishPreviewPictureAsync(fileName, started);
                 return;
             }
 
             if (asPreviewPicture)
             {
-                SetHidden(dialog.FileName);   // an old poster that was there stays hidden
+                SetHidden(fileName);   // an old poster that was there stays hidden
             }
             MessageBox.Show(this, "The frame could not be saved.", AppName,
                 MessageBoxButtons.OK, MessageBoxIcon.Warning);
@@ -1346,7 +1354,12 @@ namespace SwewolfMediaPlayer
         {
             bool available = _saveFrameShown && !_isStream && !(picCover.Visible && picCover.Image != null)
                 && string.Equals(_libraryPath, _filePath, StringComparison.OrdinalIgnoreCase);
-            if (!available)
+            // "Save Without Asking for a Folder" is for every picture the button saves, so the menu opens whenever the button
+            // is shown; only the preview picture item depends on the file.
+            mnuSetPreviewPicture.Visible = available;
+            sepSaveFrame.Visible = available;
+            mnuSaveWithoutAsking.Checked = _quietSaveFolder != null;
+            if (!_saveFrameShown)
             {
                 e.Cancel = true;
             }
@@ -1357,6 +1370,55 @@ namespace SwewolfMediaPlayer
             SaveFrame(asPreviewPicture: true);
         }
 
+        // Checking the item asks for the folder once; from then on frames and cover art are saved there without a dialog
+        // (the same suggested file name; an existing file is never replaced, a number is added). Not remembered between runs.
+        private void mnuSaveWithoutAsking_Click(object? sender, EventArgs e)
+        {
+            if (_quietSaveFolder != null)
+            {
+                _quietSaveFolder = null;
+                return;
+            }
+
+            using var dialog = new FolderBrowserDialog
+            {
+                Description = "Choose the folder where pictures are saved without asking.",
+                UseDescriptionForTitle = true,
+                InitialDirectory = _lastSaveFolder ?? (_isStream ? "" : Path.GetDirectoryName(Path.GetFullPath(_filePath)) ?? "")
+            };
+            if (dialog.ShowDialog(this) == DialogResult.OK)
+            {
+                _quietSaveFolder = dialog.SelectedPath;
+            }
+        }
+
+        // The full path to save to without a dialog, or null when the dialog is to be shown (the option is off, or the
+        // folder has been removed since and cannot be created again).
+        private string? QuietSavePath(string suggestedName)
+        {
+            if (_quietSaveFolder == null)
+            {
+                return null;
+            }
+            try
+            {
+                Directory.CreateDirectory(_quietSaveFolder);   // does nothing when it exists
+            }
+            catch (Exception)
+            {
+                return null;
+            }
+
+            string path = Path.Combine(_quietSaveFolder, suggestedName);
+            string name = Path.GetFileNameWithoutExtension(suggestedName);
+            string ext = Path.GetExtension(suggestedName);
+            for (int n = 2; File.Exists(path); n++)
+            {
+                path = Path.Combine(_quietSaveFolder, $"{name} ({n}){ext}");
+            }
+            return path;
+        }
+
         // Saves the cover art on screen as a PNG (there is no video frame to take).
         private void SaveCoverArt()
         {
@@ -1365,25 +1427,31 @@ namespace SwewolfMediaPlayer
                 return;
             }
 
-            using var dialog = new SaveFileDialog
+            string suggested = $"{Path.GetFileNameWithoutExtension(_filePath)}_cover.png";
+            string? fileName = QuietSavePath(suggested);
+            if (fileName == null)
             {
-                Title = "Save Cover Art as PNG",
-                Filter = "PNG Image|*.png",
-                DefaultExt = "png",
-                FileName = $"{Path.GetFileNameWithoutExtension(_filePath)}_cover.png",
-                InitialDirectory = _lastSaveFolder ?? Path.GetDirectoryName(Path.GetFullPath(_filePath)),
-                OverwritePrompt = true
-            };
+                using var dialog = new SaveFileDialog
+                {
+                    Title = "Save Cover Art as PNG",
+                    Filter = "PNG Image|*.png",
+                    DefaultExt = "png",
+                    FileName = suggested,
+                    InitialDirectory = _lastSaveFolder ?? Path.GetDirectoryName(Path.GetFullPath(_filePath)),
+                    OverwritePrompt = true
+                };
 
-            if (dialog.ShowDialog(this) != DialogResult.OK)
-            {
-                return;
+                if (dialog.ShowDialog(this) != DialogResult.OK)
+                {
+                    return;
+                }
+
+                fileName = dialog.FileName;
+                _lastSaveFolder = Path.GetDirectoryName(fileName);
             }
-
-            _lastSaveFolder = Path.GetDirectoryName(dialog.FileName);
             try
             {
-                picCover.Image.Save(dialog.FileName, System.Drawing.Imaging.ImageFormat.Png);
+                picCover.Image.Save(fileName, System.Drawing.Imaging.ImageFormat.Png);
             }
             catch (Exception ex)
             {
