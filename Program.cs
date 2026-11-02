@@ -11,6 +11,15 @@ namespace SwewolfMediaPlayer
             // To customize application configuration such as set high DPI settings or default font,
             // see https://aka.ms/applicationconfiguration.
             OpenTimingLog.Write($"Main: started, program folder: {AppContext.BaseDirectory}, arguments: {string.Join(" ", args)}");
+            // --warm-up (from the explorer, a few seconds after it starts): load the video engine once, so that
+            // the antivirus program has scanned its files and Windows has them cached when a real video is opened,
+            // then end. No window, no pipe, no library file; if a player is running already there is nothing to do.
+            if (args.Length == 1 && args[0].Equals("--warm-up", StringComparison.OrdinalIgnoreCase))
+            {
+                WarmUp();
+                return;
+            }
+
             ApplicationConfiguration.Initialize();
 
             // For testing a copy of the player without touching the real library file.
@@ -94,6 +103,29 @@ namespace SwewolfMediaPlayer
                     MessageBoxButtons.OK, MessageBoxIcon.Warning);
             }
             Application.Run(new MainForm(path));
+        }
+
+        private static void WarmUp()
+        {
+            try
+            {
+                // The same mutex as a real player: when one runs, its files are loaded already.
+                using var oneWindow = new Mutex(true, PlayerPipe.MutexName, out bool first);
+                if (!first)
+                {
+                    OpenTimingLog.Write("Warm-up: a player is running already, nothing to do");
+                    return;
+                }
+                var watch = System.Diagnostics.Stopwatch.StartNew();
+                // At most 2 minutes: a stuck load must never leave a hidden process behind.
+                bool done = MediaPlayerForm.PreloadAsync().Wait(TimeSpan.FromMinutes(2));
+                OpenTimingLog.Write(done ? $"Warm-up: done after {watch.ElapsedMilliseconds} ms" : "Warm-up: gave up after 2 minutes");
+            }
+            catch (Exception ex)
+            {
+                OpenTimingLog.Write($"Warm-up: failed: {ex.Message}");
+            }
+            // The process ends here: Main returns and the engine is dropped with it (nothing was ever shown).
         }
 
         // The icon is built into the program, so it also works when only the EXE is shipped.
