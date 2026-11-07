@@ -12,6 +12,7 @@
 //   2026-10-21  The same two buttons skip to the previous / next track while the explorer runs a playlist (MediaPlayerForm.Pipe.cs: TrackSkipping,
 //               SkipTrack); they are shown for any file then, and enabled at both ends (the explorer decides what comes next).
 //   2026-10-23  Tune names from HVSC's STIL in the window title and the Tune menu; a list of the tunes on the right (MediaPlayerForm.TuneList.cs).
+//   2026-11-06  Exact rule for the back button: more than 3 s restarts, 3 s or less goes to the previous track; a double-click always goes to the previous.
 //   2026-10-25  LayoutControlBar also places the chapter buttons (MediaPlayerForm.Chapters.cs), right of the tune buttons.
 
 using LibVLCSharp.Shared;
@@ -39,16 +40,23 @@ namespace SwewolfMediaPlayer
         // The two buttons: tunes of a SID file, or tracks of the explorer's playlist.
         private void NavButton(int direction)
         {
-            if (direction < 0 && RestartIfPlayedAWhile()) return;
+            // A double-click (second press within the system double-click time) always goes to the previous track.
+            long now = Environment.TickCount64;
+            bool doubleClick = direction < 0 && now - _lastPrevPressTicks <= SystemInformation.DoubleClickTime;
+            _lastPrevPressTicks = direction < 0 ? (doubleClick ? 0 : now) : 0;
+
+            if (direction < 0 && !doubleClick && RestartIfPlayedAWhile()) return;
             if (TrackSkipping) SkipTrack(direction);
             else ChangeTune(_tuneIndex + direction);
         }
 
-        // The "back" button, Page Up and the previous-track media key: after more than 3 seconds of the file (or tune) they go back to its start,
-        // and only within the first 3 seconds do they go to the previous file or tune. True if it went back to the start.
+        private long _lastPrevPressTicks;
+
+        // The "back" button, Page Up and the previous-track media key: after more than 3 seconds of the file (or tune) they go back to its start;
+        // at 3 seconds or less they go to the previous file or tune (a double-click always does). True if it went back to the start.
         private bool RestartIfPlayedAWhile()
         {
-            if (_player == null || !CanSeek || _player.Time < 3000)
+            if (_player == null || !CanSeek || _player.Time <= 3000)
             {
                 return false;
             }
