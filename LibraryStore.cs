@@ -18,6 +18,22 @@ public sealed record LibraryRoute(string DbFile, string Prefix, bool Relative, s
 /// what it knows.
 ///
 /// History:
+///   2026-11-07  ClearAllNoAskStart: forgets every NoAskStart in the main file and in the files of the connected drives (no schema change).
+///   2026-11-07  Schema 12: ItemInfo.NoAskStart (per program: the user said "Don't ask again for this file" in the question before it is started;
+///               a program inside a compressed file is keyed by its path in the archive). GetNoAskStart / SetNoAskStart; Move carries it. An
+///               existing table gets the column added; an older copy ignores it.
+///   2026-11-02  ScanForCleanup / ApplyCleanup: finds the records of a drive whose file or folder is gone (read only) and removes them
+///               after a backup copy (cleanup-*.db in Backups). No schema change.
+///   2026-10-31  Resolve: the trimmed path of a drive itself ("D:") now finds the drive's root ("D:\"), so the rows of a drive's own rating go
+///               to the same file as everything else on it.
+///   2026-10-31  A drive of any kind that is not removable by itself (internal, network, VeraCrypt) can be told to keep its data on the drive:
+///               DriveDataKind says how a drive is kept, MoveDriveData moves its rows between the main file and the drive's file (safe: nothing
+///               is lost if it fails, the changes of both files are rolled back), UnmarkDrivePortable renames the data folder to a backup.
+///               The folder marker is looked for on network drives too. No schema change.
+///   2026-10-28  ClearSubfolderLayouts: removes the chosen columns and list sort of all folders below a folder (no schema change).
+///   2026-10-28  Schema 11: FolderPrefs.Columns (per folder: the columns of the list that are shown, in order, as the names of the explorer's
+///               SortColumn separated by commas; widths are not kept, the explorer fits them). GetFolderPrefs returns it; SetFolderColumns
+///               writes it (null = the folder has no layout of its own); Move carries it. An existing table gets the column added.
 ///   2026-10-27  Schema 10: TrackChoice also keeps the video track (VideoIndex, VideoName; for files with several pictures, e.g. angles).
 ///               SetVideoChoice; an existing table gets the two columns added. An older copy ignores them.
 ///   2026-10-26  Schema 9: table TrackChoice (per file: the audio track and the subtitle track the user chose in the player, written as the
@@ -57,7 +73,7 @@ public static class LibraryStore
 {
     public const string UsbFolderName = ".SweWolfFileExplorerData";
     public const string DbFileName = "library.db";
-    private const int SchemaVersion = 10;
+    private const int SchemaVersion = 12;
 
     /// <summary>One thing at a time on the database files (inside this app).</summary>
     public static readonly object Gate = new();
@@ -148,6 +164,30 @@ public static class LibraryStore
     /// <summary>Only for tests: is this drive treated as removable (USB stick, USB hard disk, card)?</summary>
     public static bool IsPortableDrive(string root) => DriveTypeOf(root) == DriveRemovable;
 
+    /// <summary>How the data of a drive is kept (see <see cref="GetDriveDataKind"/>).</summary>
+    public enum DriveDataKind
+    {
+        /// <summary>On this computer, in the main file (the default for internal and network drives).</summary>
+        Main,
+        /// <summary>On the drive, because the user said so (the hidden data folder is in its root): can be turned off.</summary>
+        OnDriveByChoice,
+        /// <summary>On the drive, because it is removable (USB, card): always.</summary>
+        OnDriveAlways,
+        /// <summary>Cannot be kept on the drive (CD / DVD).</summary>
+        NotPossible,
+    }
+
+    public static DriveDataKind GetDriveDataKind(string root)
+    {
+        lock (Gate)
+        {
+            var type = GetDriveTypeW(root);
+            if (type == DriveCdRom) return DriveDataKind.NotPossible;
+            if (type == DriveRemovable || (type == DriveFixed && IsOnPortableBus(root))) return DriveDataKind.OnDriveAlways;
+            return Directory.Exists(Path.Combine(root, UsbFolderName)) ? DriveDataKind.OnDriveByChoice : DriveDataKind.Main;
+        }
+    }
+
     private static uint DriveTypeOf(string root)
     {
         if (!DriveTypes.TryGetValue(root, out var type))
@@ -156,11 +196,95 @@ public static class LibraryStore
             // An external USB hard disk reports itself as a fixed disk: only the bus it hangs on tells the truth.
             if (type == DriveFixed && IsOnPortableBus(root)) type = DriveRemovable;
             // A drive the bus cannot identify (a VeraCrypt volume mounted from a file on a stick) is marked by the user (or by the
-            // TeraTool converter): the hidden data folder in its root says "this drive is portable".
-            if (type == DriveFixed && Directory.Exists(Path.Combine(root, UsbFolderName))) type = DriveRemovable;
+            // TeraTool converter): the hidden data folder in its root says "this drive is portable". A network drive can be marked too.
+            if (type is DriveFixed or DriveRemote or DriveRamDisk && Directory.Exists(Path.Combine(root, UsbFolderName))) type = DriveRemovable;
             DriveTypes[root] = type;
         }
         return type;
+    }
+
+    private const uint DriveRemote = 4;
+    private const uint DriveRamDisk = 6;
+
+    /// <summary>
+    /// Moves the rows of a whole drive between the main file (full paths) and the file in the drive's hidden data folder
+    /// (paths from the root of the drive), in one go: if anything fails, both files are left as they were. Marking the drive
+    /// (creating the folder) when <paramref name="toDrive"/> is true is done here too; for the other direction
+    /// <see cref="UnmarkDrivePortable"/> is called afterwards. Returns null when it worked, else the reason.
+    /// </summary>
+    public static string? MoveDriveData(string root, bool toDrive)
+    {
+        Flush();   // read marks still waiting for the worker (which needs the gate) are written first
+        lock (Gate)
+        {
+            root = Path.GetPathRoot(root) ?? root;
+            var driveDb = Path.Combine(root, UsbFolderName, DbFileName);
+            var mainRoute = new LibraryRoute(MainDbFile, "", false, root);
+            var driveRoute = new LibraryRoute(driveDb, "", true, root);
+
+            bool folderMadeNow = toDrive && !Directory.Exists(Path.GetDirectoryName(driveDb)!);
+            if (toDrive && !MarkDrivePortable(root)) return "The drive cannot be written to.";
+
+            // From the main file the drive is found without the folder; from the drive's file it must exist.
+            if (!toDrive && !File.Exists(driveDb)) return null;   // nothing was ever kept there
+
+            var session = new Session();
+            try
+            {
+                var rootItem = root.TrimEnd('\\', '/');
+                MoveRows(session, rootItem, rootItem, toDrive ? mainRoute : driveRoute, toDrive ? driveRoute : mainRoute);
+                if (toDrive) UsbRoots.Add(root);
+                return null;
+            }
+            catch (Exception ex)
+            {
+                session.Abort = true;
+                return ex.Message;
+            }
+            finally
+            {
+                session.Dispose();
+                if (session.Abort && folderMadeNow)   // the drive is as it was before: no folder, data on this computer
+                {
+                    try { Directory.Delete(Path.GetDirectoryName(driveDb)!, recursive: true); } catch { }
+                    DriveTypes.Remove(root);
+                    UsbRoots.Remove(root);
+                }
+            }
+        }
+    }
+
+    /// <summary>
+    /// The drive keeps its data on this computer again: its hidden data folder is renamed (.SweWolfFileExplorerData_BAK, then _BAK2 ...) as a
+    /// backup, so nothing is deleted. Returns null when it worked (or there was no folder), else the reason.
+    /// </summary>
+    public static string? UnmarkDrivePortable(string root)
+    {
+        lock (Gate)
+        {
+            root = Path.GetPathRoot(root) ?? root;
+            var folder = Path.Combine(root, UsbFolderName);
+            if (!Directory.Exists(folder))
+            {
+                DriveTypes.Remove(root);
+                UsbRoots.Remove(root);
+                return null;
+            }
+
+            try
+            {
+                var backup = folder + "_BAK";
+                for (int n = 2; Directory.Exists(backup) || File.Exists(backup); n++) backup = folder + "_BAK" + n;
+                Directory.Move(folder, backup);
+                DriveTypes.Remove(root);
+                UsbRoots.Remove(root);
+                return null;
+            }
+            catch (Exception ex)
+            {
+                return ex.Message;
+            }
+        }
     }
 
     // STORAGE_BUS_TYPE: 4 = IEEE 1394, 7 = USB, 0xC = SD card, 0xD = MMC card.
@@ -194,6 +318,7 @@ public static class LibraryStore
     {
         var root = Path.GetPathRoot(path);
         if (string.IsNullOrEmpty(root)) return null;
+        if (root.Length == 2 && root[1] == ':') root += "\\";   // the path of a drive itself, trimmed ("D:"): Path.Combine would give "D:file", not "D:\file"
 
         var type = DriveTypeOf(root);
         if (type == DriveCdRom) return VolumeRoute(root);
@@ -495,7 +620,8 @@ public static class LibraryStore
                     SortColumn        TEXT,
                     SortAscending     INTEGER,
                     TreeSortColumn    TEXT,
-                    TreeSortAscending INTEGER
+                    TreeSortAscending INTEGER,
+                    Columns           TEXT
                 ) WITHOUT ROWID;
                 CREATE TABLE IF NOT EXISTS FolderPicture (
                     Path TEXT NOT NULL COLLATE NOCASE PRIMARY KEY,
@@ -510,6 +636,7 @@ public static class LibraryStore
                     Name        TEXT NOT NULL COLLATE NOCASE,
                     HostUrl     TEXT,
                     ReferrerUrl TEXT,
+                    NoAskStart  INTEGER,
                     PRIMARY KEY (Folder, Name)
                 ) WITHOUT ROWID;
                 CREATE TABLE IF NOT EXISTS PreviewPick (
@@ -552,6 +679,28 @@ public static class LibraryStore
                 {
                     using var add = connection.CreateCommand();
                     add.CommandText = $"ALTER TABLE TrackChoice ADD COLUMN {column} {type}";
+                    add.ExecuteNonQuery();
+                }
+            }
+
+            // Schema 4 to 10 had no FolderPrefs.Columns.
+            using (var hasColumns = Command(connection, "SELECT COUNT(*) FROM pragma_table_info('FolderPrefs') WHERE name = 'Columns'"))
+            {
+                if (Convert.ToInt32(hasColumns.ExecuteScalar()) == 0)
+                {
+                    using var add = connection.CreateCommand();
+                    add.CommandText = "ALTER TABLE FolderPrefs ADD COLUMN Columns TEXT";
+                    add.ExecuteNonQuery();
+                }
+            }
+
+            // Schema 8 to 11 had no ItemInfo.NoAskStart.
+            using (var hasNoAsk = Command(connection, "SELECT COUNT(*) FROM pragma_table_info('ItemInfo') WHERE name = 'NoAskStart'"))
+            {
+                if (Convert.ToInt32(hasNoAsk.ExecuteScalar()) == 0)
+                {
+                    using var add = connection.CreateCommand();
+                    add.CommandText = "ALTER TABLE ItemInfo ADD COLUMN NoAskStart INTEGER";
                     add.ExecuteNonQuery();
                 }
             }
@@ -1274,13 +1423,118 @@ public static class LibraryStore
         }
     }
 
+    /// <summary>True when the user said "Don't ask again for this file" before starting this program (ItemInfo.NoAskStart). Creates nothing.</summary>
+    public static bool GetNoAskStart(string filePath)
+    {
+        var path = filePath.TrimEnd('\\', '/');
+        var folder = Path.GetDirectoryName(path);
+        if (string.IsNullOrEmpty(folder)) return false;
+
+        lock (Gate)
+        {
+            try
+            {
+                var route = Resolve(folder, create: false);
+                if (route == null) return false;
+
+                using var connection = Open(route, create: false);
+                if (connection == null) return false;
+
+                var (parentKey, name) = RatedKey(route, path);
+                using var command = Command(connection, "SELECT NoAskStart FROM ItemInfo WHERE Folder = $f AND Name = $n",
+                    ("$f", parentKey), ("$n", name));
+                var value = command.ExecuteScalar();
+                return value != null && value != DBNull.Value && Convert.ToInt32(value) != 0;
+            }
+            catch (Exception ex)
+            {
+                RepairAfter(ex, path);
+                return false;
+            }
+        }
+    }
+
+    /// <summary>Remembers (or forgets, with false) "Don't ask again for this file" for a program. A user action, so it may make the library file
+    /// on a drive, like a rating. Only the NoAskStart column changes: the addresses of the row are kept.</summary>
+    public static bool SetNoAskStart(string filePath, bool noAsk = true)
+    {
+        var path = filePath.TrimEnd('\\', '/');
+        var folder = Path.GetDirectoryName(path);
+        if (string.IsNullOrEmpty(folder)) return false;
+
+        lock (Gate)
+        {
+            try
+            {
+                var route = Resolve(folder, create: noAsk);
+                if (route == null) return false;
+
+                using var connection = Open(route, create: noAsk);
+                if (connection == null) return false;
+
+                var (parentKey, name) = RatedKey(route, path);
+                using var write = Command(connection,
+                    "INSERT INTO ItemInfo (Folder, Name, NoAskStart) VALUES ($f, $n, $v) ON CONFLICT(Folder, Name) DO UPDATE SET NoAskStart = $v",
+                    ("$f", parentKey), ("$n", name), ("$v", noAsk ? 1 : 0));
+                write.ExecuteNonQuery();
+                return true;
+            }
+            catch (Exception ex)
+            {
+                RepairAfter(ex, path);
+                return false;
+            }
+        }
+    }
+
+    /// <summary>
+    /// "Ask again about every program": clears every "Don't ask again for this file" in the main file and in the library file of each drive
+    /// that is connected now (a drive that is not connected keeps its choices). A row left with nothing in it is removed. Returns how many
+    /// programs were cleared.
+    /// </summary>
+    public static int ClearAllNoAskStart(bool includeDrives = true)
+    {
+        var files = new List<LibraryRoute> { new(MainDbFile, "", false, "") };
+        foreach (var drive in includeDrives ? Directory.GetLogicalDrives() : Array.Empty<string>())
+        {
+            try
+            {
+                if (DriveTypeOf(drive) == DriveCdRom) continue;
+                var usb = Path.Combine(drive, UsbFolderName, DbFileName);
+                if (File.Exists(usb)) files.Add(new LibraryRoute(usb, "", true, drive));
+            }
+            catch { /* a drive that cannot be asked is left alone */ }
+        }
+
+        int cleared = 0;
+        lock (Gate)
+        {
+            foreach (var route in files)
+            {
+                try
+                {
+                    using var connection = Open(route, create: false);
+                    if (connection == null) continue;
+                    using (var count = Command(connection, "SELECT COUNT(*) FROM ItemInfo WHERE NoAskStart IS NOT NULL AND NoAskStart <> 0"))
+                        cleared += Convert.ToInt32(count.ExecuteScalar());
+                    using (var update = Command(connection, "UPDATE ItemInfo SET NoAskStart = NULL WHERE NoAskStart IS NOT NULL"))
+                        update.ExecuteNonQuery();
+                    using (var empty = Command(connection, "DELETE FROM ItemInfo WHERE NoAskStart IS NULL AND HostUrl IS NULL AND ReferrerUrl IS NULL"))
+                        empty.ExecuteNonQuery();
+                }
+                catch (Exception ex) { RepairAfter(ex, route.DbFile); }
+            }
+        }
+        return cleared;
+    }
+
     // ── Sort order of a folder ───────────────────────────────────────────────
 
     /// <summary>
     /// What the user chose for a folder: how its list is sorted, and how its subfolders are sorted in the tree. The column is the
     /// name of the explorer's SortColumn (a text, so a newer app can add columns). Null where nothing was chosen.
     /// </summary>
-    public sealed record FolderPrefs(string? SortColumn, bool SortAscending, string? TreeSortColumn, bool TreeSortAscending);
+    public sealed record FolderPrefs(string? SortColumn, bool SortAscending, string? TreeSortColumn, bool TreeSortAscending, string? Columns = null);
 
     /// <summary>The saved sort orders of a folder, or null if none was ever chosen for it (or nothing can be read).</summary>
     public static FolderPrefs? GetFolderPrefs(string folderPath)
@@ -1299,14 +1553,15 @@ public static class LibraryStore
                 if (connection == null) return null;
 
                 using var command = Command(connection,
-                    "SELECT SortColumn, SortAscending, TreeSortColumn, TreeSortAscending FROM FolderPrefs WHERE Path = $p",
+                    "SELECT SortColumn, SortAscending, TreeSortColumn, TreeSortAscending, Columns FROM FolderPrefs WHERE Path = $p",
                     ("$p", KeyOf(route, path)));
                 using var reader = command.ExecuteReader();
                 if (!reader.Read()) return null;
 
                 return new FolderPrefs(
                     reader.IsDBNull(0) ? null : reader.GetString(0), reader.IsDBNull(1) || reader.GetInt64(1) != 0,
-                    reader.IsDBNull(2) ? null : reader.GetString(2), reader.IsDBNull(3) || reader.GetInt64(3) != 0);
+                    reader.IsDBNull(2) ? null : reader.GetString(2), reader.IsDBNull(3) || reader.GetInt64(3) != 0,
+                    reader.IsDBNull(4) ? null : reader.GetString(4));
             }
             catch (Exception ex)
             {
@@ -1323,6 +1578,77 @@ public static class LibraryStore
     /// <summary>Saves how the subfolders of a folder are sorted in the tree. False if it could not be saved.</summary>
     public static bool SetFolderTreeSort(string folderPath, string column, bool ascending) =>
         SetPrefs(folderPath, "TreeSortColumn", "TreeSortAscending", column, ascending);
+
+    /// <summary>
+    /// Saves which columns the list of a folder shows, in order (the names of the explorer's SortColumn, separated by commas); null
+    /// removes the folder's own layout. False if it could not be saved (a write-protected drive).
+    /// </summary>
+    public static bool SetFolderColumns(string folderPath, string? columns)
+    {
+        var path = folderPath.TrimEnd('\\', '/');
+        if (path.Length == 0) return false;
+
+        lock (Gate)
+        {
+            try
+            {
+                var route = Resolve(path, create: columns != null);   // removing a layout never creates a file
+                if (route == null) return false;
+
+                using var connection = Open(route, create: columns != null);
+                if (connection == null) return false;
+
+                using var command = Command(connection,
+                    "INSERT INTO FolderPrefs (Path, Columns) VALUES ($p, $c) ON CONFLICT(Path) DO UPDATE SET Columns = $c",
+                    ("$p", KeyOf(route, path)), ("$c", columns));
+                command.ExecuteNonQuery();
+                return true;
+            }
+            catch (Exception ex)
+            {
+                RepairAfter(ex, path);
+                return false;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Removes the columns and the list sort order that were chosen for the folders below <paramref name="folderPath"/> (all levels, not the
+    /// folder itself), so they take the folder's own again. The tree sort of their subfolders is left. Never creates a library file.
+    /// </summary>
+    public static bool ClearSubfolderLayouts(string folderPath)
+    {
+        var path = folderPath.TrimEnd('\\', '/');
+        if (path.Length == 0) return false;
+
+        lock (Gate)
+        {
+            try
+            {
+                var route = Resolve(path, create: false);
+                if (route == null) return false;
+
+                using var connection = Open(route, create: false);
+                if (connection == null) return false;
+
+                var (below, above) = SubtreeRange(KeyOf(route, path));
+                using var clear = Command(connection,
+                    "UPDATE FolderPrefs SET Columns = NULL, SortColumn = NULL, SortAscending = NULL WHERE Path > $a AND Path < $b",
+                    ("$a", below), ("$b", above));
+                clear.ExecuteNonQuery();
+                using var tidy = Command(connection,
+                    "DELETE FROM FolderPrefs WHERE TreeSortColumn IS NULL AND Columns IS NULL AND SortColumn IS NULL AND Path > $a AND Path < $b",
+                    ("$a", below), ("$b", above));
+                tidy.ExecuteNonQuery();
+                return true;
+            }
+            catch (Exception ex)
+            {
+                RepairAfter(ex, path);
+                return false;
+            }
+        }
+    }
 
     private static bool SetPrefs(string folderPath, string columnField, string ascendingField, string column, bool ascending)
     {
@@ -1380,11 +1706,14 @@ public static class LibraryStore
             return command;
         }
 
+        /// <summary>Set when the work failed half way: the changes of every file are rolled back instead of committed.</summary>
+        public bool Abort;
+
         public void Dispose()
         {
             foreach (var (connection, transaction) in _open.Values)
             {
-                try { transaction.Commit(); } catch { /* write-protected or busy: nothing was changed */ }
+                try { if (Abort) transaction.Rollback(); else transaction.Commit(); } catch { /* write-protected or busy: nothing was changed */ }
                 connection.Dispose();
             }
             _open.Clear();
@@ -1457,6 +1786,222 @@ public static class LibraryStore
         }
     }
 
+    // ── Cleaning up a drive's data ───────────────────────────────────────────
+
+    /// <summary>What <see cref="ScanForCleanup"/> found: the records of a drive that point to files or folders that are gone.</summary>
+    public sealed class CleanupPlan
+    {
+        internal LibraryRoute? Route;
+        internal readonly List<(string Table, string Key, string? Name)> Dead = new();
+
+        /// <summary>How many records of the drive were looked at.</summary>
+        public int Total;
+        /// <summary>How many of them point to something that no longer exists.</summary>
+        public int DeadCount => Dead.Count;
+        /// <summary>Set when nothing could be done and why (the drive is not ready or looks empty, the scan was canceled).</summary>
+        public string? Problem;
+        /// <summary>More than half of the records are dead (and at least 10): the caller should ask before removing them.</summary>
+        public bool MostAreDead => DeadCount >= 10 && DeadCount * 2 > Total;
+    }
+
+    private enum PathKind { Missing, Folder, InsideArchive, Unknown }
+
+    // Tables whose rows are (Folder, Name): an item in a folder. And tables with one row per folder (Path), some with a file name too.
+    private static readonly string[] ItemTables = { "File", "Rated", "PreviewPick", "ItemInfo", "TrackChoice" };
+    private static readonly string[] FolderTables = { "Folder", "FolderPrefs", "LastOpened", "FolderPicture" };
+
+    /// <summary>
+    /// Looks (read only) at every record of a drive and lists the ones whose file or folder is gone. A path inside an archive counts
+    /// as there as long as the archive file is (archives are not opened). Nothing is removed here: see <see cref="ApplyCleanup"/>.
+    /// The drive must be readable and not empty, else <see cref="CleanupPlan.Problem"/> says so. A folder that cannot be listed keeps
+    /// its records. Call it on a background thread.
+    /// </summary>
+    public static CleanupPlan ScanForCleanup(string root, CancellationToken cancel)
+    {
+        Flush();   // read marks still waiting for the worker are written first
+        var plan = new CleanupPlan();
+        root = Path.GetPathRoot(root) ?? root;
+
+        try
+        {
+            // A drive that is not there, or that looks empty (a drive that has not come up properly), would make every record look dead.
+            if (!Directory.Exists(root) || !Directory.EnumerateFileSystemEntries(root).Any())
+            {
+                plan.Problem = $"Drive {root.TrimEnd('\\', '/')} is not ready, or it looks empty, so nothing was checked.";
+                return plan;
+            }
+        }
+        catch (Exception ex)
+        {
+            plan.Problem = $"Drive {root.TrimEnd('\\', '/')} cannot be read ({ex.Message}), so nothing was checked.";
+            return plan;
+        }
+
+        var route = Resolve(root, create: false);
+        if (route == null || route.Prefix.Length > 0) { plan.Problem = "This drive keeps its tracking data on this computer under its disc number: there is nothing to clean up."; return plan; }
+        plan.Route = route;
+
+        var rootItem = root.TrimEnd('\\', '/');
+        var itemRows   = new List<(string Table, string Folder, string Name)>();
+        var folderRows = new List<(string Table, string Path, string? Name)>();
+
+        lock (Gate)
+        {
+            using var connection = Open(route, create: false);
+            if (connection == null) return plan;   // no file, nothing remembered
+
+            // The main file holds every fixed drive: only the rows of this drive. A drive's own file is all this drive.
+            var (below, above) = SubtreeRange(rootItem);
+            string ItemWhere   = route.Relative ? "" : " WHERE Folder = $k OR (Folder > $a AND Folder < $b)";
+            string FolderWhere = route.Relative ? "" : " WHERE Path = $k OR (Path > $a AND Path < $b)";
+            var p = new (string, object?)[] { ("$k", rootItem), ("$a", below), ("$b", above) };
+
+            foreach (var table in ItemTables)
+            {
+                using var command = Command(connection, $"SELECT Folder, Name FROM {table}{ItemWhere}", route.Relative ? Array.Empty<(string, object?)>() : p);
+                using var reader = command.ExecuteReader();
+                while (reader.Read()) itemRows.Add((table, reader.GetString(0), reader.GetString(1)));
+            }
+            foreach (var table in FolderTables)
+            {
+                bool hasName = table is "LastOpened" or "FolderPicture";
+                using var command = Command(connection, $"SELECT Path{(hasName ? ", Name" : "")} FROM {table}{FolderWhere}", route.Relative ? Array.Empty<(string, object?)>() : p);
+                using var reader = command.ExecuteReader();
+                while (reader.Read()) folderRows.Add((table, reader.GetString(0), hasName ? reader.GetString(1) : null));
+            }
+        }
+
+        plan.Total = itemRows.Count + folderRows.Count;
+
+        // From here on only the disk is asked, with no lock on the database: a slow drive must not hold up the rest of the app.
+        var kinds   = new Dictionary<string, PathKind>(StringComparer.OrdinalIgnoreCase);
+        var entries = new Dictionary<string, HashSet<string>?>(StringComparer.OrdinalIgnoreCase);
+
+        string FullPath(string key) => route.Relative
+            ? (key.Length == 0 ? root : root.TrimEnd('\\', '/') + key)
+            : (key.Length == 2 && key[1] == ':' ? key + "\\" : key);
+
+        PathKind KindOf(string path)
+        {
+            if (kinds.TryGetValue(path, out var known)) return known;
+            PathKind kind;
+            try
+            {
+                if (Directory.Exists(path)) kind = PathKind.Folder;
+                else if (File.Exists(path)) kind = PathKind.InsideArchive;   // a file used as a folder: an archive or a playlist
+                else
+                {
+                    var parent = Path.GetDirectoryName(path.TrimEnd('\\', '/'));
+                    if (string.IsNullOrEmpty(parent)) kind = PathKind.Missing;
+                    else
+                    {
+                        var parentKind = KindOf(parent);
+                        kind = parentKind is PathKind.InsideArchive or PathKind.Unknown ? parentKind : PathKind.Missing;
+                    }
+                }
+            }
+            catch { kind = PathKind.Unknown; }
+            kinds[path] = kind;
+            return kind;
+        }
+
+        // Is the name in the folder? A folder that cannot be listed says yes (nothing is removed on a guess).
+        bool NameIsThere(string folderPath, string name)
+        {
+            if (!entries.TryGetValue(folderPath, out var names))
+            {
+                try { names = new HashSet<string>(Directory.EnumerateFileSystemEntries(folderPath).Select(e => Path.GetFileName(e)), StringComparer.OrdinalIgnoreCase); }
+                catch { names = null; }
+                entries[folderPath] = names;
+            }
+            return names == null || names.Contains(name);
+        }
+
+        bool ItemAlive(string folderKey, string name)
+        {
+            if (name.Length == 0) return true;   // the drive itself (its own rating): the drive is there
+            var folder = FullPath(folderKey);
+            var kind = KindOf(folder);
+            return kind switch
+            {
+                PathKind.Missing => false,
+                PathKind.Folder  => NameIsThere(folder, name),
+                _                => true,   // inside an archive, or not known
+            };
+        }
+
+        int counter = 0;
+        foreach (var (table, folder, name) in itemRows)
+        {
+            if ((++counter & 63) == 0) cancel.ThrowIfCancellationRequested();
+            if (!ItemAlive(folder, name)) plan.Dead.Add((table, folder, name));
+        }
+        foreach (var (table, path, name) in folderRows)
+        {
+            if ((++counter & 63) == 0) cancel.ThrowIfCancellationRequested();
+            var kind = KindOf(FullPath(path));
+            bool alive = kind != PathKind.Missing;
+            if (alive && name != null && kind == PathKind.Folder && !NameIsThere(FullPath(path), name)) alive = false;   // the file it names is gone
+            if (!alive) plan.Dead.Add((table, path, null));   // these tables have one row per folder: the folder is the key
+        }
+        return plan;
+    }
+
+    /// <summary>
+    /// Removes the records <see cref="ScanForCleanup"/> found, after saving a copy of the data file first (cleanup-yyyyMMdd-HHmmss.db in
+    /// the Backups folder next to it; the last 5 are kept). All of it or nothing. Returns null when it worked, else the reason
+    /// (then nothing was changed); <paramref name="backupFile"/> is where the copy is.
+    /// </summary>
+    public static string? ApplyCleanup(CleanupPlan plan, out string? backupFile)
+    {
+        backupFile = null;
+        if (plan.Route == null || plan.Dead.Count == 0) return null;
+        Flush();
+
+        lock (Gate)
+        {
+            try
+            {
+                using var connection = Open(plan.Route, create: false);
+                if (connection == null) return "The data file could not be opened.";
+
+                var folder = BackupFolder(plan.Route.DbFile);
+                Directory.CreateDirectory(folder);
+                var target = Path.Combine(folder, $"cleanup-{DateTime.Now:yyyyMMdd-HHmmss}.db");
+                var temp = target + ".tmp";
+                File.Delete(temp);
+                using (var copy = new SqliteConnection(new SqliteConnectionStringBuilder { DataSource = temp, Pooling = false }.ToString()))
+                {
+                    copy.Open();
+                    connection.BackupDatabase(copy);
+                }
+                File.Move(temp, target, overwrite: true);
+                backupFile = target;
+
+                using (var transaction = connection.BeginTransaction())
+                {
+                    foreach (var (table, key, name) in plan.Dead)
+                    {
+                        using var delete = name != null
+                            ? Command(connection, $"DELETE FROM {table} WHERE Folder = $k AND Name = $n", ("$k", key), ("$n", name))
+                            : Command(connection, $"DELETE FROM {table} WHERE Path = $k", ("$k", key));
+                        delete.Transaction = transaction;
+                        delete.ExecuteNonQuery();
+                    }
+                    transaction.Commit();
+                }
+
+                foreach (var old in Directory.GetFiles(folder, "cleanup-*.db").OrderByDescending(f => f, StringComparer.OrdinalIgnoreCase).Skip(5))
+                    try { File.Delete(old); } catch { }
+                return null;
+            }
+            catch (Exception ex)
+            {
+                return ex.Message;
+            }
+        }
+    }
+
     /// <summary>
     /// What is remembered about a file or folder that was renamed or moved follows it to its new path (for a folder: its own
     /// state and rating and everything below it), also to another drive. Call it for what the app moved itself.
@@ -1496,9 +2041,9 @@ public static class LibraryStore
         return rows;
     }
 
-    private static void MoveRows(Session session, string from, string to)
+    private static void MoveRows(Session session, string from, string to, LibraryRoute? fromRouteGiven = null, LibraryRoute? toRouteGiven = null)
     {
-        var fromRoute = Resolve(from, create: false);
+        var fromRoute = fromRouteGiven ?? Resolve(from, create: false);
         if (fromRoute == null) return;
         var fromConnection = session.Get(fromRoute, create: false);
         if (fromConnection == null) return;
@@ -1516,11 +2061,11 @@ public static class LibraryStore
         var folders = ReadAll(session, fromConnection,
             "SELECT Path, OwnUnread, Complete FROM Folder WHERE Path = $k OR (Path > $a AND Path < $b)", p);
         var prefs   = ReadAll(session, fromConnection,
-            "SELECT Path, SortColumn, SortAscending, TreeSortColumn, TreeSortAscending FROM FolderPrefs WHERE Path = $k OR (Path > $a AND Path < $b)", p);
+            "SELECT Path, SortColumn, SortAscending, TreeSortColumn, TreeSortAscending, Columns FROM FolderPrefs WHERE Path = $k OR (Path > $a AND Path < $b)", p);
         var picks   = ReadAll(session, fromConnection,
             "SELECT Folder, Name, Picture FROM PreviewPick WHERE (Folder = $p AND Name = $n) OR Folder = $k OR (Folder > $a AND Folder < $b)", p);
         var infos   = ReadAll(session, fromConnection,
-            "SELECT Folder, Name, HostUrl, ReferrerUrl FROM ItemInfo WHERE (Folder = $p AND Name = $n) OR Folder = $k OR (Folder > $a AND Folder < $b)", p);
+            "SELECT Folder, Name, HostUrl, ReferrerUrl, NoAskStart FROM ItemInfo WHERE (Folder = $p AND Name = $n) OR Folder = $k OR (Folder > $a AND Folder < $b)", p);
         var tracks  = ReadAll(session, fromConnection,
             "SELECT Folder, Name, AudioIndex, AudioName, SubtitleOff, SubtitleIndex, SubtitleName, VideoIndex, VideoName FROM TrackChoice WHERE (Folder = $p AND Name = $n) OR Folder = $k OR (Folder > $a AND Folder < $b)", p);
         var lasts   = ReadAll(session, fromConnection,
@@ -1534,9 +2079,10 @@ public static class LibraryStore
         if (files.Count == 0 && rated.Count == 0 && folders.Count == 0 && prefs.Count == 0 && picks.Count == 0 && infos.Count == 0
             && tracks.Count == 0 && lasts.Count == 0 && lastOfItem.Count == 0 && folderPics.Count == 0 && folderPicOfItem.Count == 0) return;
 
-        var toRoute = Resolve(to, create: true);
+        var toRoute = toRouteGiven ?? Resolve(to, create: true);
         if (toRoute == null) return;
         var toConnection = session.Get(toRoute, create: true);
+        if (toConnection == null && toRouteGiven != null) throw new IOException("The data file could not be opened.");
         if (toConnection == null) return;
 
         var toKey = KeyOf(toRoute, to);
@@ -1580,8 +2126,8 @@ public static class LibraryStore
         {
             var (folder, name) = IsTheItem(r[0], r[1]) ? (toParent, toName) : (Remap((string)r[0]!), (string)r[1]!);
             using var insert = session.Command(toConnection,
-                "INSERT OR REPLACE INTO ItemInfo (Folder, Name, HostUrl, ReferrerUrl) VALUES ($f, $n, $h, $r)",
-                ("$f", folder), ("$n", name), ("$h", r[2]), ("$r", r[3]));
+                "INSERT OR REPLACE INTO ItemInfo (Folder, Name, HostUrl, ReferrerUrl, NoAskStart) VALUES ($f, $n, $h, $r, $x)",
+                ("$f", folder), ("$n", name), ("$h", r[2]), ("$r", r[3]), ("$x", r[4]));
             insert.ExecuteNonQuery();
         }
 
@@ -1654,8 +2200,8 @@ public static class LibraryStore
         foreach (var r in prefs)
         {
             using var insert = session.Command(toConnection,
-                "INSERT OR REPLACE INTO FolderPrefs (Path, SortColumn, SortAscending, TreeSortColumn, TreeSortAscending) VALUES ($p, $c, $a, $tc, $ta)",
-                ("$p", Remap((string)r[0]!)), ("$c", r[1]), ("$a", r[2]), ("$tc", r[3]), ("$ta", r[4]));
+                "INSERT OR REPLACE INTO FolderPrefs (Path, SortColumn, SortAscending, TreeSortColumn, TreeSortAscending, Columns) VALUES ($p, $c, $a, $tc, $ta, $cols)",
+                ("$p", Remap((string)r[0]!)), ("$c", r[1]), ("$a", r[2]), ("$tc", r[3]), ("$ta", r[4]), ("$cols", r[5]));
             insert.ExecuteNonQuery();
         }
     }
