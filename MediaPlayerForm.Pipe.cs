@@ -140,7 +140,14 @@ namespace SwewolfMediaPlayer
         private void BringToFrontNow()
         {
             if (IsDisposed) return;
-            if (WindowState == FormWindowState.Minimized) WindowState = FormWindowState.Normal;
+            // SW_RESTORE gives a minimized window back in the state it had before (a maximized window stays maximized);
+            // WindowState = Normal would lose that.
+            if (WindowState == FormWindowState.Minimized)
+            {
+                ShowWindow(Handle, 9);
+                // Make sure it is the state it had before it was minimized (maximized stays maximized).
+                if (WindowState != _lastShownState && WindowState != FormWindowState.Minimized) WindowState = _lastShownState;
+            }
             bool wasTop = TopMost;
             TopMost = true;
             TopMost = wasTop;
@@ -149,6 +156,16 @@ namespace SwewolfMediaPlayer
         }
 
         [DllImport("user32.dll")] private static extern bool SetForegroundWindow(IntPtr hWnd);
+        [DllImport("user32.dll")] private static extern bool ShowWindow(IntPtr hWnd, int nCmd);
+
+        /// <summary>The last state the window had while it was not minimized (Normal or Maximized): what Show Media Player brings it back to.</summary>
+        private FormWindowState _lastShownState = FormWindowState.Normal;
+
+        protected override void OnResize(EventArgs e)
+        {
+            base.OnResize(e);
+            if (WindowState != FormWindowState.Minimized) _lastShownState = WindowState;
+        }
 
         /// <summary>A file played to its end: the explorer is told. True if the explorer runs a playlist (the end actions are not used then).</summary>
         private bool ReportEnded()
