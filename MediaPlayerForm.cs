@@ -185,6 +185,10 @@ namespace SwewolfMediaPlayer
             InitControlPanel();
             InitTuneControls();
             InitBookmarkButton();
+            foreach (TextBox box in new[] { txtStartAt, txtEndAt, txtFadeIn, txtFadeOut })
+            {
+                TextBoxStyle.Apply(box);   // a little space before the text; Tab into a box selects all of its text
+            }
             InitChapterControls();
             InitSpeedBox();
             StyleMenu(menuVideo);
