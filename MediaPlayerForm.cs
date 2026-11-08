@@ -773,6 +773,12 @@ namespace SwewolfMediaPlayer
                     return true;
                 }
             }
+            // M (as on YouTube): mute / unmute, the same as the Mute button; not while typing in a text box.
+            if (keyData == Keys.M && !(ActiveControl is TextBoxBase { Visible: true }))
+            {
+                btnMute_Click(null, EventArgs.Empty);
+                return true;
+            }
             if (keyData == Keys.C)
             {
                 ToggleSubtitles();
