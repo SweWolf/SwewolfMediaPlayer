@@ -33,8 +33,10 @@ namespace SwewolfMediaPlayer
 
         private void InitTuneControls()
         {
-            btnPrevTune = NewTuneButton(IconKind.PreviousTune, "Previous Tune (Page Up)", () => NavButton(-1));
-            btnNextTune = NewTuneButton(IconKind.NextTune, "Next Tune (Page Down)", () => NavButton(+1));
+            // Modern look (the default) draws the same one-triangle icons as the chapter buttons; Classic has two triangles.
+            bool classic = _settings.ClassicTrackButtons;
+            btnPrevTune = NewTuneButton(classic ? IconKind.PreviousTune : IconKind.PreviousChapter, "Previous Tune (Page Up)", () => NavButton(-1));
+            btnNextTune = NewTuneButton(classic ? IconKind.NextTune : IconKind.NextChapter, "Next Tune (Page Down)", () => NavButton(+1));
         }
 
         // The two buttons: tunes of a SID file, or tracks of the explorer's playlist.

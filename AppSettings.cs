@@ -17,6 +17,7 @@
 //   2026-10-23  CoverPictureSize (Medium by default).
 //   2026-10-26  ShowSubtitles (on by default): the default for videos with no choice of their own.
 //   2026-10-27  TrackMenusOnlyWithChoice (off by default).
+//   2026-11-08  ClassicTrackButtons (off by default = modern look).
 
 using System.Text.Json;
 
@@ -61,6 +62,9 @@ namespace SwewolfMediaPlayer
         // Whether the right-click menu shows Audio Track and Video Track only for a file with more than one of them, and Subtitle Track only for a
         // file with at least one (one is enough: the menu also turns subtitles off). Off by default: the menus are always there, greyed out when empty.
         public bool TrackMenusOnlyWithChoice { get; set; }
+
+        // Look of the previous / next tune and track buttons: false = Modern (one triangle and a bar, the default), true = Classic (two triangles and a bar).
+        public bool ClassicTrackButtons { get; set; }
 
         // Whether the main window asks GitHub for a newer version when it starts.
         public bool CheckForUpdatesOnStartup { get; set; } = true;

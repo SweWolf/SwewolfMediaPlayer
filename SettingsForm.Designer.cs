@@ -22,6 +22,8 @@ namespace SwewolfMediaPlayer
             chkTrackMenus = new CheckBox();
             lblCoverSize = new Label();
             cboCoverSize = new ComboBox();
+            lblButtonLook = new Label();
+            cboButtonLook = new ComboBox();
             grpResume = new GroupBox();
             lblResumeMode = new Label();
             cboResumeMode = new ComboBox();
@@ -59,9 +61,11 @@ namespace SwewolfMediaPlayer
             grpPlayer.Controls.Add(chkTrackMenus);
             grpPlayer.Controls.Add(lblCoverSize);
             grpPlayer.Controls.Add(cboCoverSize);
+            grpPlayer.Controls.Add(lblButtonLook);
+            grpPlayer.Controls.Add(cboButtonLook);
             grpPlayer.Location = new Point(12, 12);
             grpPlayer.Name = "grpPlayer";
-            grpPlayer.Size = new Size(360, 184);
+            grpPlayer.Size = new Size(360, 238);
             grpPlayer.TabIndex = 0;
             grpPlayer.TabStop = false;
             grpPlayer.Text = "Player";
@@ -74,7 +78,7 @@ namespace SwewolfMediaPlayer
             chkStartFullScreen.Size = new Size(280, 19);
             chkStartFullScreen.TabIndex = 0;
             chkStartFullScreen.Text = "Start Player in &Full Screen Mode for Video Files";
-            toolTip.SetToolTip(chkStartFullScreen, "Open every video file in full screen mode, whether it is opened from the main window or from the command line. Audio files never open in full screen mode. Press Esc to leave full screen mode.");
+            toolTip.SetToolTip(chkStartFullScreen, "Open every video file in full screen mode, whether it is opened\r\nfrom the main window or from the command line.\r\nAudio files never open in full screen mode.\r\nPress Esc to leave full screen mode.");
             chkStartFullScreen.UseVisualStyleBackColor = true;
             //
             // chkSeekThumbnails
@@ -85,7 +89,7 @@ namespace SwewolfMediaPlayer
             chkSeekThumbnails.Size = new Size(240, 19);
             chkSeekThumbnails.TabIndex = 1;
             chkSeekThumbnails.Text = "Show &Thumbnail Previews on the Seek Bar";
-            toolTip.SetToolTip(chkSeekThumbnails, "Show a small picture of the video at the pointer while you point at the seek bar. Video files only. It needs FFmpeg (ffmpeg.exe in the program folder or in the PATH); without it nothing is shown.");
+            toolTip.SetToolTip(chkSeekThumbnails, "Show a small picture of the video at the pointer\r\nwhile you point at the seek bar. Video files only.\r\nIt needs FFmpeg (ffmpeg.exe in the program folder or in the PATH);\r\nwithout it nothing is shown.");
             chkSeekThumbnails.UseVisualStyleBackColor = true;
             //
             // chkShowSubtitles
@@ -96,7 +100,7 @@ namespace SwewolfMediaPlayer
             chkShowSubtitles.Size = new Size(240, 19);
             chkShowSubtitles.TabIndex = 2;
             chkShowSubtitles.Text = "Turn On Subtitles When a &Video Opens";
-            toolTip.SetToolTip(chkShowSubtitles, "Show the subtitles of a video the first time you open it. A choice you make in the right-click menu (or with the C key) is remembered for that video and used instead.");
+            toolTip.SetToolTip(chkShowSubtitles, "Show the subtitles of a video the first time you open it.\r\nA choice you make in the right-click menu (or with the C key)\r\nis remembered for that video and used instead.");
             chkShowSubtitles.UseVisualStyleBackColor = true;
             //
             // chkTrackMenus
@@ -127,7 +131,26 @@ namespace SwewolfMediaPlayer
             cboCoverSize.Name = "cboCoverSize";
             cboCoverSize.Size = new Size(218, 23);
             cboCoverSize.TabIndex = 5;
-            toolTip.SetToolTip(cboCoverSize, "How large the cover picture of a music file is shown: Medium is 75 percent of the largest size that fits the window, Maximum fills the video area.");
+            toolTip.SetToolTip(cboCoverSize, "How large the cover picture of a music file is shown.\r\nMedium is 75 percent of the largest size that fits the window.\r\nMaximum fills the video area.");
+            //
+            // lblButtonLook
+            //
+            lblButtonLook.AutoSize = true;
+            lblButtonLook.Location = new Point(10, 186);
+            lblButtonLook.Name = "lblButtonLook";
+            lblButtonLook.TabIndex = 6;
+            lblButtonLook.Text = "&Look of the Previous and Next Buttons";
+            //
+            // cboButtonLook
+            //
+            cboButtonLook.DropDownStyle = ComboBoxStyle.DropDownList;
+            cboButtonLook.FormattingEnabled = true;
+            cboButtonLook.Items.AddRange(new object[] { "Modern", "Classic" });
+            cboButtonLook.Location = new Point(10, 204);
+            cboButtonLook.Name = "cboButtonLook";
+            cboButtonLook.Size = new Size(218, 23);
+            cboButtonLook.TabIndex = 7;
+            toolTip.SetToolTip(cboButtonLook, "How the buttons for the previous and next tune or track look.\r\nModern has one triangle and a bar.\r\nClassic has two triangles and a bar.\r\nA player that is already open keeps its look until it is opened again.");
             //
             // grpResume
             //
@@ -166,7 +189,7 @@ namespace SwewolfMediaPlayer
             cboResumeMode.Size = new Size(120, 23);
             cboResumeMode.TabIndex = 1;
             cboResumeMode.SelectedIndexChanged += cboResumeMode_SelectedIndexChanged;
-            toolTip.SetToolTip(cboResumeMode, "What happens when you open a file you stopped in before. Yes: continue from where you stopped, without asking. Ask: ask first. No: always start from the beginning, and the player does not remember where you stopped.");
+            toolTip.SetToolTip(cboResumeMode, "What happens when you open a file you stopped in before.\r\nYes: continue from where you stopped, without asking.\r\nAsk: ask first.\r\nNo: always start from the beginning,\r\nand the player does not remember where you stopped.");
             //
             // lblRewind
             //
@@ -184,7 +207,7 @@ namespace SwewolfMediaPlayer
             nudRewind.Size = new Size(60, 23);
             nudRewind.TabIndex = 3;
             nudRewind.Value = new decimal(new int[] { 10, 0, 0, 0 });
-            toolTip.SetToolTip(nudRewind, "The saved position is this many seconds before the point where you stopped, so you see a little of what came before. 0 saves the exact point. Example: with 10 seconds, stopping at 2:00 saves 1:50.");
+            toolTip.SetToolTip(nudRewind, "The saved position is this many seconds before the point\r\nwhere you stopped, so you see a little of what came before.\r\n0 saves the exact point.\r\nExample: with 10 seconds, stopping at 2:00 saves 1:50.");
             //
             // lblSeconds
             //
@@ -212,7 +235,7 @@ namespace SwewolfMediaPlayer
             cboSaveResume.Size = new Size(340, 23);
             cboSaveResume.TabIndex = 6;
             cboSaveResume.SelectedIndexChanged += cboSaveResume_SelectedIndexChanged;
-            toolTip.SetToolTip(cboSaveResume, "The player remembers where you stopped. It starts after the file has played for 60 seconds. The position is kept in the library database that SweWolf File Explorer uses too.");
+            toolTip.SetToolTip(cboSaveResume, "The player remembers where you stopped.\r\nIt starts after the file has played for 60 seconds.\r\nThe position is kept in the library database\r\nthat SweWolf File Explorer uses too.");
             //
             // lblAudioMinutes
             //
@@ -231,7 +254,7 @@ namespace SwewolfMediaPlayer
             nudAudioMinutes.Size = new Size(60, 23);
             nudAudioMinutes.TabIndex = 8;
             nudAudioMinutes.Value = new decimal(new int[] { 10, 0, 0, 0 });
-            toolTip.SetToolTip(nudAudioMinutes, "Audio files of this length or longer get a resume point (for example podcasts and audio books). Shorter ones do not.");
+            toolTip.SetToolTip(nudAudioMinutes, "Audio files of this length or longer get a resume point\r\n(for example podcasts and audio books).\r\nShorter ones do not.");
             //
             // lblMinutes
             //
@@ -333,6 +356,8 @@ namespace SwewolfMediaPlayer
         private CheckBox chkTrackMenus;
         private Label lblCoverSize;
         private ComboBox cboCoverSize;
+        private Label lblButtonLook;
+        private ComboBox cboButtonLook;
         private GroupBox grpResume;
         private Label lblResumeMode;
         private ComboBox cboResumeMode;
