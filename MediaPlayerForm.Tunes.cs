@@ -33,6 +33,8 @@ namespace SwewolfMediaPlayer
 
         private void InitTuneControls()
         {
+            InitSkipButtons();
+
             // Modern look (the default) draws the same one-triangle icons as the chapter buttons; Classic has two triangles.
             bool classic = _settings.ClassicTrackButtons;
             btnPrevTune = NewTuneButton(classic ? IconKind.PreviousTune : IconKind.PreviousChapter, "Previous Tune (Page Up)", () => NavButton(-1));
@@ -192,6 +194,12 @@ namespace SwewolfMediaPlayer
 
             int gap = LogicalToDeviceUnits(6);
             int x = btnStop.Right;
+            if (btnSkipBack != null && btnSkipForward != null)   // always shown, right of Stop
+            {
+                btnSkipBack.Left = x + gap;
+                btnSkipForward.Left = btnSkipBack.Right + gap;
+                x = btnSkipForward.Right;
+            }
             if (_saveFrameShown)
             {
                 btnSaveFrame.Left = x + gap;

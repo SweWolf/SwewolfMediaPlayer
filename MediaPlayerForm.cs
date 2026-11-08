@@ -576,6 +576,10 @@ namespace SwewolfMediaPlayer
         private void ApplySeekState()
         {
             trkSeek.Enabled = CanSeek;
+            if (btnSkipBack != null && btnSkipForward != null)
+            {
+                btnSkipBack.Enabled = btnSkipForward.Enabled = CanSeek;
+            }
             if (speedBox != null)
             {
                 speedBox.Enabled = CanSeek;
@@ -2111,7 +2115,7 @@ namespace SwewolfMediaPlayer
 
     // A button that draws its own icon, so it can be filled and take the colors of the dark theme.
     // BackColor is the button color, ForeColor the icon color.
-    internal enum IconKind { Play, Pause, Stop, Camera, Volume, Muted, PreviousTune, NextTune, More, Bookmark, PreviousChapter, NextChapter }
+    internal enum IconKind { Play, Pause, Stop, Camera, Volume, Muted, PreviousTune, NextTune, More, Bookmark, PreviousChapter, NextChapter, Rewind, FastForward }
 
     internal sealed class IconButton : Button
     {
@@ -2182,6 +2186,14 @@ namespace SwewolfMediaPlayer
                 case IconKind.PreviousChapter:   // a bar and one triangle, as VLC draws the chapter buttons
                     g.FillRectangle(brush, R(0.08f, 0.05f, 0.14f, 0.90f));
                     g.FillPolygon(brush, new[] { P(0.95f, 0.05f), P(0.95f, 0.95f), P(0.30f, 0.5f) });
+                    break;
+                case IconKind.Rewind:   // two triangles pointing left, touching
+                    g.FillPolygon(brush, new[] { P(0.50f, 0.10f), P(0.50f, 0.90f), P(0.02f, 0.5f) });
+                    g.FillPolygon(brush, new[] { P(0.98f, 0.10f), P(0.98f, 0.90f), P(0.50f, 0.5f) });
+                    break;
+                case IconKind.FastForward:   // two triangles pointing right, touching
+                    g.FillPolygon(brush, new[] { P(0.02f, 0.10f), P(0.02f, 0.90f), P(0.50f, 0.5f) });
+                    g.FillPolygon(brush, new[] { P(0.50f, 0.10f), P(0.50f, 0.90f), P(0.98f, 0.5f) });
                     break;
                 case IconKind.More:
                     foreach (float cx in new[] { 0.10f, 0.50f, 0.90f })
