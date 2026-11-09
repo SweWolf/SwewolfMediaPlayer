@@ -309,6 +309,7 @@ namespace SwewolfMediaPlayer
             _lengthMs = 0;
             _frameMs = 0;
             _pendingSeekMs = -1;
+            _endShownMs = -1;
             _lastSubtitleTrack = -1;
             _videoCheckDone = false;
             _playingSinceTicks = 0;
@@ -541,6 +542,7 @@ namespace SwewolfMediaPlayer
             OpenTimingLog.Write($"StartMedia: library/resume, {stepWatch.ElapsedMilliseconds} ms");
             stepWatch.Restart();
             _media = new Media(_activeLib, _filePath, _isStream ? FromType.FromLocation : FromType.FromPath);
+            _mediaStartsAtEnd = false;
             _openWatch = System.Diagnostics.Stopwatch.StartNew();
             _player.Play(_media);
             OpenTimingLog.Write($"StartMedia: Media created and Play called, {stepWatch.ElapsedMilliseconds} ms");
@@ -1041,6 +1043,7 @@ namespace SwewolfMediaPlayer
 
             // Show the end at once and keep it there: the player is started again behind the scenes.
             _restoringEnd = true;
+            _endShownMs = -1;
             _paused = true;
             _stepTimeMs = -1;
             ShowPlayPause(false);
@@ -1054,6 +1057,22 @@ namespace SwewolfMediaPlayer
                 if (_player != player)
                 {
                     return;
+                }
+
+                // Start about a second before the end, so the first frame of the video is never on screen meanwhile.
+                long lengthMs = player.Length > 0 ? player.Length : _lengthMs;
+                if (_activeLib != null && lengthMs > 2500)
+                {
+                    Media? old = _media;
+                    Media endMedia = new(_activeLib, _filePath, FromType.FromPath);
+                    endMedia.AddOption(string.Create(System.Globalization.CultureInfo.InvariantCulture, $":start-time={(lengthMs - 1000) / 1000.0:F3}"));
+                    _media = endMedia;
+                    _mediaStartsAtEnd = true;
+                    player.Media = endMedia;
+                    if (old != null)
+                    {
+                        _ = Task.Run(old.Dispose);
+                    }
                 }
 
                 player.Play();
@@ -1073,13 +1092,25 @@ namespace SwewolfMediaPlayer
                     return;
                 }
 
+                // A seek to the very end (or into the last frames) is ignored by LibVLC and the picture stays on the first
+                // frame. So go a little before the end, and a little further back if the picture did not move.
                 long endMs = player.Length > 0 ? player.Length : _lengthMs;
-                player.Time = endMs;
-                await Task.Delay(300);
-                if (_player == player)
+                foreach (long before in new long[] { 100, 250, 600, 1500 })
                 {
-                    UpdateTime(endMs);
+                    long target = Math.Max(0, endMs - before);
+                    player.Time = target;
+                    await Task.Delay(300);
+                    if (_player != player)
+                    {
+                        return;
+                    }
+                    if (Math.Abs(player.Time - target) < 400 || target == 0)
+                    {
+                        _endShownMs = player.Time;
+                        break;
+                    }
                 }
+                UpdateTime(endMs);
             }
             finally
             {
@@ -1090,6 +1121,27 @@ namespace SwewolfMediaPlayer
                     _paused = true;
                     ShowPlayPause(false);
                 }
+            }
+        }
+
+        // After a video has ended, the player holds a copy of the media that starts a second before the end (see OnEndReached).
+        // Before the player is started from the beginning again it gets a plain one.
+        private bool _mediaStartsAtEnd;
+
+        private void EnsureCleanMedia(MediaPlayer player)
+        {
+            if (!_mediaStartsAtEnd || _activeLib == null)
+            {
+                return;
+            }
+
+            _mediaStartsAtEnd = false;
+            Media? old = _media;
+            _media = new Media(_activeLib, _filePath, FromType.FromPath);
+            player.Media = _media;
+            if (old != null)
+            {
+                _ = Task.Run(old.Dispose);
             }
         }
 
@@ -1139,7 +1191,7 @@ namespace SwewolfMediaPlayer
             {
                 RestartPlayback();
             }
-            else if (!_player.IsPlaying && _lengthMs > 0 && _player.Time >= _lengthMs - 200)
+            else if (!_player.IsPlaying && (IsAtEnd() || _lengthMs > 0 && _player.Time >= _lengthMs - 200))
             {
                 // Paused on the last frame: play again from the beginning.
                 _player.Time = 0;
@@ -1170,6 +1222,8 @@ namespace SwewolfMediaPlayer
             {
                 return;
             }
+
+            EnsureCleanMedia(player);
 
             // The position the user dragged the seek bar to while the video was stopped.
             long seekTo = _pendingSeekMs;
@@ -1485,8 +1539,15 @@ namespace SwewolfMediaPlayer
             {
                 return true;
             }
-            return _player.State == VLCState.Paused && _player.Time >= _lengthMs - 20;
+            if (_player.State != VLCState.Paused)
+            {
+                return false;
+            }
+            // Where OnEndReached left the picture (a little before the end), or really at the end.
+            return _player.Time >= _lengthMs - 20 || _endShownMs >= 0 && Math.Abs(_player.Time - _endShownMs) < 50;
         }
+
+        private long _endShownMs = -1;   // the time of the picture OnEndReached shows after a video has ended; -1 = none
 
         // FFmpeg reads the last two seconds of the file and keeps overwriting the one picture
         // file, so what is left is the very last frame.

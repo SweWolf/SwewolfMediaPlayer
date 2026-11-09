@@ -291,6 +291,7 @@ namespace SwewolfMediaPlayer
                 {
                     return;
                 }
+                EnsureCleanMedia(player);
                 player.Play();
                 for (int i = 0; i < 60 && !player.IsPlaying; i++)
                 {
