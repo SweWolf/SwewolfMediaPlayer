@@ -133,6 +133,7 @@ namespace SwewolfMediaPlayer
         // Where the seek bar was dragged while the player was stopped, -1 = nowhere. A stopped
         // player ignores seeks, so Play starts from here instead (see RestartPlayback).
         private long _pendingSeekMs = -1;
+        private bool _audioKick;   // see ApplyAudioState
         private int _audioStateApplied;   // see ApplyAudioState
         private double _frameMs;         // length of one frame, 0 = not known yet
         private bool _muted;
@@ -672,8 +673,20 @@ namespace SwewolfMediaPlayer
                 return;
             }
 
+            if (_audioKick && _paused)
+            {
+                return;   // wait until the video plays on
+            }
+
             _audioStateApplied++;
             _player.Volume = trkVolume.Value;
+            if (_audioKick)
+            {
+                // After the restart that shows the last frame (OnEndReached) the sound stayed off until the user pressed Mute and
+                // then Unmute: setting the same state again does nothing, so flip it first, as that does.
+                _audioKick = false;
+                _player.Mute = !_muted;
+            }
             _player.Mute = _muted;
         }
 
@@ -1042,6 +1055,7 @@ namespace SwewolfMediaPlayer
             }
 
             // Show the end at once and keep it there: the player is started again behind the scenes.
+            ShowEndCover();   // what the video area shows now, over it until the last picture is back
             _restoringEnd = true;
             _endShownMs = -1;
             _paused = true;
@@ -1114,7 +1128,11 @@ namespace SwewolfMediaPlayer
             }
             finally
             {
+                await Task.Delay(100);   // let the picture under the cover appear first
+                HideEndCover();
                 _restoringEnd = false;
+                _audioStateApplied = 0;   // the sound is set up again when the video plays on (see ApplyAudioState)
+                _audioKick = true;
                 if (_player == player)
                 {
                     player.Mute = wasMuted;
