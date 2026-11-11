@@ -1352,7 +1352,7 @@ namespace SwewolfMediaPlayer
                     Filter = "PNG Image|*.png",
                     DefaultExt = "png",
                     FileName = suggested,
-                    InitialDirectory = asPreviewPicture ? folder : _lastSaveFolder ?? (_isStream ? null : folder),
+                    InitialDirectory = asPreviewPicture ? folder : _lastSaveFolder ?? DefaultFramesFolder(createIfMissing: true) ?? (_isStream ? null : folder),
                     OverwritePrompt = true
                 };
 
@@ -1495,7 +1495,7 @@ namespace SwewolfMediaPlayer
             {
                 Description = "Choose the folder where pictures are saved without asking.",
                 UseDescriptionForTitle = true,
-                InitialDirectory = _lastSaveFolder ?? (_isStream ? "" : Path.GetDirectoryName(Path.GetFullPath(_filePath)) ?? "")
+                InitialDirectory = _lastSaveFolder ?? DefaultFramesFolder() ?? (_isStream ? "" : Path.GetDirectoryName(Path.GetFullPath(_filePath)) ?? "")
             };
             if (dialog.ShowDialog(this) == DialogResult.OK)
             {
@@ -1503,12 +1503,38 @@ namespace SwewolfMediaPlayer
             }
         }
 
+        // Settings > Default Folder for Saved Frames: where the save dialogs start. Null when it is blank (the folder of the video is
+        // used then) or the folder does not exist (any more). The settings file is read again each time, so a change made in the
+        // Settings window counts at once. A folder chosen in a dialog (_lastSaveFolder) wins over it for this player window.
+        // createIfMissing: the user is saving a picture, so a folder that is not there yet is made now (the save dialog cannot
+        // start in a folder that does not exist). Without it a missing folder gives null, so nothing is created just by looking.
+        private static string? DefaultFramesFolder(bool createIfMissing = false)
+        {
+            string folder = (AppSettings.Load().SaveFramesFolder ?? "").Trim().Trim('"');
+            if (folder.Length == 0 || !Path.IsPathRooted(folder))
+            {
+                return null;
+            }
+            if (!Directory.Exists(folder) && createIfMissing)
+            {
+                try
+                {
+                    Directory.CreateDirectory(folder);
+                }
+                catch (Exception)
+                {
+                    return null;   // e.g. the drive is not there: the folder of the video is used instead
+                }
+            }
+            return Directory.Exists(folder) ? folder : null;
+        }
+
         // "Open Folder" in the camera menu: the folder where pictures are saved (the "without asking" folder, else the one the last
-        // picture went to, else the folder of the video, for a stream the Pictures folder). Opened in SweWolf File Explorer when it is
+        // picture went to, else the default folder of the settings, else the folder of the video, for a stream the Pictures folder). Opened in SweWolf File Explorer when it is
         // found (D:\Dev\CLAUDE.md, "Finding a sibling app"), else quietly in the Windows Explorer.
         private void mnuOpenFolder_Click(object? sender, EventArgs e)
         {
-            string? folder = _quietSaveFolder ?? _lastSaveFolder;
+            string? folder = _quietSaveFolder ?? _lastSaveFolder ?? DefaultFramesFolder();
             if (string.IsNullOrEmpty(folder) || !Directory.Exists(folder))
             {
                 folder = _isStream ? null : Path.GetDirectoryName(Path.GetFullPath(_filePath));
@@ -1599,7 +1625,7 @@ namespace SwewolfMediaPlayer
                     Filter = "PNG Image|*.png",
                     DefaultExt = "png",
                     FileName = suggested,
-                    InitialDirectory = _lastSaveFolder ?? Path.GetDirectoryName(Path.GetFullPath(_filePath)),
+                    InitialDirectory = _lastSaveFolder ?? DefaultFramesFolder(createIfMissing: true) ?? Path.GetDirectoryName(Path.GetFullPath(_filePath)),
                     OverwritePrompt = true
                 };
 

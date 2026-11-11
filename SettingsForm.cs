@@ -10,6 +10,7 @@
 //   2026-10-23  Cover Picture Size for Music Files (Medium / Maximum) in the Player group.
 //   2026-10-27  Show Track Menus Only When There Is a Choice in the Player group.
 //   2026-11-08  Look of the Previous and Next Buttons (Modern / Classic) in the Player group.
+//   2026-11-10  Saved Frames group: Default Folder for Saved Frames (text box, Browse, grey hint; blank = the folder of the video).
 //   2026-10-26  "Turn On Subtitles When a Video Opens" (the default for videos with no choice of their own) in the Player group.
 
 namespace SwewolfMediaPlayer
@@ -20,8 +21,24 @@ namespace SwewolfMediaPlayer
         {
             InitializeComponent();
             Icon = Program.LoadIcon();
+            TextBoxStyle.Apply(txtFramesFolder);
 
             ApplyLayout();
+        }
+
+        // Browse for the folder; it starts where the box points now, when that folder exists.
+        private void btnBrowseFrames_Click(object? sender, EventArgs e)
+        {
+            using var dialog = new FolderBrowserDialog
+            {
+                Description = "Choose the default folder for saved frames.",
+                UseDescriptionForTitle = true,
+                InitialDirectory = Directory.Exists(txtFramesFolder.Text.Trim()) ? txtFramesFolder.Text.Trim() : ""
+            };
+            if (dialog.ShowDialog(this) == DialogResult.OK)
+            {
+                txtFramesFolder.Text = dialog.SelectedPath;
+            }
         }
 
         // The Designer sets ClientSize before ControlBox = false / FixedDialog, and changing
@@ -42,7 +59,8 @@ namespace SwewolfMediaPlayer
 
             grpResume.Top = grpPlayer.Bottom + 12;
             grpResume.Height = !resumeOn ? 82 : showLength ? 224 : 186;
-            grpUpdate.Top = grpResume.Bottom + 12;
+            grpFrames.Top = grpResume.Bottom + 12;
+            grpUpdate.Top = grpFrames.Bottom + 12;
 
             ClientSize = new Size(grpUpdate.Right + 12, grpUpdate.Bottom + 12 + btnOK.Height + 12);
             btnOK.Top = btnCancel.Top = ClientSize.Height - 12 - btnOK.Height;
@@ -56,6 +74,7 @@ namespace SwewolfMediaPlayer
             chkShowSubtitles.Checked = settings.ShowSubtitles;
             chkTrackMenus.Checked = settings.TrackMenusOnlyWithChoice;
             cboNewVersionCheck.SelectedItem = settings.CheckForUpdatesOnStartup ? "Yes" : "No";
+            txtFramesFolder.Text = settings.SaveFramesFolder ?? "";
             cboCoverSize.SelectedIndex = Math.Clamp(settings.CoverPictureSize, 0, 1);
             cboButtonLook.SelectedIndex = settings.ClassicTrackButtons ? 1 : 0;
             cboResumeMode.SelectedIndex = Math.Clamp(settings.ResumeWhenOpening, 0, 2);
@@ -84,6 +103,7 @@ namespace SwewolfMediaPlayer
             settings.ShowSubtitles = chkShowSubtitles.Checked;
             settings.TrackMenusOnlyWithChoice = chkTrackMenus.Checked;
             settings.CheckForUpdatesOnStartup = cboNewVersionCheck.SelectedItem?.ToString() != "No";
+            settings.SaveFramesFolder = txtFramesFolder.Text.Trim().Trim('"');
             settings.CoverPictureSize = Math.Max(0, cboCoverSize.SelectedIndex);
             settings.ClassicTrackButtons = cboButtonLook.SelectedIndex == 1;
             settings.ResumeWhenOpening = Math.Max(0, cboResumeMode.SelectedIndex);

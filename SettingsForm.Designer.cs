@@ -35,6 +35,11 @@ namespace SwewolfMediaPlayer
             lblAudioMinutes = new Label();
             nudAudioMinutes = new NumericUpDown();
             lblMinutes = new Label();
+            grpFrames = new GroupBox();
+            lblFramesFolder = new Label();
+            txtFramesFolder = new TextBox();
+            btnBrowseFrames = new Button();
+            lblFramesHint = new Label();
             grpUpdate = new GroupBox();
             cboNewVersionCheck = new ComboBox();
             lblNewVersionCheck = new Label();
@@ -44,6 +49,7 @@ namespace SwewolfMediaPlayer
             grpResume.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)nudRewind).BeginInit();
             ((System.ComponentModel.ISupportInitialize)nudAudioMinutes).BeginInit();
+            grpFrames.SuspendLayout();
             grpUpdate.SuspendLayout();
             SuspendLayout();
             //
@@ -264,14 +270,62 @@ namespace SwewolfMediaPlayer
             lblMinutes.TabIndex = 9;
             lblMinutes.Text = "minutes";
             //
+            // grpFrames
+            //
+            grpFrames.Controls.Add(lblFramesFolder);
+            grpFrames.Controls.Add(txtFramesFolder);
+            grpFrames.Controls.Add(btnBrowseFrames);
+            grpFrames.Controls.Add(lblFramesHint);
+            grpFrames.Location = new Point(12, 334);
+            grpFrames.Name = "grpFrames";
+            grpFrames.Size = new Size(360, 116);
+            grpFrames.TabIndex = 2;
+            grpFrames.TabStop = false;
+            grpFrames.Text = "Saved Frames";
+            //
+            // lblFramesFolder
+            //
+            lblFramesFolder.AutoSize = true;
+            lblFramesFolder.Location = new Point(10, 28);
+            lblFramesFolder.Name = "lblFramesFolder";
+            lblFramesFolder.TabIndex = 0;
+            lblFramesFolder.Text = "Default &Folder for Saved Frames";
+            //
+            // txtFramesFolder
+            //
+            txtFramesFolder.Location = new Point(10, 46);
+            txtFramesFolder.Name = "txtFramesFolder";
+            txtFramesFolder.Size = new Size(260, 23);
+            txtFramesFolder.TabIndex = 1;
+            toolTip.SetToolTip(txtFramesFolder, "The folder where the Save Frame dialog starts.\r\nThe Pictures folder of Windows is the default.\r\nLeave it blank to start in the folder of the video file.\r\nA folder you choose in the dialog is used for that player window until it is closed.");
+            //
+            // btnBrowseFrames
+            //
+            btnBrowseFrames.Location = new Point(276, 45);
+            btnBrowseFrames.Name = "btnBrowseFrames";
+            btnBrowseFrames.Size = new Size(74, 25);
+            btnBrowseFrames.TabIndex = 2;
+            btnBrowseFrames.Text = "&Browse...";
+            btnBrowseFrames.UseVisualStyleBackColor = true;
+            btnBrowseFrames.Click += btnBrowseFrames_Click;
+            //
+            // lblFramesHint
+            //
+            lblFramesHint.ForeColor = SystemColors.GrayText;
+            lblFramesHint.Location = new Point(10, 76);
+            lblFramesHint.Name = "lblFramesHint";
+            lblFramesHint.Size = new Size(340, 32);
+            lblFramesHint.TabIndex = 3;
+            lblFramesHint.Text = "Leave this blank to start in the same folder as the video file.";
+            //
             // grpUpdate
             //
             grpUpdate.Controls.Add(cboNewVersionCheck);
             grpUpdate.Controls.Add(lblNewVersionCheck);
-            grpUpdate.Location = new Point(12, 334);
+            grpUpdate.Location = new Point(12, 456);
             grpUpdate.Name = "grpUpdate";
             grpUpdate.Size = new Size(360, 90);
-            grpUpdate.TabIndex = 2;
+            grpUpdate.TabIndex = 3;
             grpUpdate.TabStop = false;
             grpUpdate.Text = "Updates";
             //
@@ -299,7 +353,7 @@ namespace SwewolfMediaPlayer
             btnOK.Location = new Point(216, 442);
             btnOK.Name = "btnOK";
             btnOK.Size = new Size(75, 27);
-            btnOK.TabIndex = 3;
+            btnOK.TabIndex = 4;
             btnOK.Text = "OK";
             btnOK.UseVisualStyleBackColor = true;
             btnOK.Click += btnOK_Click;
@@ -311,7 +365,7 @@ namespace SwewolfMediaPlayer
             btnCancel.Location = new Point(297, 442);
             btnCancel.Name = "btnCancel";
             btnCancel.Size = new Size(75, 27);
-            btnCancel.TabIndex = 4;
+            btnCancel.TabIndex = 5;
             btnCancel.Text = "Cancel";
             btnCancel.UseVisualStyleBackColor = true;
             btnCancel.Click += btnCancel_Click;
@@ -326,6 +380,7 @@ namespace SwewolfMediaPlayer
             ControlBox = false;
             Controls.Add(grpPlayer);
             Controls.Add(grpResume);
+            Controls.Add(grpFrames);
             Controls.Add(grpUpdate);
             Controls.Add(btnOK);
             Controls.Add(btnCancel);
@@ -343,6 +398,8 @@ namespace SwewolfMediaPlayer
             grpResume.PerformLayout();
             ((System.ComponentModel.ISupportInitialize)nudRewind).EndInit();
             ((System.ComponentModel.ISupportInitialize)nudAudioMinutes).EndInit();
+            grpFrames.ResumeLayout(false);
+            grpFrames.PerformLayout();
             grpUpdate.ResumeLayout(false);
             grpUpdate.PerformLayout();
             ResumeLayout(false);
@@ -369,6 +426,11 @@ namespace SwewolfMediaPlayer
         private Label lblAudioMinutes;
         private NumericUpDown nudAudioMinutes;
         private Label lblMinutes;
+        private GroupBox grpFrames;
+        private Label lblFramesFolder;
+        private TextBox txtFramesFolder;
+        private Button btnBrowseFrames;
+        private Label lblFramesHint;
         private GroupBox grpUpdate;
         private ComboBox cboNewVersionCheck;
         private Label lblNewVersionCheck;

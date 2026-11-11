@@ -18,6 +18,7 @@
 //   2026-10-26  ShowSubtitles (on by default): the default for videos with no choice of their own.
 //   2026-10-27  TrackMenusOnlyWithChoice (off by default).
 //   2026-11-08  ClassicTrackButtons (off by default = modern look).
+//   2026-11-10  SaveFramesFolder (the Windows Pictures folder by default; blank = the folder of the video).
 
 using System.Text.Json;
 
@@ -65,6 +66,10 @@ namespace SwewolfMediaPlayer
 
         // Look of the previous / next tune and track buttons: false = Modern (one triangle and a bar, the default), true = Classic (two triangles and a bar).
         public bool ClassicTrackButtons { get; set; }
+
+        // The folder the Save Frame dialog (and the cover art dialog) starts in. The Windows Pictures folder until the user changes it;
+        // blank means the folder of the video file. A folder the user picks in the dialog is used for that player window only.
+        public string SaveFramesFolder { get; set; } = Environment.GetFolderPath(Environment.SpecialFolder.MyPictures);
 
         // Whether the main window asks GitHub for a newer version when it starts.
         public bool CheckForUpdatesOnStartup { get; set; } = true;
