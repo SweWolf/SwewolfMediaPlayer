@@ -84,6 +84,16 @@ namespace SwewolfMediaPlayer
             btnOpen.Enabled = txtFile.Text.Trim().Length > 0;
         }
 
+        // The folder last browsed in this run of the program (until it is closed, the dialog starts here).
+        private string? _browsedFolder;
+
+        // The folder when the text names a full path that exists; otherwise null (blank, relative, or not there).
+        private static string? ExistingFolder(string? text)
+        {
+            string folder = (text ?? "").Trim().Trim('"');
+            return folder.Length > 0 && Path.IsPathRooted(folder) && Directory.Exists(folder) ? folder : null;
+        }
+
         private void btnBrowse_Click(object? sender, EventArgs e)
         {
             using var dialog = new OpenFileDialog
@@ -92,14 +102,41 @@ namespace SwewolfMediaPlayer
                 Filter = "Media Files|*.mp4;*.mkv;*.avi;*.mov;*.wmv;*.webm;*.mp3;*.wav;*.flac;*.m4a;*.ogg;*.sid;*.gif|All Files|*.*"
             };
 
-            if (File.Exists(txtFile.Text))
+            // Where the dialog starts: the folder of the file in the box, or the folder typed there; else the folder last browsed in this run; else the
+            // default folder of the settings (when it exists); else the last folder used in an earlier run.
+            AppSettings settings = AppSettings.Load();
+            string typed = txtFile.Text.Trim().Trim('"');
+            if (File.Exists(typed))
             {
-                dialog.InitialDirectory = Path.GetDirectoryName(Path.GetFullPath(txtFile.Text));
-                dialog.FileName = Path.GetFileName(txtFile.Text);
+                dialog.InitialDirectory = Path.GetDirectoryName(Path.GetFullPath(typed));
+                dialog.FileName = Path.GetFileName(typed);
+            }
+            else if (ExistingFolder(typed) is { } typedFolder)
+            {
+                dialog.InitialDirectory = typedFolder;   // a folder typed in the box (with or without a closing backslash)
+            }
+            else if (_browsedFolder != null && Directory.Exists(_browsedFolder))
+            {
+                dialog.InitialDirectory = _browsedFolder;
+            }
+            else if (ExistingFolder(settings.MediaStartFolder) is { } startFolder)
+            {
+                dialog.InitialDirectory = startFolder;
+            }
+            else if (ExistingFolder(settings.LastMediaFolder) is { } lastFolder)
+            {
+                dialog.InitialDirectory = lastFolder;
             }
 
             if (dialog.ShowDialog(this) == DialogResult.OK)
             {
+                _browsedFolder = Path.GetDirectoryName(dialog.FileName);
+                if (_browsedFolder != null && !string.Equals(settings.LastMediaFolder, _browsedFolder, StringComparison.OrdinalIgnoreCase))
+                {
+                    AppSettings latest = AppSettings.Load();   // from a fresh copy, so nothing else in the file is overwritten
+                    latest.LastMediaFolder = _browsedFolder;
+                    latest.Save();
+                }
                 txtFile.Text = dialog.FileName;
                 // The user has chosen the file, so there is no need to click Open as well.
                 btnOpen.PerformClick();

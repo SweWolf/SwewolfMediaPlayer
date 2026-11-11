@@ -200,16 +200,7 @@ namespace SwewolfMediaPlayer
                 btnSkipForward.Left = btnSkipBack.Right + gap;
                 x = btnSkipForward.Right;
             }
-            if (_saveFrameShown)
-            {
-                btnSaveFrame.Left = x + gap;
-                x = btnSaveFrame.Right;
-            }
-            if (btnBookmark != null)   // right of the camera button
-            {
-                btnBookmark.Left = x + gap;
-                x = btnBookmark.Right;
-            }
+            // The previous / next buttons (tunes or tracks, chapters) follow the skip buttons, then come the camera and the bookmark.
             if (_tuneButtonsShown)
             {
                 btnPrevTune.Left = x + gap;
@@ -221,6 +212,16 @@ namespace SwewolfMediaPlayer
                 btnPrevChapter.Left = x + gap;
                 btnNextChapter.Left = btnPrevChapter.Right + gap;
                 x = btnNextChapter.Right;
+            }
+            if (_saveFrameShown)
+            {
+                btnSaveFrame.Left = x + gap;
+                x = btnSaveFrame.Right;
+            }
+            if (btnBookmark != null)   // right of the camera button
+            {
+                btnBookmark.Left = x + gap;
+                x = btnBookmark.Right;
             }
 
             int left = x + LogicalToDeviceUnits(8);

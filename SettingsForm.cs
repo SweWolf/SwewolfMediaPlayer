@@ -11,6 +11,7 @@
 //   2026-10-27  Show Track Menus Only When There Is a Choice in the Player group.
 //   2026-11-08  Look of the Previous and Next Buttons (Modern / Classic) in the Player group.
 //   2026-11-10  Saved Frames group: Default Folder for Saved Frames (text box, Browse, grey hint; blank = the folder of the video).
+//   2026-11-10  Open a Media File group: Default Start Folder for Browsing (text box, Browse, grey hint; blank = the last folder used).
 //   2026-10-26  "Turn On Subtitles When a Video Opens" (the default for videos with no choice of their own) in the Player group.
 
 namespace SwewolfMediaPlayer
@@ -22,6 +23,7 @@ namespace SwewolfMediaPlayer
             InitializeComponent();
             Icon = Program.LoadIcon();
             TextBoxStyle.Apply(txtFramesFolder);
+            TextBoxStyle.Apply(txtOpenFolder);
 
             ApplyLayout();
         }
@@ -29,15 +31,25 @@ namespace SwewolfMediaPlayer
         // Browse for the folder; it starts where the box points now, when that folder exists.
         private void btnBrowseFrames_Click(object? sender, EventArgs e)
         {
+            BrowseFolder(txtFramesFolder, "Choose the default folder for saved frames.");
+        }
+
+        private void btnBrowseOpen_Click(object? sender, EventArgs e)
+        {
+            BrowseFolder(txtOpenFolder, "Choose the folder where browsing for a media file starts.");
+        }
+
+        private void BrowseFolder(TextBox box, string description)
+        {
             using var dialog = new FolderBrowserDialog
             {
-                Description = "Choose the default folder for saved frames.",
+                Description = description,
                 UseDescriptionForTitle = true,
-                InitialDirectory = Directory.Exists(txtFramesFolder.Text.Trim()) ? txtFramesFolder.Text.Trim() : ""
+                InitialDirectory = Directory.Exists(box.Text.Trim()) ? box.Text.Trim() : ""
             };
             if (dialog.ShowDialog(this) == DialogResult.OK)
             {
-                txtFramesFolder.Text = dialog.SelectedPath;
+                box.Text = dialog.SelectedPath;
             }
         }
 
@@ -57,7 +69,8 @@ namespace SwewolfMediaPlayer
             nudAudioMinutes.Visible = showLength;
             lblMinutes.Visible = showLength;
 
-            grpResume.Top = grpPlayer.Bottom + 12;
+            grpOpen.Top = grpPlayer.Bottom + 12;
+            grpResume.Top = grpOpen.Bottom + 12;
             grpResume.Height = !resumeOn ? 82 : showLength ? 224 : 186;
             grpFrames.Top = grpResume.Bottom + 12;
             grpUpdate.Top = grpFrames.Bottom + 12;
@@ -75,6 +88,7 @@ namespace SwewolfMediaPlayer
             chkTrackMenus.Checked = settings.TrackMenusOnlyWithChoice;
             cboNewVersionCheck.SelectedItem = settings.CheckForUpdatesOnStartup ? "Yes" : "No";
             txtFramesFolder.Text = settings.SaveFramesFolder ?? "";
+            txtOpenFolder.Text = settings.MediaStartFolder ?? "";
             cboCoverSize.SelectedIndex = Math.Clamp(settings.CoverPictureSize, 0, 1);
             cboButtonLook.SelectedIndex = settings.ClassicTrackButtons ? 1 : 0;
             cboResumeMode.SelectedIndex = Math.Clamp(settings.ResumeWhenOpening, 0, 2);
@@ -104,6 +118,7 @@ namespace SwewolfMediaPlayer
             settings.TrackMenusOnlyWithChoice = chkTrackMenus.Checked;
             settings.CheckForUpdatesOnStartup = cboNewVersionCheck.SelectedItem?.ToString() != "No";
             settings.SaveFramesFolder = txtFramesFolder.Text.Trim().Trim('"');
+            settings.MediaStartFolder = txtOpenFolder.Text.Trim().Trim('"');
             settings.CoverPictureSize = Math.Max(0, cboCoverSize.SelectedIndex);
             settings.ClassicTrackButtons = cboButtonLook.SelectedIndex == 1;
             settings.ResumeWhenOpening = Math.Max(0, cboResumeMode.SelectedIndex);

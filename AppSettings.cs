@@ -19,6 +19,7 @@
 //   2026-10-27  TrackMenusOnlyWithChoice (off by default).
 //   2026-11-08  ClassicTrackButtons (off by default = modern look).
 //   2026-11-10  SaveFramesFolder (the Windows Pictures folder by default; blank = the folder of the video).
+//   2026-11-10  MediaStartFolder (the Windows Videos folder by default; blank = the last folder used) and LastMediaFolder.
 
 using System.Text.Json;
 
@@ -70,6 +71,13 @@ namespace SwewolfMediaPlayer
         // The folder the Save Frame dialog (and the cover art dialog) starts in. The Windows Pictures folder until the user changes it;
         // blank means the folder of the video file. A folder the user picks in the dialog is used for that player window only.
         public string SaveFramesFolder { get; set; } = Environment.GetFolderPath(Environment.SpecialFolder.MyPictures);
+
+        // The folder the Browse button of the main window starts in (Open a Media File). The Windows Videos folder until the user changes
+        // it; blank means the last folder a file was opened from (LastMediaFolder, kept between runs). A folder that does not exist is skipped.
+        public string MediaStartFolder { get; set; } = Environment.GetFolderPath(Environment.SpecialFolder.MyVideos);
+
+        // The folder of the last file chosen with the Browse button: used when MediaStartFolder is blank.
+        public string LastMediaFolder { get; set; } = "";
 
         // Whether the main window asks GitHub for a newer version when it starts.
         public bool CheckForUpdatesOnStartup { get; set; } = true;

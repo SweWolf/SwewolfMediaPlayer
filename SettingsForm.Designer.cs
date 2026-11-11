@@ -24,6 +24,11 @@ namespace SwewolfMediaPlayer
             cboCoverSize = new ComboBox();
             lblButtonLook = new Label();
             cboButtonLook = new ComboBox();
+            grpOpen = new GroupBox();
+            lblOpenFolder = new Label();
+            txtOpenFolder = new TextBox();
+            btnBrowseOpen = new Button();
+            lblOpenHint = new Label();
             grpResume = new GroupBox();
             lblResumeMode = new Label();
             cboResumeMode = new ComboBox();
@@ -46,6 +51,7 @@ namespace SwewolfMediaPlayer
             btnOK = new Button();
             btnCancel = new Button();
             grpPlayer.SuspendLayout();
+            grpOpen.SuspendLayout();
             grpResume.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)nudRewind).BeginInit();
             ((System.ComponentModel.ISupportInitialize)nudAudioMinutes).BeginInit();
@@ -158,6 +164,54 @@ namespace SwewolfMediaPlayer
             cboButtonLook.TabIndex = 7;
             toolTip.SetToolTip(cboButtonLook, "How the buttons for the previous and next tune or track look.\r\nModern has one triangle and a bar.\r\nClassic has two triangles and a bar.\r\nA player that is already open keeps its look until it is opened again.");
             //
+            // grpOpen
+            //
+            grpOpen.Controls.Add(lblOpenFolder);
+            grpOpen.Controls.Add(txtOpenFolder);
+            grpOpen.Controls.Add(btnBrowseOpen);
+            grpOpen.Controls.Add(lblOpenHint);
+            grpOpen.Location = new Point(12, 256);
+            grpOpen.Name = "grpOpen";
+            grpOpen.Size = new Size(360, 116);
+            grpOpen.TabIndex = 1;
+            grpOpen.TabStop = false;
+            grpOpen.Text = "Open a Media File";
+            //
+            // lblOpenFolder
+            //
+            lblOpenFolder.AutoSize = true;
+            lblOpenFolder.Location = new Point(10, 28);
+            lblOpenFolder.Name = "lblOpenFolder";
+            lblOpenFolder.TabIndex = 0;
+            lblOpenFolder.Text = "Default Start Fol&der for Browsing";
+            //
+            // txtOpenFolder
+            //
+            txtOpenFolder.Location = new Point(10, 46);
+            txtOpenFolder.Name = "txtOpenFolder";
+            txtOpenFolder.Size = new Size(260, 23);
+            txtOpenFolder.TabIndex = 1;
+            toolTip.SetToolTip(txtOpenFolder, "The folder that opens when you click Browse in the main window.\r\nThe Videos folder of Windows is the default.\r\nA folder that does not exist is skipped.\r\nWhile the program runs, the last folder you browsed in is used instead.\r\nLeave it blank to start in the last folder you used,\r\neven after the program has been closed.");
+            //
+            // btnBrowseOpen
+            //
+            btnBrowseOpen.Location = new Point(276, 45);
+            btnBrowseOpen.Name = "btnBrowseOpen";
+            btnBrowseOpen.Size = new Size(74, 25);
+            btnBrowseOpen.TabIndex = 2;
+            btnBrowseOpen.Text = "Bro&wse...";
+            btnBrowseOpen.UseVisualStyleBackColor = true;
+            btnBrowseOpen.Click += btnBrowseOpen_Click;
+            //
+            // lblOpenHint
+            //
+            lblOpenHint.ForeColor = SystemColors.GrayText;
+            lblOpenHint.Location = new Point(10, 76);
+            lblOpenHint.Name = "lblOpenHint";
+            lblOpenHint.Size = new Size(340, 32);
+            lblOpenHint.TabIndex = 3;
+            lblOpenHint.Text = "Leave this blank to start in the last folder you used.";
+            //
             // grpResume
             //
             grpResume.Controls.Add(lblResumeMode);
@@ -173,7 +227,7 @@ namespace SwewolfMediaPlayer
             grpResume.Location = new Point(12, 108);
             grpResume.Name = "grpResume";
             grpResume.Size = new Size(360, 224);
-            grpResume.TabIndex = 1;
+            grpResume.TabIndex = 2;
             grpResume.TabStop = false;
             grpResume.Text = "Resume";
             //
@@ -279,7 +333,7 @@ namespace SwewolfMediaPlayer
             grpFrames.Location = new Point(12, 334);
             grpFrames.Name = "grpFrames";
             grpFrames.Size = new Size(360, 116);
-            grpFrames.TabIndex = 2;
+            grpFrames.TabIndex = 3;
             grpFrames.TabStop = false;
             grpFrames.Text = "Saved Frames";
             //
@@ -325,7 +379,7 @@ namespace SwewolfMediaPlayer
             grpUpdate.Location = new Point(12, 456);
             grpUpdate.Name = "grpUpdate";
             grpUpdate.Size = new Size(360, 90);
-            grpUpdate.TabIndex = 3;
+            grpUpdate.TabIndex = 4;
             grpUpdate.TabStop = false;
             grpUpdate.Text = "Updates";
             //
@@ -353,7 +407,7 @@ namespace SwewolfMediaPlayer
             btnOK.Location = new Point(216, 442);
             btnOK.Name = "btnOK";
             btnOK.Size = new Size(75, 27);
-            btnOK.TabIndex = 4;
+            btnOK.TabIndex = 5;
             btnOK.Text = "OK";
             btnOK.UseVisualStyleBackColor = true;
             btnOK.Click += btnOK_Click;
@@ -365,7 +419,7 @@ namespace SwewolfMediaPlayer
             btnCancel.Location = new Point(297, 442);
             btnCancel.Name = "btnCancel";
             btnCancel.Size = new Size(75, 27);
-            btnCancel.TabIndex = 5;
+            btnCancel.TabIndex = 6;
             btnCancel.Text = "Cancel";
             btnCancel.UseVisualStyleBackColor = true;
             btnCancel.Click += btnCancel_Click;
@@ -379,6 +433,7 @@ namespace SwewolfMediaPlayer
             ClientSize = new Size(384, 481);
             ControlBox = false;
             Controls.Add(grpPlayer);
+            Controls.Add(grpOpen);
             Controls.Add(grpResume);
             Controls.Add(grpFrames);
             Controls.Add(grpUpdate);
@@ -394,6 +449,8 @@ namespace SwewolfMediaPlayer
             Load += SettingsForm_Load;
             grpPlayer.ResumeLayout(false);
             grpPlayer.PerformLayout();
+            grpOpen.ResumeLayout(false);
+            grpOpen.PerformLayout();
             grpResume.ResumeLayout(false);
             grpResume.PerformLayout();
             ((System.ComponentModel.ISupportInitialize)nudRewind).EndInit();
@@ -415,6 +472,11 @@ namespace SwewolfMediaPlayer
         private ComboBox cboCoverSize;
         private Label lblButtonLook;
         private ComboBox cboButtonLook;
+        private GroupBox grpOpen;
+        private Label lblOpenFolder;
+        private TextBox txtOpenFolder;
+        private Button btnBrowseOpen;
+        private Label lblOpenHint;
         private GroupBox grpResume;
         private Label lblResumeMode;
         private ComboBox cboResumeMode;
