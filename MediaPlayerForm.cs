@@ -542,12 +542,11 @@ namespace SwewolfMediaPlayer
             // Includes the time the resume prompt waits for the user, if it is shown.
             OpenTimingLog.Write($"StartMedia: library/resume, {stepWatch.ElapsedMilliseconds} ms");
             stepWatch.Restart();
-            _media = new Media(_activeLib, _filePath, _isStream ? FromType.FromLocation : FromType.FromPath);
-            if (!_isStream && string.Equals(Path.GetExtension(_filePath), ".gif", StringComparison.OrdinalIgnoreCase))
+            if (IsGifFile && _trimVisible)
             {
-                // VLC shows a GIF as one still picture; the FFmpeg demuxer plays it as a movie (pause, seek, ...).
-                _media.AddOption(":demux=avformat");
+                SetTrimVisible(false);   // a GIF is not trimmed
             }
+            _media = CreateMedia(_activeLib, _filePath, _isStream);
             _mediaStartsAtEnd = false;
             _openWatch = System.Diagnostics.Stopwatch.StartNew();
             _player.Play(_media);
@@ -929,7 +928,14 @@ namespace SwewolfMediaPlayer
             }
 
             double frameMs = GetFrameMs();
-            _stepTimeMs = (long)Math.Clamp(_stepTimeMs + direction * frameMs, 0, Math.Max(_lengthMs - 1, 0));
+            // A seek into the last frames of a GIF ends playback in LibVLC, and a stopped player ignores every further seek
+            // (the wheel then seemed dead until Stop and Play). So stepping a GIF forward stops two frames before the end.
+            long lastMs = Math.Max(_lengthMs - 1, 0);
+            if (IsGifFile)
+            {
+                lastMs = Math.Max(_lengthMs - (long)(frameMs * 2) - 1, 0);
+            }
+            _stepTimeMs = (long)Math.Clamp(_stepTimeMs + direction * frameMs, 0, lastMs);
             _player.Time = _stepTimeMs;
             UpdateTime(_stepTimeMs);
         }
@@ -1083,7 +1089,7 @@ namespace SwewolfMediaPlayer
                 if (_activeLib != null && lengthMs > 2500)
                 {
                     Media? old = _media;
-                    Media endMedia = new(_activeLib, _filePath, FromType.FromPath);
+                    Media endMedia = CreateMedia(_activeLib, _filePath, false);
                     endMedia.AddOption(string.Create(System.Globalization.CultureInfo.InvariantCulture, $":start-time={(lengthMs - 1000) / 1000.0:F3}"));
                     _media = endMedia;
                     _mediaStartsAtEnd = true;
@@ -1151,6 +1157,20 @@ namespace SwewolfMediaPlayer
         // Before the player is started from the beginning again it gets a plain one.
         private bool _mediaStartsAtEnd;
 
+        // An animated GIF is played as a movie (pause, seek, step). VLC shows a GIF as one still picture unless it is told
+        // to read it with the FFmpeg demuxer, so every Media made for the file goes through here.
+        private bool IsGifFile => !_isStream && string.Equals(Path.GetExtension(_filePath), ".gif", StringComparison.OrdinalIgnoreCase);
+
+        private Media CreateMedia(LibVLC lib, string path, bool isStream)
+        {
+            Media media = new(lib, path, isStream ? FromType.FromLocation : FromType.FromPath);
+            if (!isStream && string.Equals(Path.GetExtension(path), ".gif", StringComparison.OrdinalIgnoreCase))
+            {
+                media.AddOption(":demux=avformat");
+            }
+            return media;
+        }
+
         private void EnsureCleanMedia(MediaPlayer player)
         {
             if (!_mediaStartsAtEnd || _activeLib == null)
@@ -1160,7 +1180,7 @@ namespace SwewolfMediaPlayer
 
             _mediaStartsAtEnd = false;
             Media? old = _media;
-            _media = new Media(_activeLib, _filePath, FromType.FromPath);
+            _media = CreateMedia(_activeLib, _filePath, false);
             player.Media = _media;
             if (old != null)
             {

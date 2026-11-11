@@ -61,6 +61,8 @@ namespace SwewolfMediaPlayer
         private void menuControls_Opening(object? sender, CancelEventArgs e)
         {
             // A stream has no file to trim, and neither has a file that cannot be searched (SID music).
+            // An animated GIF is not trimmed: the item is hidden for it.
+            mnuShowTrim.Visible = !IsGifFile;
             mnuShowTrim.Enabled = CanSeek && !_trimming;
             mnuShowTrim.Checked = _trimVisible;
             mnuShowControlPanel.Checked = _panelVisible;
