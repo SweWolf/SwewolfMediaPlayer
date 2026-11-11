@@ -1503,6 +1503,57 @@ namespace SwewolfMediaPlayer
             }
         }
 
+        // "Open Folder" in the camera menu: the folder where pictures are saved (the "without asking" folder, else the one the last
+        // picture went to, else the folder of the video, for a stream the Pictures folder). Opened in SweWolf File Explorer when it is
+        // found (D:\Dev\CLAUDE.md, "Finding a sibling app"), else quietly in the Windows Explorer.
+        private void mnuOpenFolder_Click(object? sender, EventArgs e)
+        {
+            string? folder = _quietSaveFolder ?? _lastSaveFolder;
+            if (string.IsNullOrEmpty(folder) || !Directory.Exists(folder))
+            {
+                folder = _isStream ? null : Path.GetDirectoryName(Path.GetFullPath(_filePath));
+            }
+            if (string.IsNullOrEmpty(folder) || !Directory.Exists(folder))
+            {
+                folder = Environment.GetFolderPath(Environment.SpecialFolder.MyPictures);
+            }
+
+            string? explorer = FindFileExplorer();
+            try
+            {
+                if (explorer != null)
+                {
+                    System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(explorer) { ArgumentList = { folder } });
+                    return;
+                }
+            }
+            catch (Exception)
+            {
+                // The sibling would not start: the Windows Explorer below does it.
+            }
+
+            try
+            {
+                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(folder) { UseShellExecute = true });
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(this, $"The folder could not be opened.\r\n\r\n{ex.Message}", AppName, MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            }
+        }
+
+        // The EXE of SweWolf File Explorer: next to this EXE, then in the sibling project folder; null when not found.
+        private static string? FindFileExplorer()
+        {
+            const string name = "SwewolfFileExplorer";
+            string here = AppContext.BaseDirectory;
+            return new[]
+            {
+                Path.Combine(here, name + ".exe"),
+                Path.GetFullPath(Path.Combine(here, "..", name, name + ".exe")),
+            }.FirstOrDefault(File.Exists);
+        }
+
         // The full path to save to without a dialog, or null when the dialog is to be shown (the option is off, or the
         // folder has been removed since and cannot be created again).
         private string? QuietSavePath(string suggestedName)

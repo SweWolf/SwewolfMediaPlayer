@@ -57,6 +57,8 @@ namespace SwewolfMediaPlayer
             mnuSetPreviewPicture = new ToolStripMenuItem();
             sepSaveFrame = new ToolStripSeparator();
             mnuSaveWithoutAsking = new ToolStripMenuItem();
+            sepOpenFolder = new ToolStripSeparator();
+            mnuOpenFolder = new ToolStripMenuItem();
             mnuShowTrim = new ToolStripMenuItem();
             mnuShowControlPanel = new ToolStripMenuItem();
             grpControlPanel = new GroupBox();
@@ -382,7 +384,7 @@ namespace SwewolfMediaPlayer
             //
             // menuSaveFrame (right-click on the camera button)
             //
-            menuSaveFrame.Items.AddRange(new ToolStripItem[] { mnuSetPreviewPicture, sepSaveFrame, mnuSaveWithoutAsking });
+            menuSaveFrame.Items.AddRange(new ToolStripItem[] { mnuSetPreviewPicture, sepSaveFrame, mnuSaveWithoutAsking, sepOpenFolder, mnuOpenFolder });
             menuSaveFrame.Name = "menuSaveFrame";
             menuSaveFrame.Size = new Size(210, 26);
             menuSaveFrame.Opening += menuSaveFrame_Opening;
@@ -405,6 +407,18 @@ namespace SwewolfMediaPlayer
             mnuSaveWithoutAsking.Size = new Size(209, 22);
             mnuSaveWithoutAsking.Text = "Save Without Asking for a Folder";
             mnuSaveWithoutAsking.Click += mnuSaveWithoutAsking_Click;
+            //
+            // sepOpenFolder
+            //
+            sepOpenFolder.Name = "sepOpenFolder";
+            sepOpenFolder.Size = new Size(206, 6);
+            //
+            // mnuOpenFolder
+            //
+            mnuOpenFolder.Name = "mnuOpenFolder";
+            mnuOpenFolder.Size = new Size(209, 22);
+            mnuOpenFolder.Text = "Open Folder";
+            mnuOpenFolder.Click += mnuOpenFolder_Click;
             //
             // mnuShowTrim
             // 
@@ -586,6 +600,8 @@ namespace SwewolfMediaPlayer
         private ToolStripMenuItem mnuSetPreviewPicture;
         private ToolStripSeparator sepSaveFrame;
         private ToolStripMenuItem mnuSaveWithoutAsking;
+        private ToolStripSeparator sepOpenFolder;
+        private ToolStripMenuItem mnuOpenFolder;
         private ToolStripMenuItem mnuShowTrim;
         private ToolStripMenuItem mnuShowControlPanel;
         private GroupBox grpControlPanel;
