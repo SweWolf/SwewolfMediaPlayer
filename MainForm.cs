@@ -89,7 +89,7 @@ namespace SwewolfMediaPlayer
             using var dialog = new OpenFileDialog
             {
                 Title = "Select a Media File",
-                Filter = "Media Files|*.mp4;*.mkv;*.avi;*.mov;*.wmv;*.webm;*.mp3;*.wav;*.flac;*.m4a;*.ogg;*.sid|All Files|*.*"
+                Filter = "Media Files|*.mp4;*.mkv;*.avi;*.mov;*.wmv;*.webm;*.mp3;*.wav;*.flac;*.m4a;*.ogg;*.sid;*.gif|All Files|*.*"
             };
 
             if (File.Exists(txtFile.Text))

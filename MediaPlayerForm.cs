@@ -543,6 +543,11 @@ namespace SwewolfMediaPlayer
             OpenTimingLog.Write($"StartMedia: library/resume, {stepWatch.ElapsedMilliseconds} ms");
             stepWatch.Restart();
             _media = new Media(_activeLib, _filePath, _isStream ? FromType.FromLocation : FromType.FromPath);
+            if (!_isStream && string.Equals(Path.GetExtension(_filePath), ".gif", StringComparison.OrdinalIgnoreCase))
+            {
+                // VLC shows a GIF as one still picture; the FFmpeg demuxer plays it as a movie (pause, seek, ...).
+                _media.AddOption(":demux=avformat");
+            }
             _mediaStartsAtEnd = false;
             _openWatch = System.Diagnostics.Stopwatch.StartNew();
             _player.Play(_media);
