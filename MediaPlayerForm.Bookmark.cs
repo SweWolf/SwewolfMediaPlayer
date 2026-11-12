@@ -8,6 +8,7 @@
 // History:
 //   2026-10-21  First version. A question first (the file, a checkbox "Start Point 0:00:53", unchecked, as TeraTool had it).
 //   2026-10-23  SID files: no Start Point checkbox (a SID file cannot be jumped in), the question is shorter.
+//   2026-11-11  Streams can be bookmarked too: an Internet shortcut (.url) in the same folder, no start point.
 
 using System.Runtime.InteropServices;
 
@@ -43,7 +44,18 @@ namespace SwewolfMediaPlayer
         // points of one file can be kept, with the start point in the Comment.
         private void AddBookmark()
         {
-            if (_player == null || _isStream || _restoringEnd || !File.Exists(_filePath))
+            if (_player == null || _restoringEnd)
+            {
+                return;
+            }
+
+            if (_isStream)
+            {
+                AddStreamBookmark();
+                return;
+            }
+
+            if (!File.Exists(_filePath))
             {
                 return;
             }
@@ -105,6 +117,61 @@ namespace SwewolfMediaPlayer
             }
         }
 
+        // A stream (a TV channel, a radio station) is bookmarked as an Internet shortcut (.url), the same kind of file the explorer makes
+        // for a web address (BookmarkStore.AddUrl: [InternetShortcut], ANSI code page). There is no start point: a stream has no position.
+        private void AddStreamBookmark()
+        {
+            if (!TryGetStreamUri(_filePath, out Uri? uri) || uri == null)
+            {
+                return;
+            }
+
+            string url = uri.AbsoluteUri;
+            if (!AskBookmark(url, null, out _))
+            {
+                return;
+            }
+
+            string last = uri.Segments.Length > 1 ? uri.Segments[^1].Trim('/') : "";
+            string name = uri.Host + (last.Length > 0 ? " - " + last : "");
+            foreach (char bad in Path.GetInvalidFileNameChars())
+            {
+                name = name.Replace(bad.ToString(), "");
+            }
+            name = name.Trim().Trim('.').Trim();
+            if (name.Length == 0)
+            {
+                name = "Stream";
+            }
+
+            string folder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+                "SweWolfSoftware", "SwewolfFileExplorer", "Bookmarks");
+            string path = Path.Combine(folder, name + ".url");
+            string temp = path + ".part" + Environment.ProcessId;
+            try
+            {
+                Directory.CreateDirectory(folder);
+                if (File.Exists(path))
+                {
+                    ShowTitleMessage("This stream is bookmarked already");
+                    return;
+                }
+
+                // Windows reads an Internet shortcut in the ANSI code page. Written under another name and moved into place,
+                // so that nobody sees the finished name as an empty file.
+                System.Text.Encoding.RegisterProvider(System.Text.CodePagesEncodingProvider.Instance);
+                var ansi = System.Text.Encoding.GetEncoding(System.Globalization.CultureInfo.CurrentCulture.TextInfo.ANSICodePage);
+                File.WriteAllBytes(temp, ansi.GetBytes("[InternetShortcut]\r\nURL=" + url + "\r\n"));
+                File.Move(temp, path);
+                ShowTitleMessage("Bookmark added");
+            }
+            catch (Exception ex)
+            {
+                try { File.Delete(temp); } catch { }
+                MessageBox.Show(this, $"The bookmark could not be made. {ex.Message}", AppName, MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            }
+        }
+
         // The window title says something for a moment.
         private void ShowTitleMessage(string text)
         {
@@ -114,7 +181,7 @@ namespace SwewolfMediaPlayer
             {
                 restore.Stop();
                 restore.Dispose();
-                Text = Path.GetFileName(_filePath);
+                Text = TitleBase();
             };
             restore.Start();
         }
