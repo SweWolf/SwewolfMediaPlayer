@@ -35,6 +35,16 @@ namespace SwewolfMediaPlayer
             form.ShowDialog(this);
         }
 
+        // The public channel list of the iptv-org project. For now it is the one list in the menu; the same as typing the address in the
+        // box and clicking Open (the list is kept on disk and checked for changes, see M3uPlaylist.cs).
+        private const string IptvPlaylistUrl = "https://iptv-org.github.io/iptv/index.m3u";
+
+        private void menuOpenPlaylist_Click(object? sender, EventArgs e)
+        {
+            txtFile.Text = IptvPlaylistUrl;
+            btnOpen.PerformClick();
+        }
+
         private void menuAbout_Click(object? sender, EventArgs e)
         {
             using var form = new AboutForm();

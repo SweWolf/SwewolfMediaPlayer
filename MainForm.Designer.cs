@@ -37,6 +37,8 @@
             menuHelp = new ToolStripMenuItem();
             menuAbout = new ToolStripMenuItem();
             menuNewVersion = new ToolStripMenuItem();
+            menuIptv = new ToolStripMenuItem();
+            menuOpenPlaylist = new ToolStripMenuItem();
             lblFile = new Label();
             txtFile = new TextBox();
             btnBrowse = new Button();
@@ -46,7 +48,7 @@
             //
             // menuStrip
             //
-            menuStrip.Items.AddRange(new ToolStripItem[] { menuTools, menuHelp, menuNewVersion });
+            menuStrip.Items.AddRange(new ToolStripItem[] { menuTools, menuIptv, menuHelp, menuNewVersion });
             menuStrip.Location = new Point(0, 0);
             menuStrip.Name = "menuStrip";
             menuStrip.Size = new Size(754, 24);
@@ -72,6 +74,21 @@
             menuSettings.Size = new Size(180, 22);
             menuSettings.Text = "Settings";
             menuSettings.Click += menuSettings_Click;
+            //
+            // menuIptv
+            //
+            menuIptv.DropDownItems.AddRange(new ToolStripItem[] { menuOpenPlaylist });
+            menuIptv.Name = "menuIptv";
+            menuIptv.Size = new Size(41, 20);
+            menuIptv.Text = "IPTV";
+            //
+            // menuOpenPlaylist
+            //
+            menuOpenPlaylist.Name = "menuOpenPlaylist";
+            menuOpenPlaylist.Size = new Size(180, 22);
+            menuOpenPlaylist.Text = "Open Playlist";
+            menuOpenPlaylist.ToolTipText = "Open the public IPTV channel list (iptv-org).";
+            menuOpenPlaylist.Click += menuOpenPlaylist_Click;
             //
             // menuHelp
             //
@@ -180,6 +197,8 @@
         private ToolStripMenuItem menuCreateShortcut;
         private ToolStripMenuItem menuSettings;
         private ToolStripMenuItem menuNewVersion;
+        private ToolStripMenuItem menuIptv;
+        private ToolStripMenuItem menuOpenPlaylist;
         private ToolStripMenuItem menuHelp;
         private ToolStripMenuItem menuAbout;
     }
