@@ -12,6 +12,7 @@
 //   2026-11-08  Look of the Previous and Next Buttons (Modern / Classic) in the Player group.
 //   2026-11-10  Saved Frames group: Default Folder for Saved Frames (text box, Browse, grey hint; blank = the folder of the video).
 //   2026-11-10  Open a Media File group: Default Start Folder for Browsing (text box, Browse, grey hint; blank = the last folder used).
+//   2026-11-12  Side of the Tune and Channel Lists (Right / Left) in the Player group.
 //   2026-10-26  "Turn On Subtitles When a Video Opens" (the default for videos with no choice of their own) in the Player group.
 
 namespace SwewolfMediaPlayer
@@ -91,6 +92,7 @@ namespace SwewolfMediaPlayer
             txtOpenFolder.Text = settings.MediaStartFolder ?? "";
             cboCoverSize.SelectedIndex = Math.Clamp(settings.CoverPictureSize, 0, 1);
             cboButtonLook.SelectedIndex = settings.ClassicTrackButtons ? 1 : 0;
+            cboListSide.SelectedIndex = Math.Clamp(settings.ListSide, 0, 1);
             cboResumeMode.SelectedIndex = Math.Clamp(settings.ResumeWhenOpening, 0, 2);
             cboSaveResume.SelectedIndex = Math.Clamp(settings.SaveResumePoint, 0, 1);
             nudRewind.Value = Math.Clamp(settings.ResumeRewindSeconds, (int)nudRewind.Minimum, (int)nudRewind.Maximum);
@@ -121,6 +123,7 @@ namespace SwewolfMediaPlayer
             settings.MediaStartFolder = txtOpenFolder.Text.Trim().Trim('"');
             settings.CoverPictureSize = Math.Max(0, cboCoverSize.SelectedIndex);
             settings.ClassicTrackButtons = cboButtonLook.SelectedIndex == 1;
+            settings.ListSide = Math.Max(0, cboListSide.SelectedIndex);
             settings.ResumeWhenOpening = Math.Max(0, cboResumeMode.SelectedIndex);
             settings.SaveResumePoint = Math.Max(0, cboSaveResume.SelectedIndex);
             settings.ResumeRewindSeconds = (int)nudRewind.Value;

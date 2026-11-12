@@ -148,7 +148,7 @@ namespace SwewolfMediaPlayer
 
             _pnlTuneList = new Panel
             {
-                Dock = DockStyle.Right,
+                Dock = ListDock(),
                 Width = LogicalToDeviceUnits(340),
                 BackColor = Color.FromArgb(48, 48, 48),
                 Visible = false,

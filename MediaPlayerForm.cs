@@ -286,12 +286,22 @@ namespace SwewolfMediaPlayer
         }
 
         // Plays another file in this window: a file dropped on it, or one the explorer sends through the pipe (MediaPlayerForm.Pipe.cs).
-        internal async Task OpenAnotherAsync(string path, string libraryPath)
+        // checkList: false for a channel the user clicked in the channel list (an .m3u8 address there is a stream, not another list).
+        internal async Task OpenAnotherAsync(string path, string libraryPath, bool checkList = true)
         {
             MediaPlayer? player = _player;
             if (player == null || _trimming || _restoringEnd)
             {
                 return;
+            }
+
+            if (checkList)
+            {
+                if (await TryOpenChannelListAsync(path))
+                {
+                    return;
+                }
+                HideChannelList();   // something else is opened: the old list is of no use
             }
 
             EndPreview(false);
@@ -420,7 +430,11 @@ namespace SwewolfMediaPlayer
             _rightClickTimer.Start();
 
             _player!.Volume = trkVolume.Value;
-            StartMedia();
+            // An .m3u / .m3u8 address that is a list of channels shows the list instead of playing.
+            if (!await TryOpenChannelListAsync(_filePath) && !IsDisposed)
+            {
+                StartMedia();
+            }
             ProcessPendingPipeCommands();   // the explorer asked for another file while the engine was loading
         }
 
@@ -721,6 +735,7 @@ namespace SwewolfMediaPlayer
             _previewTimer?.Dispose();
             _previewTimer = null;
             DisposeThumbnails();
+            DisposeChannelList();
             Application.RemoveMessageFilter(this);
             _rightClickTimer?.Dispose();
             _rightClickTimer = null;
@@ -751,6 +766,11 @@ namespace SwewolfMediaPlayer
             if (_trimming)
             {
                 return base.ProcessCmdKey(ref msg, keyData);
+            }
+            // Typing in the filter box of the channel list: the keys are for the text, not for the player.
+            if (HandleChannelFilterKey(keyData, out bool filterKeyHandled))
+            {
+                return filterKeyHandled || base.ProcessCmdKey(ref msg, keyData);
             }
             if (keyData == Keys.Space)
             {
@@ -1176,6 +1196,10 @@ namespace SwewolfMediaPlayer
         private Media CreateMedia(LibVLC lib, string path, bool isStream)
         {
             Media media = new(lib, path, isStream ? FromType.FromLocation : FromType.FromPath);
+            if (isStream && path == _channelUserAgentFor && !string.IsNullOrEmpty(_channelUserAgent))
+            {
+                media.AddOption(":http-user-agent=" + _channelUserAgent);   // some streams of a channel list only play with the browser name they list
+            }
             if (!isStream && string.Equals(Path.GetExtension(path), ".gif", StringComparison.OrdinalIgnoreCase))
             {
                 media.AddOption(":demux=avformat");
@@ -2040,6 +2064,7 @@ namespace SwewolfMediaPlayer
                 menuVideo.Items.Add(subtitles);
             }
             AddDefaultTracksMenuItem();
+            AddChannelMenu();
             AddTuneMenu();
             AddChapterMenu();
             AddVisualizationMenu();

@@ -121,6 +121,10 @@ namespace SwewolfMediaPlayer
 
         private string TitleBase()
         {
+            if (_isStream && _channels != null && _channelIndex >= 0 && _channelIndex < _channels.Count && _channels[_channelIndex].Url == _filePath)
+            {
+                return _channels[_channelIndex].Name;   // a channel of the channel list
+            }
             return _isStream && TryGetStreamUri(_filePath, out Uri? uri) ? uri!.Host : Path.GetFileName(_filePath);
         }
 

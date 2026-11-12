@@ -20,6 +20,7 @@
 //   2026-11-08  ClassicTrackButtons (off by default = modern look).
 //   2026-11-10  SaveFramesFolder (the Windows Pictures folder by default; blank = the folder of the video).
 //   2026-11-10  MediaStartFolder (the Windows Videos folder by default; blank = the last folder used) and LastMediaFolder.
+//   2026-11-12  ListSide (right by default): the side of the tune list and the channel list.
 
 using System.Text.Json;
 
@@ -78,6 +79,9 @@ namespace SwewolfMediaPlayer
 
         // The folder of the last file chosen with the Browse button: used when MediaStartFolder is blank.
         public string LastMediaFolder { get; set; } = "";
+
+        // Which side of the window the tune list and the channel list are on: 0 = right (the default), 1 = left.
+        public int ListSide { get; set; }
 
         // Whether the main window asks GitHub for a newer version when it starts.
         public bool CheckForUpdatesOnStartup { get; set; } = true;

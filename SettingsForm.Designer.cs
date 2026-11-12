@@ -24,6 +24,8 @@ namespace SwewolfMediaPlayer
             cboCoverSize = new ComboBox();
             lblButtonLook = new Label();
             cboButtonLook = new ComboBox();
+            lblListSide = new Label();
+            cboListSide = new ComboBox();
             grpOpen = new GroupBox();
             lblOpenFolder = new Label();
             txtOpenFolder = new TextBox();
@@ -75,9 +77,11 @@ namespace SwewolfMediaPlayer
             grpPlayer.Controls.Add(cboCoverSize);
             grpPlayer.Controls.Add(lblButtonLook);
             grpPlayer.Controls.Add(cboButtonLook);
+            grpPlayer.Controls.Add(lblListSide);
+            grpPlayer.Controls.Add(cboListSide);
             grpPlayer.Location = new Point(12, 12);
             grpPlayer.Name = "grpPlayer";
-            grpPlayer.Size = new Size(360, 238);
+            grpPlayer.Size = new Size(360, 292);
             grpPlayer.TabIndex = 0;
             grpPlayer.TabStop = false;
             grpPlayer.Text = "Player";
@@ -163,6 +167,25 @@ namespace SwewolfMediaPlayer
             cboButtonLook.Size = new Size(218, 23);
             cboButtonLook.TabIndex = 7;
             toolTip.SetToolTip(cboButtonLook, "How the buttons for the previous and next tune or track look.\r\nModern has one triangle and a bar.\r\nClassic has two triangles and a bar.\r\nA player that is already open keeps its look until it is opened again.");
+            //
+            // lblListSide
+            //
+            lblListSide.AutoSize = true;
+            lblListSide.Location = new Point(10, 240);
+            lblListSide.Name = "lblListSide";
+            lblListSide.TabIndex = 8;
+            lblListSide.Text = "S&ide of the Tune and Channel Lists";
+            //
+            // cboListSide
+            //
+            cboListSide.DropDownStyle = ComboBoxStyle.DropDownList;
+            cboListSide.FormattingEnabled = true;
+            cboListSide.Items.AddRange(new object[] { "Right", "Left" });
+            cboListSide.Location = new Point(10, 258);
+            cboListSide.Name = "cboListSide";
+            cboListSide.Size = new Size(218, 23);
+            cboListSide.TabIndex = 9;
+            toolTip.SetToolTip(cboListSide, "Which side of the window the list of tunes (SID music)\r\nand the list of channels (an M3U list) are shown on.\r\nA player that is already open keeps its side until it is opened again.");
             //
             // grpOpen
             //
@@ -472,6 +495,8 @@ namespace SwewolfMediaPlayer
         private ComboBox cboCoverSize;
         private Label lblButtonLook;
         private ComboBox cboButtonLook;
+        private Label lblListSide;
+        private ComboBox cboListSide;
         private GroupBox grpOpen;
         private Label lblOpenFolder;
         private TextBox txtOpenFolder;
