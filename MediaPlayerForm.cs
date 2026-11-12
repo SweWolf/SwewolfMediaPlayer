@@ -586,15 +586,22 @@ namespace SwewolfMediaPlayer
 
         private void ApplySeekState()
         {
+            // What can never work for this file is hidden; the seek bar of a file that only plays on (SID music) stays
+            // as a read-only progress bar. This runs again for every file opened in the window (drop, explorer).
             trkSeek.Enabled = CanSeek;
+            trkSeek.Visible = !_isStream;
+            _skipShown = CanSeek;
             if (btnSkipBack != null && btnSkipForward != null)
             {
-                btnSkipBack.Enabled = btnSkipForward.Enabled = CanSeek;
+                btnSkipBack.Visible = btnSkipForward.Visible = _skipShown;
+                btnSkipBack.Enabled = btnSkipForward.Enabled = _skipShown;
             }
             if (speedBox != null)
             {
+                speedBox.Visible = CanSeek;
                 speedBox.Enabled = CanSeek;
             }
+            LayoutControlBar();
         }
 
         // Audio files do not open in full screen mode, even when the setting asks for it for video.
@@ -1013,14 +1020,19 @@ namespace SwewolfMediaPlayer
         // triangle otherwise. It follows the real state of the player (see CheckPlayerState).
         private void ShowPlayPause(bool playing)
         {
-            if (playing == _shownPlaying)
+            // A stream cannot be paused (it would jump to the live position on Play, which is a stop): while it
+            // plays, the button shows the Play triangle, greyed out. Stop is the way to stop; then Play is on again.
+            bool locked = playing && _isStream;
+            bool showPause = playing && !locked;
+            if (playing == _shownPlaying && locked == !btnPlayPause.Enabled)
             {
                 return;
             }
 
             _shownPlaying = playing;
-            btnPlayPause.Icon = playing ? IconKind.Pause : IconKind.Play;
-            toolTip.SetToolTip(btnPlayPause, playing ? "Pause (Space)" : "Play (Space)");
+            btnPlayPause.Icon = showPause ? IconKind.Pause : IconKind.Play;
+            btnPlayPause.Enabled = !locked;
+            toolTip.SetToolTip(btnPlayPause, showPause ? "Pause (Space)" : locked ? "A live stream cannot be paused. Use Stop." : "Play (Space)");
         }
 
         // When a video has played to its end, LibVLC drops the picture and the player is "Ended":
@@ -1205,8 +1217,8 @@ namespace SwewolfMediaPlayer
         {
             // A stream has no real length (a live stream reports a fixed window): show only the time.
             long length = _lengthMs > 0 ? _lengthMs : _knownLengthMs;
-            lblTime.Text = _isStream || length <= 0
-                ? FormatTime(timeMs, _paused)
+            lblTime.Text = _isStream ? "LIVE  " + FormatTime(timeMs, _paused)
+                : length <= 0 ? FormatTime(timeMs, _paused)
                 : $"{FormatTime(timeMs, _paused)} / {FormatTime(length, false)}";
             if (!_seeking && !_isStream && length > 0)
             {
@@ -1226,6 +1238,11 @@ namespace SwewolfMediaPlayer
             if (_player == null || _restoringEnd)
             {
                 return;
+            }
+
+            if (_isStream && _player.IsPlaying)
+            {
+                return;   // a stream cannot be paused (Stop is the way)
             }
 
             _tuneAdvanceAtTicks = 0;   // the user decides now: no automatic next tune

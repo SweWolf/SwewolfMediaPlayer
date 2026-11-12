@@ -194,7 +194,7 @@ namespace SwewolfMediaPlayer
 
             int gap = LogicalToDeviceUnits(6);
             int x = btnStop.Right;
-            if (btnSkipBack != null && btnSkipForward != null)   // always shown, right of Stop
+            if (btnSkipBack != null && btnSkipForward != null && _skipShown)   // right of Stop; hidden for streams
             {
                 btnSkipBack.Left = x + gap;
                 btnSkipForward.Left = btnSkipBack.Right + gap;
