@@ -80,6 +80,8 @@
 //               "Turn On Subtitles When a Video Opens" in Tools > Settings decides for files with no choice of their own.
 //   2026-10-27  Setting "Show Track Menus Only When There Is a Choice": the track menus of the right-click menu are left out when there is nothing to choose.
 //   2026-10-27  Right-click menu: Video Track (files with several video streams), between Audio Track and Subtitle Track as in VLC.
+//   2026-11-12  Channel list (MediaPlayerForm.ChannelList.cs).
+//               SWEWOLF_VLC_LOG=1 writes LibVLC's own log into the timing log.
 
 using System.ComponentModel;
 using System.Drawing.Drawing2D;
@@ -109,7 +111,13 @@ namespace SwewolfMediaPlayer
                 SidPluginSetup.ConfigurePluginPath();
                 Core.Initialize();
                 OpenTimingLog.Write($"LibVLC load: Core.Initialize done after {watch.ElapsedMilliseconds} ms");
-                _libVlc = new LibVLC();
+                // For finding problems: with the environment variable SWEWOLF_VLC_LOG set, LibVLC's own messages go to the timing log.
+                bool vlcLog = !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("SWEWOLF_VLC_LOG"));
+                _libVlc = new LibVLC(vlcLog);
+                if (vlcLog)
+                {
+                    _libVlc.Log += (s, e) => OpenTimingLog.Write($"VLC {e.Level} [{e.Module}] {e.Message}");
+                }
                 OpenTimingLog.Write($"LibVLC load: engine created, total {watch.ElapsedMilliseconds} ms");
             });
         }
@@ -2058,6 +2066,8 @@ namespace SwewolfMediaPlayer
                 int id = track.Id;
                 subtitles.DropDownItems.Add(TrackItem(track.Name, id == currentSpu, () => ChooseSubtitle(id)));
             }
+            // Known problem with some streams: in a live HLS stream (e.g. Pluto TV) the subtitle list can be out of step with the picture, and LibVLC
+            // then waits for it, so the picture freezes until Stop and Play (found with LibVLC's log, 2026-11-12). Kept for now, to see which channels it helps.
             subtitles.Enabled = subtitles.DropDownItems.Count > 1;
             if (!onlyWithChoice || subtitles.DropDownItems.Count > 1)   // the first item is "Disable"
             {
