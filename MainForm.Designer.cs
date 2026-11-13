@@ -39,6 +39,7 @@
             menuNewVersion = new ToolStripMenuItem();
             menuIptv = new ToolStripMenuItem();
             menuOpenPlaylist = new ToolStripMenuItem();
+            menuMyRecordings = new ToolStripMenuItem();
             lblFile = new Label();
             txtFile = new TextBox();
             btnBrowse = new Button();
@@ -48,7 +49,7 @@
             //
             // menuStrip
             //
-            menuStrip.Items.AddRange(new ToolStripItem[] { menuTools, menuIptv, menuHelp, menuNewVersion });
+            menuStrip.Items.AddRange(new ToolStripItem[] { menuTools, menuIptv, menuMyRecordings, menuHelp, menuNewVersion });
             menuStrip.Location = new Point(0, 0);
             menuStrip.Name = "menuStrip";
             menuStrip.Size = new Size(754, 24);
@@ -89,6 +90,14 @@
             menuOpenPlaylist.Text = "Open Playlist";
             menuOpenPlaylist.ToolTipText = "Open the public IPTV channel list (iptv-org).";
             menuOpenPlaylist.Click += menuOpenPlaylist_Click;
+            //
+            // menuMyRecordings
+            //
+            menuMyRecordings.Name = "menuMyRecordings";
+            menuMyRecordings.Size = new Size(95, 20);
+            menuMyRecordings.Text = "My Recordings";
+            menuMyRecordings.Visible = false;
+            menuMyRecordings.DropDownOpening += menuMyRecordings_DropDownOpening;
             //
             // menuHelp
             //
@@ -199,6 +208,7 @@
         private ToolStripMenuItem menuNewVersion;
         private ToolStripMenuItem menuIptv;
         private ToolStripMenuItem menuOpenPlaylist;
+        private ToolStripMenuItem menuMyRecordings;
         private ToolStripMenuItem menuHelp;
         private ToolStripMenuItem menuAbout;
     }

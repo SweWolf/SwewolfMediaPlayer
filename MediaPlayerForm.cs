@@ -83,6 +83,7 @@
 //   2026-11-12  Channel list (MediaPlayerForm.ChannelList.cs).
 //               SWEWOLF_VLC_LOG=1 writes LibVLC's own log into the timing log.
 //   2026-11-12  Record button for streams (MediaPlayerForm.Record.cs, StreamRecorder.cs): records to a .ts file, watch it meanwhile, Stop saves an MP4.
+//   2026-11-12  A saved recording goes into My Recordings (RecordingStore.cs, MainForm.Recordings.cs, RecordingsForm.cs) and the library keeps its stream address.
 
 using System.ComponentModel;
 using System.Drawing.Drawing2D;

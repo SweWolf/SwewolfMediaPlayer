@@ -13,6 +13,7 @@ namespace SwewolfMediaPlayer
         {
             InitializeComponent();
             Icon = Program.LoadIcon();
+            RefreshRecordingsMenu();   // there only when a recording has been made
             if (!string.IsNullOrEmpty(initialPath))
             {
                 txtFile.Text = initialPath;

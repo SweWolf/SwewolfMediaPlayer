@@ -27,6 +27,7 @@ namespace SwewolfMediaPlayer
         private string? _channelUserAgentFor;          // the stream address that needs _channelUserAgent
         private string? _channelUserAgent;
         private bool _channelListShown = true;
+        private string? _channelListSource;            // the web address of the list the channels came from (null for a file); kept with a recording
 
         // Dock side of the lists: right by default, left when the user chose so.
         private DockStyle ListDock() => _settings.ListSide == 1 ? DockStyle.Left : DockStyle.Right;
@@ -64,6 +65,7 @@ namespace SwewolfMediaPlayer
                 return true;
             }
 
+            _channelListSource = Uri.TryCreate(pathOrUrl.Trim(), UriKind.Absolute, out Uri? listUri) && (listUri.Scheme == "http" || listUri.Scheme == "https") ? pathOrUrl.Trim() : null;
             ShowChannelList(entries);
             Text = Uri.TryCreate(pathOrUrl, UriKind.Absolute, out Uri? uri) && uri.Scheme.StartsWith("http") ? uri.Host : Path.GetFileName(pathOrUrl);
             ShowVideoMessage("Choose a channel in the list.");
@@ -116,6 +118,7 @@ namespace SwewolfMediaPlayer
         private void HideChannelList()
         {
             _channels = null;
+            _channelListSource = null;
             _channelIndex = -1;
             if (_pnlChannels != null)
             {

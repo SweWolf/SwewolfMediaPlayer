@@ -310,6 +310,7 @@ namespace SwewolfMediaPlayer
                 if (problem == null)
                 {
                     StreamRecorder.TryDelete(ts);
+                    RememberRecording(target, url, recorder);
                     message = (byUser ? "" : "The stream ended.\n") + $"The recording was saved:\n{target}";
                 }
                 else
@@ -364,6 +365,46 @@ namespace SwewolfMediaPlayer
             }
             ShowStopped();
             ShowVideoMessage(message);
+        }
+
+        // A recording that is saved goes into the list of My Recordings (RecordingStore), and the library remembers where the file came from: the
+        // stream address as its host address and the channel list as its referrer, which the explorer carries along when it renames or moves the file
+        // (that is how the list finds the file again, see RecordingStore.Locate). It never writes the library on a drive that has none yet.
+        private void RememberRecording(string target, string url, StreamRecorder recorder)
+        {
+            try
+            {
+                long size = new FileInfo(target).Length;
+                long duration = (long)(DateTime.Now - recorder.StartedAt).TotalMilliseconds;   // used when the file's own length cannot be read
+                try
+                {
+                    using TagLib.File tags = TagLib.File.Create(target);
+                    if (tags.Properties.Duration > TimeSpan.Zero)
+                    {
+                        duration = (long)tags.Properties.Duration.TotalMilliseconds;
+                    }
+                }
+                catch (Exception)
+                {
+                }
+
+                RecordingStore.Add(new RecordingEntry
+                {
+                    Path = target,
+                    Channel = StreamName(url),
+                    Url = url,
+                    ListUrl = _channelListSource,
+                    RecordedAt = recorder.StartedAt,
+                    DurationMs = duration,
+                    SizeBytes = size,
+                });
+                LibraryStore.SetItemInfo(target, url, _channelListSource, create: false);
+                RecLog($"Remembered in My Recordings: {target}");
+            }
+            catch (Exception ex)
+            {
+                RecLog($"Could not remember the recording: {ex.Message}");   // the recording itself is saved: this is only the list
+            }
         }
 
         // The player reached the end of the growing .ts file (the recording stood still for a moment): start again where it was.
