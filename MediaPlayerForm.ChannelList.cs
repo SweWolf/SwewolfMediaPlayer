@@ -245,8 +245,41 @@ namespace SwewolfMediaPlayer
                 _channelFilterTimer.Stop();
                 ApplyChannelFilter();
             };
+            // A × at the right end of the box clears it (shown only while there is text). The text keeps clear of it (right margin).
+            Color boxBack = _txtChannelFilter.BackColor, clearIdle = Color.FromArgb(160, 160, 160), clearHot = Color.White;
+            var clear = new Label
+            {
+                Dock = DockStyle.Right,
+                Width = LogicalToDeviceUnits(22),
+                ForeColor = clearIdle,
+                BackColor = boxBack,
+                Cursor = Cursors.Hand,
+                UseMnemonic = false,
+                Visible = false,
+            };
+            // The × is drawn as two lines exactly in the middle (the character of a font sits below the middle of its line).
+            clear.Paint += (s, e) =>
+            {
+                e.Graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+                float half = LogicalToDeviceUnits(4);
+                float cx = clear.ClientSize.Width / 2f, cy = clear.ClientSize.Height / 2f - 0.8f;   // measured: it sat 0.8 px below the middle of the box
+                using var pen = new Pen(clear.ForeColor, Math.Max(1.5f, LogicalToDeviceUnits(2) * 0.8f)) { StartCap = System.Drawing.Drawing2D.LineCap.Round, EndCap = System.Drawing.Drawing2D.LineCap.Round };
+                e.Graphics.DrawLine(pen, cx - half, cy - half, cx + half, cy + half);
+                e.Graphics.DrawLine(pen, cx - half, cy + half, cx + half, cy - half);
+            };
+            clear.MouseEnter += (s, e) => clear.ForeColor = clearHot;
+            clear.MouseLeave += (s, e) => clear.ForeColor = clearIdle;
+            clear.Click += (s, e) =>
+            {
+                _txtChannelFilter!.Clear();
+                _txtChannelFilter.Focus();
+            };
+            toolTip.SetToolTip(clear, "Clear the filter (Esc)");
+            _txtChannelFilter.Controls.Add(clear);
+            TextBoxStyle.ApplyRightMargin(_txtChannelFilter, 22);
             _txtChannelFilter.TextChanged += (s, e) =>
             {
+                clear.Visible = _txtChannelFilter.TextLength > 0;
                 _channelFilterTimer.Stop();   // wait until the typing pauses
                 _channelFilterTimer.Start();
             };

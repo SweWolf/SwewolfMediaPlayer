@@ -10,6 +10,7 @@
 //
 // History:
 //   2026-11-08  First version (SweWolf Media Player: the four boxes of the Trim group): margin and select all on keyboard focus.
+//   2026-11-12  ApplyRightMargin (space at the right end of the box, for a clear button inside it).
 
 using System.Runtime.InteropServices;
 
@@ -22,6 +23,7 @@ namespace SwewolfMediaPlayer
 
         private const int EM_SETMARGINS = 0xD3;
         private const int EC_LEFTMARGIN = 0x1;
+        private const int EC_RIGHTMARGIN = 0x2;
 
         // Both rules. marginDip: the space in device independent pixels at 96 dpi (4 is about half a character in the default font).
         public static void Apply(TextBox box, int marginDip = 4)
@@ -36,6 +38,23 @@ namespace SwewolfMediaPlayer
             {
                 int pixels = box.LogicalToDeviceUnits(marginDip);
                 SendMessage(box.Handle, EM_SETMARGINS, EC_LEFTMARGIN, pixels);
+            }
+
+            box.HandleCreated += (_, _) => Set();
+            box.DpiChangedAfterParent += (_, _) => Set();
+            if (box.IsHandleCreated)
+            {
+                Set();
+            }
+        }
+
+        // Space on the right of the text, for something that sits inside the right end of the box (a clear button). Same rules as the left margin.
+        public static void ApplyRightMargin(TextBox box, int marginDip)
+        {
+            void Set()
+            {
+                int pixels = box.LogicalToDeviceUnits(marginDip);
+                SendMessage(box.Handle, EM_SETMARGINS, EC_RIGHTMARGIN, pixels << 16);
             }
 
             box.HandleCreated += (_, _) => Set();
