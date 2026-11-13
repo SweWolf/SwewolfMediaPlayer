@@ -30,7 +30,12 @@ namespace SwewolfMediaPlayer
         // Raised (on a worker thread) when FFmpeg ends by itself: the stream ended or broke, or FFmpeg could not start the recording.
         public event Action? Exited;
 
-        public bool IsRunning => _process is { HasExited: false };
+        // True when the player itself writes the .ts file (LibVLC, from the connection it plays through) and FFmpeg is not involved until the file is
+        // converted: for streams that do not allow a second connection. Start and Stop then only keep the time and the state.
+        public bool InPlayer { get; }
+        private bool _playerRunning;
+
+        public bool IsRunning => InPlayer ? _playerRunning : _process is { HasExited: false };
 
         public StreamRecorder(string ffmpegPath, string url, string? userAgent, string tsPath)
         {
@@ -39,6 +44,17 @@ namespace SwewolfMediaPlayer
             _userAgent = userAgent ?? "";
             TsPath = tsPath;
         }
+
+        private StreamRecorder(string url, string tsPath)
+        {
+            _ffmpeg = "";
+            _userAgent = "";
+            Url = url;
+            TsPath = tsPath;
+            InPlayer = true;
+        }
+
+        public static StreamRecorder ForPlayer(string url, string tsPath) => new(url, tsPath);
 
         // The last thing FFmpeg said (for a message when nothing was recorded).
         public string LastMessage
@@ -55,6 +71,12 @@ namespace SwewolfMediaPlayer
         public bool Start(out string error)
         {
             error = "";
+            if (InPlayer)
+            {
+                StartedAt = DateTime.Now;
+                _playerRunning = true;
+                return true;
+            }
             try
             {
                 var info = new ProcessStartInfo(_ffmpeg)
@@ -122,6 +144,7 @@ namespace SwewolfMediaPlayer
         // Asks FFmpeg to finish ("q") and waits until it has closed the file.
         public async Task StopAsync()
         {
+            _playerRunning = false;
             Process? process = _process;
             if (process == null)
             {

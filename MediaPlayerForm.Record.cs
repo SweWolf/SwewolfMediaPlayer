@@ -11,8 +11,15 @@
 // saved in the same way. Closing the window while it records asks first. While it records, other files and channels cannot be opened.
 // A recording leaves no trace in the library (no read mark, no resume point). The seek bar and skip buttons are off while the .ts file plays.
 //
+// Some streams do not allow a second connection (an address with a token): FFmpeg is refused at once (404, 403). The quick check at the start sees
+// that, and the player records through its own connection instead (RecordMethod, StartPlayerRecordingAsync): the stream is stopped and opened again
+// with LibVLC writing the .ts file as it plays (sout duplicate). Then the live picture is what is shown (no pause, no seek bar, "REC" in the title
+// and the time label); everything else is the same, the MP4 is made from the .ts file when the recording ends. An address that only works once
+// cannot be opened again: the user is told so and the recording is given up.
+//
 // History:
 //   2026-11-12  First version.
+//   2026-11-12  Streams that refuse FFmpeg's second connection are recorded through the player's own connection.
 
 using LibVLCSharp.Shared;
 
@@ -94,14 +101,31 @@ namespace SwewolfMediaPlayer
             string ts = Path.Combine(folder, $"Recording {DateTime.Now:yyyy-MM-dd HH-mm-ss}.ts");
             string suggestion = $"{SafeFileName(StreamName(url))} {DateTime.Now:yyyy-MM-dd HH-mm}";
 
-            RecLog($"Record clicked: {url}, .ts file {ts}");
-            var recorder = new StreamRecorder(ffmpeg, url, url == _channelUserAgentFor ? _channelUserAgent : null, ts);
-            recorder.Exited += () => Post(OnRecorderExited);
+            RecLog($"Record clicked: {url}, .ts file {ts}, method {RecordWith}");
+            StreamRecorder recorder;
+            if (RecordWith == RecordMethod.PlayerOnly)
+            {
+                recorder = StreamRecorder.ForPlayer(url, ts);
+            }
+            else
+            {
+                recorder = new StreamRecorder(ffmpeg, url, url == _channelUserAgentFor ? _channelUserAgent : null, ts);
+                StreamRecorder own = recorder;
+                recorder.Exited += () => Post(() =>
+                {
+                    if (ReferenceEquals(_recorder, own))   // not the exit of a recorder that was given up (see the fallback below)
+                    {
+                        OnRecorderExited();
+                    }
+                });
+            }
+
             // Starting FFmpeg takes half a second: not on the UI thread.
             string error = "";
+            StreamRecorder starting = recorder;
             bool started = await Task.Run(() =>
             {
-                bool ok = recorder.Start(out string message);
+                bool ok = starting.Start(out string message);
                 error = message;
                 return ok;
             });
@@ -118,7 +142,38 @@ namespace SwewolfMediaPlayer
             _recorderEndedEarly = false;
             _recordFinishing = false;
             UpdateRecordButton();
-            RecLog("FFmpeg started, the name dialog is shown");
+
+            if (!recorder.InPlayer)
+            {
+                // The quick check: FFmpeg opens its own connection to the stream. If the server refuses it (404, 403, a token that only allows one
+                // connection: the player has that one) FFmpeg ends within a second or two with nothing. Then the player records instead.
+                if (!await FfmpegGetsDataAsync(recorder))
+                {
+                    string why = recorder.LastMessage;
+                    RecLog($"FFmpeg got no data from the stream: {why}");
+                    _recorder = null;
+                    recorder.Dispose();
+                    StreamRecorder.TryDelete(ts);
+                    if (RecordWith == RecordMethod.FfmpegOnly)
+                    {
+                        UpdateRecordButton();
+                        MessageBox.Show(this, $"The stream cannot be recorded.\n\n{(why.Length > 0 ? why : "FFmpeg could not read it.")}", AppName, MessageBoxButtons.OK, MessageBoxIcon.Information);
+                        return;
+                    }
+                    recorder = StreamRecorder.ForPlayer(url, ts);
+                    recorder.Start(out _);
+                    _recorder = recorder;
+                    _recorderEndedEarly = false;   // FFmpeg's refusal was just dealt with: its late "ended" notice must not stop the recording of the player
+                    UpdateRecordButton();
+                    ShowVideoMessage("The server does not allow a second connection.\nRecording through the player instead...");
+                }
+            }
+
+            if (recorder.InPlayer && !await StartPlayerRecordingAsync(url, ts))
+            {
+                return;   // the stream could not be opened again: said, and the recording is given up
+            }
+            RecLog(recorder.InPlayer ? "The player writes the .ts file, the name dialog is shown" : "FFmpeg started, the name dialog is shown");
 
             // The recording runs while the question is open.
             string? target = AskRecordingName(folder, suggestion);
@@ -139,10 +194,83 @@ namespace SwewolfMediaPlayer
                 return;
             }
 
+            if (recorder.InPlayer)
+            {
+                return;   // the live picture is what plays (it is the one connection), so there is no switch to the .ts file
+            }
             _recWatchTimer?.Dispose();
             _recWatchTimer = new System.Windows.Forms.Timer { Interval = 500 };
             _recWatchTimer.Tick += (_, _) => CheckRecordingReady();
             _recWatchTimer.Start();
+        }
+
+        // How a stream is recorded (2026-11-12). Auto: FFmpeg opens a connection of its own to the stream, and the file can be watched and sought in while
+        // it grows. Some servers allow only one connection at a time (a token in the address): FFmpeg is refused, and then the player records through the
+        // connection it has itself: the stream is restarted with LibVLC writing the .ts file as it plays (no pause and no seek bar then). FfmpegOnly /
+        // PlayerOnly use just one of the two. Change the value to switch; the environment variable SWEWOLF_RECORD_WITH (auto / ffmpeg / player) overrides it.
+        private enum RecordMethod { Auto, FfmpegOnly, PlayerOnly }
+
+        private static readonly RecordMethod RecordWith = Environment.GetEnvironmentVariable("SWEWOLF_RECORD_WITH")?.Trim().ToLowerInvariant() switch
+        {
+            "ffmpeg" => RecordMethod.FfmpegOnly,
+            "player" => RecordMethod.PlayerOnly,
+            _ => RecordMethod.Auto,
+        };
+
+        // The .ts file LibVLC writes while the stream plays (the stream address it is for is the one in _filePath): set while a recording through the player runs.
+        private string? _soutPath;
+
+        // True when FFmpeg got data from the stream (or is still connecting after a few seconds: that is no refusal), false when it ended with nothing.
+        private async Task<bool> FfmpegGetsDataAsync(StreamRecorder recorder)
+        {
+            for (int i = 0; i < 30; i++)   // up to 6 seconds
+            {
+                if (RecSize(recorder.TsPath) >= 64_000)
+                {
+                    return true;
+                }
+                if (!recorder.IsRunning)
+                {
+                    return RecSize(recorder.TsPath) >= 64_000;
+                }
+                await Task.Delay(200);
+            }
+            return true;
+        }
+
+        // Recording through the player: the stream is stopped and opened again with the option that makes LibVLC write what it plays into the .ts file as
+        // well (sout duplicate: one copy to the screen, one to the file). A server that allows one connection at a time lets the new connection in once the
+        // old one is closed. Returns false (and gives the recording up, with a message) when the stream does not play again.
+        private async Task<bool> StartPlayerRecordingAsync(string url, string ts)
+        {
+            _soutPath = ts;
+            await OpenAnotherAsync(url, url, false);
+            for (int i = 0; i < 60; i++)   // up to 12 seconds for the first data
+            {
+                if (RecSize(ts) >= 64_000)
+                {
+                    return true;
+                }
+                await Task.Delay(200);
+                if (IsDisposed || _recorder == null)
+                {
+                    return false;
+                }
+            }
+
+            RecLog("The player wrote no data in 12 seconds: the recording is given up");
+            StreamRecorder? recorder = _recorder;
+            _soutPath = null;
+            if (recorder != null)
+            {
+                await FinishRecordingAsync(true, discard: true, resumeLive: false);
+            }
+            if (!IsDisposed)
+            {
+                MessageBox.Show(this, "The stream could not be recorded.\n\nIt did not play again when it was opened for recording. The address may have expired or may only work once.", AppName,
+                    MessageBoxButtons.OK, MessageBoxIcon.Information);
+            }
+            return false;
         }
 
         // How much of the stream is in the .ts file that can be played: the time since the recording started, less a few seconds (FFmpeg writes its
@@ -255,6 +383,7 @@ namespace SwewolfMediaPlayer
             {
                 RecLog($"Finishing the recording failed: {ex}");
                 recorder.Dispose();
+                _soutPath = null;
                 _recorder = null;
                 _recordTarget = null;
                 _recordFinishing = false;
@@ -271,6 +400,7 @@ namespace SwewolfMediaPlayer
         {
             _recordFinishing = true;
             _recWatchTimer?.Stop();
+            _soutPath = null;   // the stream that plays again afterwards must not be written to the file
             RecLog($"Finishing the recording (by the user: {byUser}, discard: {discard}), the .ts file is {RecSize(recorder.TsPath):N0} bytes");
             string? target = discard ? null : _recordTarget;
             string url = recorder.Url;
@@ -448,7 +578,8 @@ namespace SwewolfMediaPlayer
         // A stream or a file that is not the recording cannot be opened while it records: it would have to stop the .ts file that plays.
         private bool BlockedByRecording(string path)
         {
-            if (_recorder == null || string.Equals(path, _recorder.TsPath, StringComparison.OrdinalIgnoreCase))
+            if (_recorder == null || string.Equals(path, _recorder.TsPath, StringComparison.OrdinalIgnoreCase)
+                || (_recorder.InPlayer && string.Equals(path, _recorder.Url, StringComparison.OrdinalIgnoreCase)))   // the player opens its own stream again for the recording
             {
                 return false;
             }

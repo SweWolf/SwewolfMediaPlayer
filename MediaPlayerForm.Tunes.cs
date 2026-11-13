@@ -121,9 +121,9 @@ namespace SwewolfMediaPlayer
 
         private string TitleBase()
         {
-            if (IsRecordingPlayback)
+            if (IsRecordingPlayback || _recorder is { InPlayer: true })
             {
-                return "REC - " + StreamName(_recorder!.Url);   // the .ts file of a recording plays
+                return "REC - " + StreamName(_recorder!.Url);   // the .ts file of a recording plays, or the player writes it while the stream plays
             }
             if (_isStream && _channels != null && _channelIndex >= 0 && _channelIndex < _channels.Count && _channels[_channelIndex].Url == _filePath)
             {

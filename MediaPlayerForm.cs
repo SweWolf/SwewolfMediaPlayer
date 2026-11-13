@@ -1182,6 +1182,13 @@ namespace SwewolfMediaPlayer
             LibraryOnEnded();
             MediaPlayer? player = _player;
 
+            // The stream that the player records through ended: the recording is over too (saved like one whose FFmpeg ended).
+            if (_recorder is { InPlayer: true } && !_recordFinishing)
+            {
+                OnRecorderExited();
+                return;
+            }
+
             // The end of the .ts file of a recording that still grows: not an end. Start again where it was (MediaPlayerForm.Record.cs).
             if (IsRecordingPlayback && _recorder is { IsRunning: true } && !_recordFinishing)
             {
@@ -1330,6 +1337,13 @@ namespace SwewolfMediaPlayer
                 _nextStartSeconds = null;
                 media.AddOption(string.Create(System.Globalization.CultureInfo.InvariantCulture, $":start-time={startAt:F3}"));   // the recording plays on from here
             }
+            if (isStream && _soutPath != null && _recorder is { InPlayer: true } && string.Equals(path, _recorder.Url, StringComparison.OrdinalIgnoreCase))
+            {
+                // Recording through the player: LibVLC writes what it plays into the .ts file too (MediaPlayerForm.Record.cs, RecordMethod).
+                string file = _soutPath.Replace('\\', '/');
+                media.AddOption($":sout=#duplicate{{dst=display,dst=std{{access=file,mux=ts,dst=\"{file}\"}}}}");
+                media.AddOption(":sout-keep");
+            }
             if (isStream && path == _channelUserAgentFor && !string.IsNullOrEmpty(_channelUserAgent))
             {
                 media.AddOption(":http-user-agent=" + _channelUserAgent);   // some streams of a channel list only play with the browser name they list
@@ -1400,7 +1414,7 @@ namespace SwewolfMediaPlayer
             {
                 _recLastTimeMs = timeMs;
             }
-            lblTime.Text = _isStream ? "LIVE  " + FormatTime(timeMs, _paused)
+            lblTime.Text = _isStream ? (_recorder is { InPlayer: true } ? "REC  " : "LIVE  ") + FormatTime(timeMs, _paused)
                 : IsRecordingPlayback ? "REC  " + FormatTime(timeMs, _paused) + (length > 0 ? " / " + FormatTime(length, false) : "")   // the length is what has been recorded so far
                 : length <= 0 ? FormatTime(timeMs, _paused)
                 : $"{FormatTime(timeMs, _paused)} / {FormatTime(length, false)}";
