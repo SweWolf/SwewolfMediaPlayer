@@ -83,6 +83,10 @@ namespace SwewolfMediaPlayer
         // Which side of the window the tune list and the channel list are on: 0 = right (the default), 1 = left.
         public int ListSide { get; set; }
 
+        // The folder of the last recording of a stream (the Record button): the Save As dialog starts there, and the .ts file is written there while
+        // it records. The Windows Videos folder until the first recording.
+        public string RecordFolder { get; set; } = Environment.GetFolderPath(Environment.SpecialFolder.MyVideos);
+
         // Whether the main window asks GitHub for a newer version when it starts.
         public bool CheckForUpdatesOnStartup { get; set; } = true;
 

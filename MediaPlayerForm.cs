@@ -82,6 +82,7 @@
 //   2026-10-27  Right-click menu: Video Track (files with several video streams), between Audio Track and Subtitle Track as in VLC.
 //   2026-11-12  Channel list (MediaPlayerForm.ChannelList.cs).
 //               SWEWOLF_VLC_LOG=1 writes LibVLC's own log into the timing log.
+//   2026-11-12  Record button for streams (MediaPlayerForm.Record.cs, StreamRecorder.cs): records to a .ts file, watch it meanwhile, Stop saves an MP4.
 
 using System.ComponentModel;
 using System.Drawing.Drawing2D;
@@ -194,6 +195,7 @@ namespace SwewolfMediaPlayer
             InitControlPanel();
             InitTuneControls();
             InitBookmarkButton();
+            InitRecordButton();
             foreach (TextBox box in new[] { txtStartAt, txtEndAt, txtFadeIn, txtFadeOut })
             {
                 TextBoxStyle.Apply(box);   // a little space before the text; Tab into a box selects all of its text
@@ -298,7 +300,7 @@ namespace SwewolfMediaPlayer
         internal async Task OpenAnotherAsync(string path, string libraryPath, bool checkList = true)
         {
             MediaPlayer? player = _player;
-            if (player == null || _trimming || _restoringEnd)
+            if (player == null || _trimming || _restoringEnd || BlockedByRecording(path))
             {
                 return;
             }
@@ -436,6 +438,7 @@ namespace SwewolfMediaPlayer
                 CheckPlayerState();
             };
             _rightClickTimer.Start();
+            StartUiWatchdog();
 
             _player!.Volume = trkVolume.Value;
             // An .m3u / .m3u8 address that is a list of channels shows the list instead of playing.
@@ -444,6 +447,36 @@ namespace SwewolfMediaPlayer
                 StartMedia();
             }
             ProcessPendingPipeCommands();   // the explorer asked for another file while the engine was loading
+        }
+
+        // The timer above ticks on the UI thread every 30 ms. A second thread watches it: if the ticks stop for more than 5 seconds the window is frozen,
+        // and the timing log says so (the last lines before it show what the program was doing). A freeze that never ends is otherwise not logged at all.
+        private System.Threading.Timer? _watchdog;
+        private bool _watchdogReported;
+
+        private void StartUiWatchdog()
+        {
+            _watchdog = new System.Threading.Timer(_ =>
+            {
+                long last = Volatile.Read(ref _lastUiTickTimestamp);
+                if (last == 0)
+                {
+                    return;
+                }
+                long gapMs = (System.Diagnostics.Stopwatch.GetTimestamp() - last) * 1000 / System.Diagnostics.Stopwatch.Frequency;
+                if (gapMs > 5000)
+                {
+                    if (!_watchdogReported)
+                    {
+                        _watchdogReported = true;
+                        OpenTimingLog.Write($"WATCHDOG: the UI thread has not answered for {gapMs} ms");
+                    }
+                }
+                else if (gapMs < 1000)
+                {
+                    _watchdogReported = false;
+                }
+            }, null, 2000, 2000);
         }
 
         // Makes the player (on the engine lib) and connects its events and the video window. Used when the window
@@ -604,14 +637,16 @@ namespace SwewolfMediaPlayer
         // Whether the user can jump around in the file: not in a stream, not in SID music (the plugin only
         // plays on) and not in anything else LibVLC reports as not seekable. When it is false the seek
         // bar is read-only (it still shows the progress) and frame stepping and trimming are off.
-        private bool CanSeek => !_isStream && !SidPluginSetup.IsSidFile(_filePath) && _vlcSeekable;
+        // Not in the .ts file of a recording either: it grows, so LibVLC does not know its length.
+        private bool CanSeek => !_isStream && !IsRecordingPlayback && !SidPluginSetup.IsSidFile(_filePath) && _vlcSeekable;
 
         private void ApplySeekState()
         {
             // What can never work for this file is hidden; the seek bar of a file that only plays on (SID music) stays
             // as a read-only progress bar. This runs again for every file opened in the window (drop, explorer).
             trkSeek.Enabled = CanSeek;
-            trkSeek.Visible = !_isStream;
+            trkSeek.Visible = !_isStream && !IsRecordingPlayback;
+            UpdateRecordButton();
             _skipShown = CanSeek;
             if (btnSkipBack != null && btnSkipForward != null)
             {
@@ -736,6 +771,13 @@ namespace SwewolfMediaPlayer
                 return;
             }
 
+            // A recording runs: ask first (it is stopped and saved before the window closes).
+            if (CancelCloseWhileRecording())
+            {
+                e.Cancel = true;
+                return;
+            }
+
             SavePosition(true);   // before the player is released: where the user stopped
             ReportClosed();
             _pipe?.Dispose();
@@ -747,6 +789,8 @@ namespace SwewolfMediaPlayer
             Application.RemoveMessageFilter(this);
             _rightClickTimer?.Dispose();
             _rightClickTimer = null;
+            _watchdog?.Dispose();
+            _watchdog = null;
 
             // Detach and release the player on a worker thread: stopping LibVLC from the
             // UI thread can deadlock.
@@ -1071,6 +1115,13 @@ namespace SwewolfMediaPlayer
             LibraryOnEnded();
             MediaPlayer? player = _player;
 
+            // The end of the .ts file of a recording that still grows: not an end. Start again where it was (MediaPlayerForm.Record.cs).
+            if (IsRecordingPlayback && _recorder is { IsRunning: true } && !_recordFinishing)
+            {
+                _ = ReopenRecordingAsync();
+                return;
+            }
+
             // The explorer is told. If it runs a playlist it sends the next file: the end actions below are not used.
             if (!_previewing && ReportEnded())
             {
@@ -1207,6 +1258,11 @@ namespace SwewolfMediaPlayer
         private Media CreateMedia(LibVLC lib, string path, bool isStream)
         {
             Media media = new(lib, path, isStream ? FromType.FromLocation : FromType.FromPath);
+            if (_nextStartSeconds is { } startAt && !isStream && IsRecordingPlayback)
+            {
+                _nextStartSeconds = null;
+                media.AddOption(string.Create(System.Globalization.CultureInfo.InvariantCulture, $":start-time={startAt:F3}"));   // the recording plays on from here
+            }
             if (isStream && path == _channelUserAgentFor && !string.IsNullOrEmpty(_channelUserAgent))
             {
                 media.AddOption(":http-user-agent=" + _channelUserAgent);   // some streams of a channel list only play with the browser name they list
@@ -1252,7 +1308,12 @@ namespace SwewolfMediaPlayer
         {
             // A stream has no real length (a live stream reports a fixed window): show only the time.
             long length = _lengthMs > 0 ? _lengthMs : _knownLengthMs;
+            if (IsRecordingPlayback && timeMs > 0)
+            {
+                _recLastTimeMs = timeMs;
+            }
             lblTime.Text = _isStream ? "LIVE  " + FormatTime(timeMs, _paused)
+                : IsRecordingPlayback ? "REC  " + FormatTime(timeMs, _paused)   // the .ts file grows: no length
                 : length <= 0 ? FormatTime(timeMs, _paused)
                 : $"{FormatTime(timeMs, _paused)} / {FormatTime(length, false)}";
             if (!_seeking && !_isStream && length > 0)
@@ -1278,6 +1339,12 @@ namespace SwewolfMediaPlayer
             if (_isStream && _player.IsPlaying)
             {
                 return;   // a stream cannot be paused (Stop is the way)
+            }
+
+            if (IsRecordingPlayback)
+            {
+                _player.SetPause(_player.IsPlaying);   // pauses only what is on the screen: the recording goes on (the length of the growing file is not known)
+                return;
             }
 
             _tuneAdvanceAtTicks = 0;   // the user decides now: no automatic next tune
@@ -2142,6 +2209,11 @@ namespace SwewolfMediaPlayer
 
         private void btnStop_Click(object? sender, EventArgs e)
         {
+            if (_recorder != null)
+            {
+                _ = FinishRecordingAsync(true);   // stops and saves the recording (MediaPlayerForm.Record.cs)
+                return;
+            }
             _tuneAdvanceAtTicks = 0;
             EndPreview(false);
             MediaPlayer? player = _player;
@@ -2355,7 +2427,7 @@ namespace SwewolfMediaPlayer
 
     // A button that draws its own icon, so it can be filled and take the colors of the dark theme.
     // BackColor is the button color, ForeColor the icon color.
-    internal enum IconKind { Play, Pause, Stop, Camera, Volume, Muted, PreviousTune, NextTune, More, Bookmark, PreviousChapter, NextChapter, Rewind, FastForward }
+    internal enum IconKind { Play, Pause, Stop, Camera, Volume, Muted, PreviousTune, NextTune, More, Bookmark, PreviousChapter, NextChapter, Rewind, FastForward, Record }
 
     internal sealed class IconButton : Button
     {
@@ -2422,6 +2494,9 @@ namespace SwewolfMediaPlayer
                     break;
                 case IconKind.Stop:
                     g.FillRectangle(brush, R(0.08f, 0.08f, 0.84f, 0.84f));
+                    break;
+                case IconKind.Record:   // a filled circle (the button is red)
+                    g.FillEllipse(brush, R(0.04f, 0.04f, 0.92f, 0.92f));
                     break;
                 case IconKind.PreviousChapter:   // a bar and one triangle, as VLC draws the chapter buttons
                     g.FillRectangle(brush, R(0.08f, 0.05f, 0.14f, 0.90f));

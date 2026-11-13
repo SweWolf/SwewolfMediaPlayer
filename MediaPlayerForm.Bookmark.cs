@@ -44,7 +44,7 @@ namespace SwewolfMediaPlayer
         // points of one file can be kept, with the start point in the Comment.
         private void AddBookmark()
         {
-            if (_player == null || _restoringEnd)
+            if (_player == null || _restoringEnd || IsRecordingPlayback)   // the .ts file of a recording is temporary
             {
                 return;
             }

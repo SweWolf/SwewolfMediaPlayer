@@ -121,6 +121,10 @@ namespace SwewolfMediaPlayer
 
         private string TitleBase()
         {
+            if (IsRecordingPlayback)
+            {
+                return "REC - " + StreamName(_recorder!.Url);   // the .ts file of a recording plays
+            }
             if (_isStream && _channels != null && _channelIndex >= 0 && _channelIndex < _channels.Count && _channels[_channelIndex].Url == _filePath)
             {
                 return _channels[_channelIndex].Name;   // a channel of the channel list
@@ -198,6 +202,11 @@ namespace SwewolfMediaPlayer
 
             int gap = LogicalToDeviceUnits(6);
             int x = btnStop.Right;
+            if (btnRecord != null && _recordShown)   // right of Stop; only for streams and while a recording runs
+            {
+                btnRecord.Left = x + gap;
+                x = btnRecord.Right;
+            }
             if (btnSkipBack != null && btnSkipForward != null && _skipShown)   // right of Stop; hidden for streams
             {
                 btnSkipBack.Left = x + gap;

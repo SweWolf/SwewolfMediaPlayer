@@ -103,6 +103,8 @@ namespace SwewolfMediaPlayer
             ApplyChannelFilter();
             _pnlChannels!.Visible = true;
             UpdateChannelPanelSide();
+            UpdateRecordButton();   // the list itself is not recorded: nothing plays until a channel is chosen
+            LayoutControlBar();
         }
 
         // A channel can be in several groups: "Entertainment;Family;General".
@@ -350,7 +352,7 @@ namespace SwewolfMediaPlayer
 
         private async Task PlayChannelAsync(int index)
         {
-            if (_channels == null || index < 0 || index >= _channels.Count || _player == null)
+            if (_channels == null || index < 0 || index >= _channels.Count || _player == null || BlockedByRecording(_channels[index].Url))
             {
                 return;
             }

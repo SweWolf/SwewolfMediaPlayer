@@ -80,7 +80,7 @@ namespace SwewolfMediaPlayer
 
         private void SetTrimVisible(bool visible)
         {
-            if (visible == _trimVisible)
+            if (visible == _trimVisible || visible && IsRecordingPlayback)   // not while a recording grows
             {
                 return;
             }
