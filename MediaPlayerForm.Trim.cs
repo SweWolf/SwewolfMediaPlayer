@@ -287,7 +287,7 @@ namespace SwewolfMediaPlayer
             // An ended or stopped player has to be started again first.
             if (player.State is VLCState.Stopped or VLCState.Ended or VLCState.Error or VLCState.NothingSpecial)
             {
-                await Task.Run(() => player.Stop());
+                await StopPlayerTask(player);
                 _pendingSeekMs = -1;
                 if (_player != player || !_previewing)
                 {

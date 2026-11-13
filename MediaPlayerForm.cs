@@ -344,11 +344,11 @@ namespace SwewolfMediaPlayer
             _lastSubtitleTrack = -1;
             _videoCheckDone = false;
             _playingSinceTicks = 0;
-            await Task.Run(() =>
+            await StopPlayerTask(player, () => oldMedia?.Dispose());
+            for (int i = 0; i < 100 && PlayerBusy; i++)
             {
-                player.Stop();
-                oldMedia?.Dispose();
-            });
+                await Task.Delay(50);   // another Stop is still running (Stop was clicked just before): Play must not meet it on the UI thread
+            }
             if (_player == player && !IsDisposed && await EnsureSidSupportAsync(false))
             {
                 StartMedia();
@@ -445,7 +445,10 @@ namespace SwewolfMediaPlayer
                 CheckRightClick();
                 CheckLeftClick();
                 CheckCursorIdle();
-                CheckPlayerState();
+                if (!PlayerBusy)
+                {
+                    CheckPlayerState();   // asks LibVLC a lot: not while a Stop runs (see StopPlayerTask)
+                }
             };
             _rightClickTimer.Start();
             StartUiWatchdog();
@@ -534,7 +537,7 @@ namespace SwewolfMediaPlayer
                 }
                 _paused = true;
                 ShowPlayPause(false);
-                if (_player != null)
+                if (_player != null && !PlayerBusy)
                 {
                     UpdateTime(_player.Time);
                 }
@@ -555,7 +558,7 @@ namespace SwewolfMediaPlayer
             });
             _player.LengthChanged += (s, a) => Post(() =>
             {
-                _lengthMs = a.Length;
+                _lengthMs = IsRecordingPlayback ? RecordedMs() : a.Length;   // the growing .ts file: LibVLC only knows its length from when it was opened
                 if (!_restoringEnd)
                 {
                     UpdateTime(0);
@@ -567,6 +570,10 @@ namespace SwewolfMediaPlayer
                 if (!_paused)
                 {
                     UpdateTime(a.Time);
+                }
+                if (PlayerBusy)
+                {
+                    return;   // the rest asks LibVLC (see StopPlayerTask)
                 }
                 ApplyAudioState();
                 ApplyResume();
@@ -647,15 +654,14 @@ namespace SwewolfMediaPlayer
         // Whether the user can jump around in the file: not in a stream, not in SID music (the plugin only
         // plays on) and not in anything else LibVLC reports as not seekable. When it is false the seek
         // bar is read-only (it still shows the progress) and frame stepping and trimming are off.
-        // Not in the .ts file of a recording either: it grows, so LibVLC does not know its length.
-        private bool CanSeek => !_isStream && !IsRecordingPlayback && !SidPluginSetup.IsSidFile(_filePath) && _vlcSeekable;
+        private bool CanSeek => !_isStream && !SidPluginSetup.IsSidFile(_filePath) && _vlcSeekable;
 
         private void ApplySeekState()
         {
             // What can never work for this file is hidden; the seek bar of a file that only plays on (SID music) stays
             // as a read-only progress bar. This runs again for every file opened in the window (drop, explorer).
             trkSeek.Enabled = CanSeek;
-            trkSeek.Visible = !_isStream && !IsRecordingPlayback;
+            trkSeek.Visible = !_isStream;
             UpdateRecordButton();
             _skipShown = CanSeek;
             if (btnSkipBack != null && btnSkipForward != null)
@@ -1089,6 +1095,31 @@ namespace SwewolfMediaPlayer
             toolTip.Active = true;
         }
 
+        // Stops the player on a worker thread (stopping on the UI thread can deadlock). While a Stop is running (_playerBusy) the UI thread must not
+        // call into LibVLC either: LibVLC lets one thread in at a time, and its Stop needs the window to go on (it takes down the video window), so a
+        // timer tick on the UI thread that waited for LibVLC froze the whole window for good (found 2026-11-12 with dotnet-stack: the UI thread in a
+        // LibVLC call from the 30 ms timer, a worker in MediaPlayer.Stop). The timer and the posted player events check _playerBusy.
+        private int _playerBusy;
+
+        private bool PlayerBusy => Volatile.Read(ref _playerBusy) != 0;
+
+        private Task StopPlayerTask(MediaPlayer player, Action? alsoOnWorker = null)
+        {
+            Interlocked.Increment(ref _playerBusy);
+            return Task.Run(() =>
+            {
+                try
+                {
+                    player.Stop();
+                    alsoOnWorker?.Invoke();
+                }
+                finally
+                {
+                    Interlocked.Decrement(ref _playerBusy);
+                }
+            });
+        }
+
         // LibVLC raises its events on its own threads: hand the work over to the UI thread.
         private void Post(Action action)
         {
@@ -1137,7 +1168,7 @@ namespace SwewolfMediaPlayer
             {
                 if (player != null)
                 {
-                    _ = Task.Run(player.Stop);   // let go of the file: the explorer may rename or move it at once
+                    _ = StopPlayerTask(player);   // let go of the file: the explorer may rename or move it at once
                 }
                 ShowStopped();
                 return;
@@ -1164,7 +1195,7 @@ namespace SwewolfMediaPlayer
             }
             if (!_previewing && EffectiveEndAction == EndAction.BlackScreen)
             {
-                _ = Task.Run(player.Stop);
+                _ = StopPlayerTask(player);
                 ShowStopped();
                 return;
             }
@@ -1182,7 +1213,7 @@ namespace SwewolfMediaPlayer
             try
             {
                 player.Mute = true;
-                await Task.Run(() => player.Stop());
+                await StopPlayerTask(player);
                 if (_player != player)
                 {
                     return;
@@ -1344,7 +1375,7 @@ namespace SwewolfMediaPlayer
                 _recLastTimeMs = timeMs;
             }
             lblTime.Text = _isStream ? "LIVE  " + FormatTime(timeMs, _paused)
-                : IsRecordingPlayback ? "REC  " + FormatTime(timeMs, _paused)   // the .ts file grows: no length
+                : IsRecordingPlayback ? "REC  " + FormatTime(timeMs, _paused) + (length > 0 ? " / " + FormatTime(length, false) : "")   // the length is what has been recorded so far
                 : length <= 0 ? FormatTime(timeMs, _paused)
                 : $"{FormatTime(timeMs, _paused)} / {FormatTime(length, false)}";
             if (!_seeking && !_isStream && length > 0)
@@ -1410,7 +1441,7 @@ namespace SwewolfMediaPlayer
                 return;
             }
 
-            await Task.Run(() => player.Stop());
+            await StopPlayerTask(player);
             if (_player != player)
             {
                 return;
@@ -2031,6 +2062,11 @@ namespace SwewolfMediaPlayer
                 ShowPlayPause(_player.IsPlaying);
             }
 
+            if (IsRecordingPlayback)
+            {
+                _lengthMs = RecordedMs();   // the seek bar grows with the recording
+            }
+
             CheckTunes();
             CheckChapters();
             CheckSpeed();
@@ -2250,7 +2286,7 @@ namespace SwewolfMediaPlayer
             MediaPlayer? player = _player;
             if (player != null)
             {
-                Task.Run(player.Stop);
+                _ = StopPlayerTask(player);
             }
         }
 

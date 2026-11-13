@@ -145,6 +145,13 @@ namespace SwewolfMediaPlayer
             _recWatchTimer.Start();
         }
 
+        // How much of the stream is in the .ts file that can be played: the time since the recording started, less a few seconds (FFmpeg writes its
+        // file in large pieces and needs a moment to connect), so a click at the right end of the seek bar lands where there is something to play.
+        private long RecordedMs()
+        {
+            return _recorder == null ? 0 : Math.Max(0, (long)(DateTime.Now - _recorder.StartedAt).TotalMilliseconds - 4000);
+        }
+
         // The usual Save As question: the dialog asks by itself what to do with a name that exists (replace it, or choose another name).
         private string? AskRecordingName(string folder, string suggestion)
         {
@@ -275,7 +282,7 @@ namespace SwewolfMediaPlayer
                 _tuneAdvanceAtTicks = 0;
                 EndPreview(false);
                 // The player lets go of the .ts file. LibVLC is not waited for longer than 8 seconds: a stuck Stop must not keep the recording open.
-                Task stopping = Task.Run(() => player.Stop());
+                Task stopping = StopPlayerTask(player);
                 if (await Task.WhenAny(stopping, Task.Delay(8000)) != stopping)
                 {
                     RecLog("The player did not stop within 8 seconds; going on without it");
@@ -344,7 +351,17 @@ namespace SwewolfMediaPlayer
                 return;
             }
 
-            // Stopped: Play watches it live again.
+            // Stopped: Play watches it live again. The player must hold the stream as its media now (it still has the .ts file, which is gone).
+            if (_player != null && _activeLib != null)
+            {
+                Media? old = _media;
+                _media = CreateMedia(_activeLib, url, true);
+                _player.Media = _media;
+                if (old != null)
+                {
+                    _ = Task.Run(old.Dispose);
+                }
+            }
             ShowStopped();
             ShowVideoMessage(message);
         }

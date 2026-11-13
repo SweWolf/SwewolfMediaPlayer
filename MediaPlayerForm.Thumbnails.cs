@@ -22,7 +22,7 @@ namespace SwewolfMediaPlayer
         private bool _thumbHover;
 
         private bool ThumbnailsWanted =>
-            _settings.ShowSeekBarThumbnails && !_isStream && _lengthMs > 0 && !IsAudioFile(_filePath)
+            _settings.ShowSeekBarThumbnails && !_isStream && !IsRecordingPlayback && _lengthMs > 0 && !IsAudioFile(_filePath)
             && _thumbFailures < 3 && FfmpegPath.Value != null;
 
         // The file changed (or was trimmed): forget everything about the old one.
