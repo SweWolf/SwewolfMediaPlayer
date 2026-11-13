@@ -363,6 +363,16 @@ namespace SwewolfMediaPlayer
                 TextAlign = ContentAlignment.MiddleLeft,
             };
 
+            // A small X in the upper right corner closes the list (Show Channel List in the right-click menu of the video opens it again); red when the pointer is over it,
+            // like the one of the Control Panel and Trim group boxes (CloseXButton.cs, the same as in the explorer).
+            var closeList = new CloseXButton { Size = new Size(LogicalToDeviceUnits(22), LogicalToDeviceUnits(20)) };
+            void PlaceClose() => closeList.Location = new Point(_lblChannelsHeader.ClientSize.Width - closeList.Width - LogicalToDeviceUnits(6), (_lblChannelsHeader.ClientSize.Height - closeList.Height) / 2);
+            _lblChannelsHeader.Controls.Add(closeList);
+            _lblChannelsHeader.SizeChanged += (s, e) => PlaceClose();
+            PlaceClose();
+            closeList.Click += (s, e) => SetChannelListShown(false);
+            toolTip.SetToolTip(closeList, "Close the Channel List");
+
             _pnlChannels = new Panel
             {
                 Dock = ListDock(),
