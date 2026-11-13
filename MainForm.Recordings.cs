@@ -35,7 +35,7 @@ namespace SwewolfMediaPlayer
             foreach (RecordingEntry entry in RecordingStore.All().Take(9))
             {
                 RecordingEntry captured = entry;
-                var item = new ToolStripMenuItem($"&{number} {entry.Name.Replace("&", "&&")}") { ToolTipText = entry.Path };
+                var item = new ToolStripMenuItem($"&{number}. {entry.Name.Replace("&", "&&")}") { ToolTipText = entry.Path };   // "1. Name": the number key opens it
                 item.Click += (_, _) => OpenRecording(captured);
                 items.Add(item);
                 number++;
