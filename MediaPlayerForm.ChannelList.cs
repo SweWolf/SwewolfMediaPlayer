@@ -10,6 +10,7 @@
 // History:
 //   2026-11-12  First version.
 //   2026-11-13  "Recently Watched" in the group drop-down: the last 10 channels that really played, newest first (RecentChannels.cs).
+//   2026-11-13  "Favorites" group (right-click: Add to Favorites / Remove from Favorites), before Recently Watched (FavoriteChannels.cs).
 
 namespace SwewolfMediaPlayer
 {
@@ -28,6 +29,7 @@ namespace SwewolfMediaPlayer
         private string? _channelUserAgentFor;          // the stream address that needs _channelUserAgent
         private string? _channelUserAgent;
         private bool _channelListShown = true;
+        private const string FavoritesGroupName = "Favorites";   // first item after "All Groups": the channels the user marked
         private const string RecentGroupName = "Recently Watched";   // second item of the group drop-down: the last 10 channels that played
         private string? _channelListSource;            // the web address of the list the channels came from (null for a file); kept with a recording
 
@@ -96,6 +98,7 @@ namespace SwewolfMediaPlayer
             _cboChannelGroup!.BeginUpdate();
             _cboChannelGroup.Items.Clear();
             _cboChannelGroup.Items.Add("All Groups");
+            _cboChannelGroup.Items.Add(FavoritesGroupName);
             _cboChannelGroup.Items.Add(RecentGroupName);
             foreach (string group in _channelGroups)
             {
@@ -157,11 +160,24 @@ namespace SwewolfMediaPlayer
 
             string[] words = _txtChannelFilter!.Text.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
             int selected = _cboChannelGroup!.SelectedIndex;
-            bool recent = selected == 1;
-            string? group = selected > 1 ? _channelGroups[selected - 2] : null;
+            bool favorites = selected == 1;
+            bool recent = selected == 2;
+            string? group = selected > 2 ? _channelGroups[selected - 3] : null;
 
             var rows = new List<object>();
-            if (recent)
+            if (favorites)
+            {
+                // In the order of the list; only those that this list has.
+                HashSet<string> urls = FavoriteChannels.All().ToHashSet(StringComparer.OrdinalIgnoreCase);
+                for (int i = 0; i < _channels.Count; i++)
+                {
+                    if (urls.Contains(_channels[i].Url) && (words.Length == 0 || words.All(w => _channels[i].Name.Contains(w, StringComparison.CurrentCultureIgnoreCase))))
+                    {
+                        rows.Add(i);
+                    }
+                }
+            }
+            else if (recent)
             {
                 // The most recently watched first (not in the order of the list); only those that this list has.
                 foreach (string url in RecentChannels.All())
@@ -316,7 +332,7 @@ namespace SwewolfMediaPlayer
             };
             _cboChannelGroup.SelectedIndexChanged += (s, e) => ApplyChannelFilter();
             toolTip.SetToolTip(_txtChannelFilter, "Type a part of a channel name to show only the channels that match.\nSeveral words must all be in the name.");
-            toolTip.SetToolTip(_cboChannelGroup, "Show only the channels of one group, or the last 10 channels you watched.");
+            toolTip.SetToolTip(_cboChannelGroup, "Show only the channels of one group, your favorites, or the last 10 channels you watched.");
 
             var filterRow = new Panel
             {
@@ -428,6 +444,27 @@ namespace SwewolfMediaPlayer
                     // Another program has the clipboard just now: nothing was copied.
                 }
             };
+            var favorite = new ToolStripMenuItem("Add to Favorites");
+            favorite.Click += (_, _) =>
+            {
+                if (url == null)
+                {
+                    return;
+                }
+                if (FavoriteChannels.Contains(url))
+                {
+                    FavoriteChannels.Remove(url);
+                }
+                else
+                {
+                    FavoriteChannels.Add(url);
+                }
+                if (_cboChannelGroup?.SelectedIndex == 1)
+                {
+                    ApplyChannelFilter();   // a channel removed from the Favorites list leaves it at once
+                }
+            };
+            menu.Items.Add(favorite);
             menu.Items.Add(copy);
             StyleMenu(menu);
             menu.Opening += (_, e) =>
@@ -442,6 +479,7 @@ namespace SwewolfMediaPlayer
                 }
                 url = _channels[index].Url;
                 copy.ToolTipText = url;
+                favorite.Text = FavoriteChannels.Contains(url) ? "Remove from Favorites" : "Add to Favorites";
             };
             return menu;
         }
@@ -477,7 +515,7 @@ namespace SwewolfMediaPlayer
             if (playing >= 2)
             {
                 RecentChannels.Add(channel.Url);
-                if (_cboChannelGroup?.SelectedIndex == 1)
+                if (_cboChannelGroup?.SelectedIndex == 2)
                 {
                     ApplyChannelFilter();
                 }
