@@ -35,14 +35,13 @@ namespace SwewolfMediaPlayer
             form.ShowDialog(this);
         }
 
-        // The public channel list of the iptv-org project. For now it is the one list in the menu; the same as typing the address in the
-        // box and clicking Open (the list is kept on disk and checked for changes, see M3uPlaylist.cs).
+        // The public channel list of the iptv-org project. For now it is the one list in the menu. It opens like an address typed in the
+        // box and opened, but the box is left as it is (the list is kept on disk and checked for changes, see M3uPlaylist.cs).
         private const string IptvPlaylistUrl = "https://iptv-org.github.io/iptv/index.m3u";
 
         private void menuOpenPlaylist_Click(object? sender, EventArgs e)
         {
-            txtFile.Text = IptvPlaylistUrl;
-            btnOpen.PerformClick();
+            OpenMedia(IptvPlaylistUrl);
         }
 
         private void menuAbout_Click(object? sender, EventArgs e)
@@ -171,8 +170,12 @@ namespace SwewolfMediaPlayer
 
         private void btnOpen_Click(object? sender, EventArgs e)
         {
-            string path = txtFile.Text.Trim().Trim('"');
+            OpenMedia(txtFile.Text.Trim().Trim('"'));
+        }
 
+        // Opens a file or web address in a player window. Used by Open and by the IPTV menu (which leaves the box alone).
+        private void OpenMedia(string path)
+        {
             // A web address (a stream) is not checked: only files must exist.
             if (!MediaPlayerForm.TryGetStreamUri(path, out _) && !File.Exists(path))
             {
