@@ -81,6 +81,18 @@ namespace SwewolfMediaPlayer
                 return;
             }
 
+            // The recording that is made right now is watched like the live stream was: no saved choice, and no subtitles turned on
+            // by the default (a TV stream carries several subtitle tracks, and nobody asked for one).
+            if (IsRecordingPlayback)
+            {
+                if (player.Spu >= 0)
+                {
+                    player.SetSpu(-1);
+                }
+                _audioApplied = _subtitleApplied = _videoApplied = true;
+                return;
+            }
+
             if (_isStream || SidPluginSetup.IsSidFile(_filePath))
             {
                 _audioApplied = _subtitleApplied = _videoApplied = true;
