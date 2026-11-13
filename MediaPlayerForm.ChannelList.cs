@@ -229,6 +229,7 @@ namespace SwewolfMediaPlayer
                     _ = PlayChannelAsync((int)_lstChannels.Items[row]);
                 }
             };
+            _lstChannels.ContextMenuStrip = CreateChannelMenu();
 
             _txtChannelFilter = new TextBox
             {
@@ -351,6 +352,45 @@ namespace SwewolfMediaPlayer
             Color text = current ? Color.FromArgb(120, 190, 255) : Color.FromArgb(230, 230, 230);
             TextRenderer.DrawText(e.Graphics, channel.Name, e.Font, nameBounds, text, flags | TextFormatFlags.Bottom);
             TextRenderer.DrawText(e.Graphics, channel.Group.Replace(";", ", "), e.Font, groupBounds, Color.FromArgb(150, 150, 150), flags | TextFormatFlags.Top);
+        }
+
+        // The right-click menu of a channel row: Copy Stream Address puts the address of the stream (the https link) on the clipboard.
+        private ContextMenuStrip CreateChannelMenu()
+        {
+            string? url = null;   // the address of the row the menu was opened on
+            var menu = new ContextMenuStrip();
+            var copy = new ToolStripMenuItem("Copy Stream Address");
+            copy.Click += (_, _) =>
+            {
+                if (url == null)
+                {
+                    return;
+                }
+                try
+                {
+                    Clipboard.SetText(url);
+                }
+                catch (System.Runtime.InteropServices.ExternalException)
+                {
+                    // Another program has the clipboard just now: nothing was copied.
+                }
+            };
+            menu.Items.Add(copy);
+            StyleMenu(menu);
+            menu.Opening += (_, e) =>
+            {
+                // Only over a row: which one is found from where the pointer is.
+                int row = _lstChannels!.IndexFromPoint(_lstChannels.PointToClient(Cursor.Position));
+                int index = row >= 0 ? (int)_lstChannels.Items[row] : -1;
+                if (_channels == null || index < 0 || index >= _channels.Count)
+                {
+                    e.Cancel = true;
+                    return;
+                }
+                url = _channels[index].Url;
+                copy.ToolTipText = url;
+            };
+            return menu;
         }
 
         private async Task PlayChannelAsync(int index)
