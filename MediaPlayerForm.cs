@@ -1262,6 +1262,13 @@ namespace SwewolfMediaPlayer
         // silently and pause on the last frame it can show. Play then starts from the beginning.
         private async void OnEndReached()
         {
+            // The .ts file of a recording that was ended has played out (see FinishRecordingCoreAsync): the recording code takes it from here.
+            if (_tsPlayedOut != null)
+            {
+                _tsPlayedOut.TrySetResult();
+                return;
+            }
+
             LibraryOnEnded();
             MediaPlayer? player = _player;
 

@@ -80,6 +80,12 @@ namespace SwewolfMediaPlayer
             if (_recorder != null)
             {
                 // The Record button toggles: it ends the recording and goes back to the live stream. (Stop saves it and stops everything.)
+                // At once, so the click is seen; the message of the saved file replaces it later (it goes by itself after 2 seconds if nothing else has).
+                if (!_recordFinishing)
+                {
+                    ShowVideoMessage(RecordingStoppedText);
+                    HideStartedMessage(2000, RecordingStoppedText);
+                }
                 await FinishRecordingAsync(true, resumeLive: true);
                 return;
             }
@@ -219,11 +225,13 @@ namespace SwewolfMediaPlayer
         private const string RecordingStartedText = "Recording started\n(short interruptions may occur)";
 
         // Hides the "Recording started" message after a delay, unless another message has replaced it.
-        private void HideStartedMessage(int delayMs)
+        private const string RecordingStoppedText = "Recording stopped";
+
+        private void HideStartedMessage(int delayMs, string text = RecordingStartedText)
         {
             void Hide()
             {
-                if (!IsDisposed && _loadingText == RecordingStartedText)
+                if (!IsDisposed && _loadingText == text)
                 {
                     HideLoading();
                 }
@@ -416,6 +424,7 @@ namespace SwewolfMediaPlayer
                 RecLog($"Finishing the recording failed: {ex}");
                 recorder.Dispose();
                 _soutPath = null;
+                _tsPlayedOut = null;
                 _recorder = null;
                 _recordTarget = null;
                 _recordFinishing = false;
@@ -425,6 +434,21 @@ namespace SwewolfMediaPlayer
                     MessageBox.Show(this, $"The recording could not be finished.\n\n{ex.Message}\n\nThe .ts file may still be there:\n{recorder.TsPath}", AppName,
                         MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 }
+            }
+        }
+
+        // Set while the .ts file plays on after the recording was ended: OnEndReached completes it when the file has played out.
+        private TaskCompletionSource? _tsPlayedOut;
+
+        // The player lets go of the .ts file. LibVLC is not waited for longer than 8 seconds: a stuck Stop must not keep the recording open.
+        private async Task StopPlayerForRecordingAsync(MediaPlayer player)
+        {
+            _tuneAdvanceAtTicks = 0;
+            EndPreview(false);
+            Task stopping = StopPlayerTask(player);
+            if (await Task.WhenAny(stopping, Task.Delay(8000)) != stopping)
+            {
+                RecLog("The player did not stop within 8 seconds; going on without it");
             }
         }
 
@@ -439,19 +463,20 @@ namespace SwewolfMediaPlayer
             string ts = recorder.TsPath;
 
             MediaPlayer? player = keepPlaying ? null : _player;   // keepPlaying: the live stream is on its own connection and goes on playing
-            if (player != null)
+            // Record clicked again: the .ts file goes on playing, as far as it reaches, while FFmpeg closes it and it is converted. The player is stopped
+            // when the file has played out or the MP4 file is ready, whichever comes first. (Paused or not playing: stopped at once.)
+            bool playOn = player != null && resumeLive && !discard && IsRecordingPlayback && player.IsPlaying;
+            if (playOn)
             {
-                _tuneAdvanceAtTicks = 0;
-                EndPreview(false);
-                // The player lets go of the .ts file. LibVLC is not waited for longer than 8 seconds: a stuck Stop must not keep the recording open.
-                Task stopping = StopPlayerTask(player);
-                if (await Task.WhenAny(stopping, Task.Delay(8000)) != stopping)
-                {
-                    RecLog("The player did not stop within 8 seconds; going on without it");
-                }
+                _tsPlayedOut = new TaskCompletionSource();
+                RecLog("The .ts file goes on playing while the recording is finished");
+            }
+            else if (player != null)
+            {
+                await StopPlayerForRecordingAsync(player);
             }
 
-            if (!keepPlaying)
+            if (!keepPlaying && !playOn)
             {
                 ShowVideoMessage(discard ? "Canceling the recording..." : "Finishing the recording...");
             }
@@ -468,9 +493,24 @@ namespace SwewolfMediaPlayer
             }
             else
             {
-                ShowVideoMessage("Converting the recording to MP4...");
                 RecLog($"Converting {size:N0} bytes to {target}");
-                string? problem = await StreamRecorder.ConvertToMp4Async(FfmpegPath.Value ?? "ffmpeg", ts, target);
+                Task<string?> converting = StreamRecorder.ConvertToMp4Async(FfmpegPath.Value ?? "ffmpeg", ts, target);
+                if (playOn)
+                {
+                    Task playedOut = _tsPlayedOut!.Task;
+                    Task first = await Task.WhenAny(converting, playedOut, Task.Delay(60000));   // the minute: a file that never ends must not keep it open
+                    RecLog(first == converting ? "The MP4 file is ready before the .ts file has played out" : "The .ts file has played out (or the wait ended)");
+                    _tsPlayedOut = null;
+                    if (player != null && ReferenceEquals(player, _player))
+                    {
+                        await StopPlayerForRecordingAsync(player);
+                    }
+                }
+                if (!converting.IsCompleted)
+                {
+                    ShowVideoMessage("Converting the recording to MP4...");
+                }
+                string? problem = await converting;
                 RecLog(problem == null ? "Converted" : $"The conversion failed: {problem}");
                 if (problem == null)
                 {
@@ -485,6 +525,15 @@ namespace SwewolfMediaPlayer
                     {
                         MessageBox.Show(this, message, AppName, MessageBoxButtons.OK, MessageBoxIcon.Warning);
                     }
+                }
+            }
+
+            if (playOn && _tsPlayedOut != null)
+            {
+                _tsPlayedOut = null;   // nothing was converted: the player is stopped now
+                if (player != null && ReferenceEquals(player, _player))
+                {
+                    await StopPlayerForRecordingAsync(player);
                 }
             }
 
