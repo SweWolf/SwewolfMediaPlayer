@@ -180,7 +180,9 @@ namespace SwewolfMediaPlayer
             if (target == null)
             {
                 RecLog("The name dialog was canceled: the recording is discarded");
-                await FinishRecordingAsync(true, discard: true);   // Cancel: no recording
+                // Cancel: no recording. FFmpeg has its own connection, so the live picture keeps playing without a break. When the player itself
+                // writes the file it was restarted for the recording, so it opens the live stream again.
+                await FinishRecordingAsync(true, discard: true, resumeLive: recorder.InPlayer, keepPlaying: !recorder.InPlayer);
                 return;
             }
 
@@ -193,6 +195,17 @@ namespace SwewolfMediaPlayer
                 await FinishRecordingAsync(false);
                 return;
             }
+
+            // Tell that it records, and that a short break in the picture is nothing wrong (the player switches to the file a few seconds from now).
+            const string startedText = "Recording startedText\n(short interruptions may occur)";
+            ShowVideoMessage(startedText);
+            _ = Task.Delay(5000).ContinueWith(_ => Post(() =>
+            {
+                if (!IsDisposed && _loadingText == startedText)   // not when another message has replaced it
+                {
+                    HideLoading();
+                }
+            }));
 
             if (recorder.InPlayer)
             {
@@ -367,7 +380,7 @@ namespace SwewolfMediaPlayer
         // Ends the recording: the player lets go of the .ts file, FFmpeg closes it, and it becomes the MP4 file. discard: no file is made.
         // Whatever goes wrong, the recording is over afterwards (so Stop and Close never get stuck), and the .ts file is kept.
         // resumeLive: afterwards the live stream plays again (the message stays on the screen for a few seconds first), instead of the player being stopped.
-        private async Task FinishRecordingAsync(bool byUser, bool discard = false, bool resumeLive = false)
+        private async Task FinishRecordingAsync(bool byUser, bool discard = false, bool resumeLive = false, bool keepPlaying = false)
         {
             StreamRecorder? recorder = _recorder;
             if (recorder == null || _recordFinishing)
@@ -377,7 +390,7 @@ namespace SwewolfMediaPlayer
 
             try
             {
-                await FinishRecordingCoreAsync(recorder, byUser, discard, resumeLive);
+                await FinishRecordingCoreAsync(recorder, byUser, discard, resumeLive, keepPlaying);
             }
             catch (Exception ex)
             {
@@ -396,7 +409,7 @@ namespace SwewolfMediaPlayer
             }
         }
 
-        private async Task FinishRecordingCoreAsync(StreamRecorder recorder, bool byUser, bool discard, bool resumeLive)
+        private async Task FinishRecordingCoreAsync(StreamRecorder recorder, bool byUser, bool discard, bool resumeLive, bool keepPlaying)
         {
             _recordFinishing = true;
             _recWatchTimer?.Stop();
@@ -406,7 +419,7 @@ namespace SwewolfMediaPlayer
             string url = recorder.Url;
             string ts = recorder.TsPath;
 
-            MediaPlayer? player = _player;
+            MediaPlayer? player = keepPlaying ? null : _player;   // keepPlaying: the live stream is on its own connection and goes on playing
             if (player != null)
             {
                 _tuneAdvanceAtTicks = 0;
@@ -419,7 +432,10 @@ namespace SwewolfMediaPlayer
                 }
             }
 
-            ShowVideoMessage(discard ? "Canceling the recording..." : "Finishing the recording...");
+            if (!keepPlaying)
+            {
+                ShowVideoMessage(discard ? "Canceling the recording..." : "Finishing the recording...");
+            }
             await recorder.StopAsync();
             RecLog("FFmpeg has stopped");
 
@@ -459,6 +475,12 @@ namespace SwewolfMediaPlayer
             _recordFinishing = false;
             if (IsDisposed)
             {
+                return;
+            }
+
+            if (keepPlaying)
+            {
+                UpdateRecordButton();   // nothing else changes: the picture was never interrupted
                 return;
             }
 
