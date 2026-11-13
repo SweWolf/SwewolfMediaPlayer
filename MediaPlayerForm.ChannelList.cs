@@ -9,6 +9,7 @@
 //
 // History:
 //   2026-11-12  First version.
+//   2026-11-13  "Recently Watched" in the group drop-down: the last 10 channels that really played, newest first (RecentChannels.cs).
 
 namespace SwewolfMediaPlayer
 {
@@ -27,6 +28,7 @@ namespace SwewolfMediaPlayer
         private string? _channelUserAgentFor;          // the stream address that needs _channelUserAgent
         private string? _channelUserAgent;
         private bool _channelListShown = true;
+        private const string RecentGroupName = "Recently Watched";   // second item of the group drop-down: the last 10 channels that played
         private string? _channelListSource;            // the web address of the list the channels came from (null for a file); kept with a recording
 
         // Dock side of the lists: right by default, left when the user chose so.
@@ -94,6 +96,7 @@ namespace SwewolfMediaPlayer
             _cboChannelGroup!.BeginUpdate();
             _cboChannelGroup.Items.Clear();
             _cboChannelGroup.Items.Add("All Groups");
+            _cboChannelGroup.Items.Add(RecentGroupName);
             foreach (string group in _channelGroups)
             {
                 _cboChannelGroup.Items.Add(group);
@@ -153,21 +156,38 @@ namespace SwewolfMediaPlayer
             }
 
             string[] words = _txtChannelFilter!.Text.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-            string? group = _cboChannelGroup!.SelectedIndex > 0 ? _channelGroups[_cboChannelGroup.SelectedIndex - 1] : null;
+            int selected = _cboChannelGroup!.SelectedIndex;
+            bool recent = selected == 1;
+            string? group = selected > 1 ? _channelGroups[selected - 2] : null;
 
             var rows = new List<object>();
-            for (int i = 0; i < _channels.Count; i++)
+            if (recent)
             {
-                M3uEntry channel = _channels[i];
-                if (group != null && !GroupsOf(channel).Contains(group, StringComparer.OrdinalIgnoreCase))
+                // The most recently watched first (not in the order of the list); only those that this list has.
+                foreach (string url in RecentChannels.All())
                 {
-                    continue;
+                    int i = _channels.FindIndex(c => string.Equals(c.Url, url, StringComparison.OrdinalIgnoreCase));
+                    if (i >= 0 && (words.Length == 0 || words.All(w => _channels[i].Name.Contains(w, StringComparison.CurrentCultureIgnoreCase))))
+                    {
+                        rows.Add(i);
+                    }
                 }
-                if (words.Length > 0 && !words.All(w => channel.Name.Contains(w, StringComparison.CurrentCultureIgnoreCase)))
+            }
+            else
+            {
+                for (int i = 0; i < _channels.Count; i++)
                 {
-                    continue;
+                    M3uEntry channel = _channels[i];
+                    if (group != null && !GroupsOf(channel).Contains(group, StringComparer.OrdinalIgnoreCase))
+                    {
+                        continue;
+                    }
+                    if (words.Length > 0 && !words.All(w => channel.Name.Contains(w, StringComparison.CurrentCultureIgnoreCase)))
+                    {
+                        continue;
+                    }
+                    rows.Add(i);   // the row holds the number of the entry
                 }
-                rows.Add(i);   // the row holds the number of the entry
             }
 
             _lstChannels.BeginUpdate();
@@ -176,8 +196,8 @@ namespace SwewolfMediaPlayer
             _lstChannels.EndUpdate();
             _lblChannelsHeader!.Text = rows.Count == _channels.Count ? $"Channels ({rows.Count:N0})" : $"Channels ({rows.Count:N0} of {_channels.Count:N0})";
 
-            // Keep the channel that plays in view when it is in the list.
-            int at = _channelIndex >= 0 ? rows.IndexOf(_channelIndex) : -1;
+            // Keep the channel that plays in view when it is in the list (not in the recent list: the newest is on top).
+            int at = _channelIndex >= 0 && !recent ? rows.IndexOf(_channelIndex) : -1;
             if (at >= 0)
             {
                 _lstChannels.TopIndex = Math.Max(0, at - Math.Max(1, _lstChannels.ClientSize.Height / _lstChannels.ItemHeight) / 2);
@@ -296,7 +316,7 @@ namespace SwewolfMediaPlayer
             };
             _cboChannelGroup.SelectedIndexChanged += (s, e) => ApplyChannelFilter();
             toolTip.SetToolTip(_txtChannelFilter, "Type a part of a channel name to show only the channels that match.\nSeveral words must all be in the name.");
-            toolTip.SetToolTip(_cboChannelGroup, "Show only the channels of one group.");
+            toolTip.SetToolTip(_cboChannelGroup, "Show only the channels of one group, or the last 10 channels you watched.");
 
             var filterRow = new Panel
             {
@@ -442,8 +462,27 @@ namespace SwewolfMediaPlayer
 
             await OpenAnotherAsync(channel.Url, channel.Url, false);
 
-            // A stream that never starts (dead, blocked in this country) gives no error of its own: say so.
-            await Task.Delay(15000);
+            // A stream that never starts (dead, blocked in this country) gives no error of its own. Only a channel that really plays
+            // (two checks in a row, half a second apart) goes on the Recently Watched list; after 15 seconds without that we say so.
+            int playing = 0;
+            for (int waited = 0; waited < 15000 && playing < 2; waited += 500)
+            {
+                await Task.Delay(500);
+                if (IsDisposed || _channelIndex != index || _player == null)
+                {
+                    return;
+                }
+                playing = _player.IsPlaying ? playing + 1 : 0;
+            }
+            if (playing >= 2)
+            {
+                RecentChannels.Add(channel.Url);
+                if (_cboChannelGroup?.SelectedIndex == 1)
+                {
+                    ApplyChannelFilter();
+                }
+                return;
+            }
             if (!IsDisposed && _channelIndex == index && _player != null && !_player.IsPlaying && _channelListShown)
             {
                 ShowVideoMessage($"{channel.Name} does not seem to play.\nMany channels in such lists are offline or blocked. Try another one.");
