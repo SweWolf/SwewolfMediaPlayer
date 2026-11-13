@@ -216,13 +216,18 @@ namespace SwewolfMediaPlayer
         // so the video area says what is going on until the file plays. There is no setting for it yet.
         private Label? _loadingLabel;
 
+        // How a message in the video area looks (2026-11-12): true = a black box around the text only, in the middle of the video area, so a picture
+        // that already plays stays visible around it; false = the whole video area is covered in black (the way it was before). There is no setting
+        // for it: change this value to go back.
+        private static readonly bool MessageAsBox = true;
+
         private void ShowLoading(string text)
         {
             if (_loadingLabel == null)
             {
                 _loadingLabel = new Label
                 {
-                    Dock = DockStyle.Fill,
+                    Dock = MessageAsBox ? DockStyle.None : DockStyle.Fill,
                     BackColor = Color.Black,
                     ForeColor = Color.Gainsboro,
                     TextAlign = ContentAlignment.MiddleCenter,
@@ -230,6 +235,7 @@ namespace SwewolfMediaPlayer
                     UseMnemonic = false,
                 };
                 Controls.Add(_loadingLabel);
+                videoView.SizeChanged += (_, _) => PositionLoadingLabel();   // the box stays in the middle when the window changes size
             }
             _loadingText = text;
             ApplyLoadingText();
@@ -262,7 +268,26 @@ namespace SwewolfMediaPlayer
                 _loadingLabel.Text = _slowLoadHint
                     ? _loadingText + "\n\nStarting is taking longer than usual.\nYour security software is probably checking the program files. This is normal after an update,\nand the next start is usually much faster."
                     : _loadingText;
+                PositionLoadingLabel();
             }
+        }
+
+        // The box (MessageAsBox): as large as its text needs (long texts wrap at 80 percent of the video area), in the middle of the video area.
+        private void PositionLoadingLabel()
+        {
+            if (!MessageAsBox || _loadingLabel == null)
+            {
+                return;
+            }
+
+            Rectangle area = videoView.Bounds;
+            int maxWidth = Math.Max(LogicalToDeviceUnits(200), area.Width * 8 / 10);
+            Padding pad = new(LogicalToDeviceUnits(28), LogicalToDeviceUnits(18), LogicalToDeviceUnits(28), LogicalToDeviceUnits(18));
+            _loadingLabel.Padding = pad;
+            _loadingLabel.AutoSize = false;
+            Size size = _loadingLabel.GetPreferredSize(new Size(maxWidth, 0));
+            size.Width = Math.Min(size.Width, maxWidth);
+            _loadingLabel.Bounds = new Rectangle(area.Left + (area.Width - size.Width) / 2, area.Top + (area.Height - size.Height) / 2, size.Width, size.Height);
         }
 
         // A message that must stay a little longer (the recording was saved) holds the hiding back until this time.
