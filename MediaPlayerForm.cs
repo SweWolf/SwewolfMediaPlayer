@@ -194,6 +194,7 @@ namespace SwewolfMediaPlayer
         {
             InitializeComponent();
             InitControlPanel();
+            InitStreamInfo();
             InitTuneControls();
             InitBookmarkButton();
             InitRecordButton();
@@ -960,9 +961,13 @@ namespace SwewolfMediaPlayer
                 return true;
             }
             // Escape hides the group box that has the focus; when none of them has it, all of them.
-            if (keyData == Keys.Escape && (_panelVisible || _trimVisible))
+            if (keyData == Keys.Escape && (_panelVisible || _trimVisible || _streamInfoVisible))
             {
-                if (_panelVisible && IsInside(ActiveControl, grpControlPanel))
+                if (_streamInfoVisible && _grpStreamInfo != null && IsInside(ActiveControl, _grpStreamInfo))
+                {
+                    SetStreamInfoVisible(false);
+                }
+                else if (_panelVisible && IsInside(ActiveControl, grpControlPanel))
                 {
                     SetPanelVisible(false);
                 }
@@ -974,6 +979,7 @@ namespace SwewolfMediaPlayer
                 {
                     SetPanelVisible(false);
                     SetTrimVisible(false);
+                    SetStreamInfoVisible(false);
                 }
                 return true;
             }
@@ -1108,6 +1114,10 @@ namespace SwewolfMediaPlayer
             pnlControls.Visible = !fullScreen;
             grpTrim.Visible = _trimVisible && !fullScreen;
             grpControlPanel.Visible = _panelVisible && !fullScreen;
+            if (_grpStreamInfo != null)
+            {
+                _grpStreamInfo.Visible = _streamInfoVisible && !fullScreen;
+            }
 
             // Changing the border style makes a new window, which shows the normal pointer again: forget that it was
             // hidden, and count the pointer as idle already, so it is hidden again at once (until it moves or clicks).

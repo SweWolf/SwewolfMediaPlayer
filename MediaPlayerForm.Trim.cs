@@ -66,6 +66,10 @@ namespace SwewolfMediaPlayer
             mnuShowTrim.Enabled = CanSeek && !_trimming;
             mnuShowTrim.Checked = _trimVisible;
             mnuShowControlPanel.Checked = _panelVisible;
+            if (_mnuShowStreamInfo != null)
+            {
+                _mnuShowStreamInfo.Checked = _streamInfoVisible;
+            }
         }
 
         private void mnuShowTrim_Click(object? sender, EventArgs e)
@@ -106,7 +110,8 @@ namespace SwewolfMediaPlayer
         private void UpdateMinimumSize()
         {
             int width = LogicalToDeviceUnits(_trimVisible ? 880 : 840);
-            int height = LogicalToDeviceUnits(200) + (_trimVisible ? grpTrim.Height : 0) + (_panelVisible ? grpControlPanel.Height : 0);
+            int height = LogicalToDeviceUnits(200) + (_trimVisible ? grpTrim.Height : 0) + (_panelVisible ? grpControlPanel.Height : 0)
+                + (_streamInfoVisible && _grpStreamInfo != null ? _grpStreamInfo.Height : 0);
             MinimumSize = SizeFromClientSize(new Size(width, height));
         }
 
