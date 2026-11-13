@@ -376,7 +376,8 @@ namespace SwewolfMediaPlayer
             {
                 await Task.Delay(50);   // another Stop is still running (Stop was clicked just before): Play must not meet it on the UI thread
             }
-            if (_player == player && !IsDisposed && await EnsureSidSupportAsync(false))
+            // (_player is another one than player when the old one was stuck and has been replaced: see StopPlayerTask.)
+            if (_player != null && !IsDisposed && await EnsureSidSupportAsync(false))
             {
                 StartMedia();
             }
@@ -525,6 +526,7 @@ namespace SwewolfMediaPlayer
         {
             _activeLib = lib;
             _player = new MediaPlayer(lib);
+            MediaPlayer mine = _player;   // the handlers below compare with this one (the sender of a LibVLCSharp event is not the player itself)
             // Timing log: when LibVLC reports the first steps of opening (these events come on LibVLC's own threads).
             _player.Opening += (s, a) => OpenTimingLog.Write($"LibVLC: Opening ({_openWatch?.ElapsedMilliseconds} ms after Play was called)");
             _player.Playing += (s, a) =>
@@ -544,8 +546,13 @@ namespace SwewolfMediaPlayer
             };
             // Without this the native video window swallows the mouse, and no right-click menu opens.
             _player.EnableMouseInput = false;
+            // The events of a player that was given up (see StopPlayerTask) must not change what the new one shows: each handler checks that its player is still the current one.
             _player.Playing += (s, a) => Post(() =>
             {
+                if (!ReferenceEquals(mine, _player))
+                {
+                    return;
+                }
                 HideLoading();
                 if (_restoringEnd)
                 {
@@ -558,7 +565,7 @@ namespace SwewolfMediaPlayer
             });
             _player.Paused += (s, a) => Post(() =>
             {
-                if (_restoringEnd)
+                if (!ReferenceEquals(mine, _player) || _restoringEnd)
                 {
                     return;
                 }
@@ -572,12 +579,18 @@ namespace SwewolfMediaPlayer
             });
             _player.Stopped += (s, a) => Post(() =>
             {
-                if (!_restoringEnd)
+                if (!_restoringEnd && ReferenceEquals(mine, _player))
                 {
                     ShowStopped();
                 }
             });
-            _player.EndReached += (s, a) => Post(OnEndReached);
+            _player.EndReached += (s, a) => Post(() =>
+            {
+                if (ReferenceEquals(mine, _player))
+                {
+                    OnEndReached();
+                }
+            });
             _player.SeekableChanged += (s, a) => Post(() =>
             {
                 _vlcSeekable = a.Seekable != 0;
@@ -594,6 +607,10 @@ namespace SwewolfMediaPlayer
             // While paused the label is driven by seeking and frame stepping, not by LibVLC.
             _player.TimeChanged += (s, a) => Post(() =>
             {
+                if (!ReferenceEquals(mine, _player))
+                {
+                    return;
+                }
                 if (!_paused)
                 {
                     UpdateTime(a.Time);
@@ -1139,10 +1156,18 @@ namespace SwewolfMediaPlayer
 
         private bool PlayerBusy => Volatile.Read(ref _playerBusy) != 0;
 
-        private Task StopPlayerTask(MediaPlayer player, Action? alsoOnWorker = null)
+        //
+        // A Stop that never comes back (found 2026-11-13 on SVT1: after switching the subtitles on, the stream hung inside LibVLC, and then neither
+        // Stop nor another channel worked, because every later Stop waited for the first one) is given StopTimeoutMs. After that the player is
+        // abandoned: it is left to its worker (and disposed if it ever finishes), and a new MediaPlayer takes over the video window, with
+        // the same address, stopped. So Stop and Play, or another channel, work again.
+        private const int StopTimeoutMs = 6000;
+
+        private async Task StopPlayerTask(MediaPlayer player, Action? alsoOnWorker = null)
         {
             Interlocked.Increment(ref _playerBusy);
-            return Task.Run(() =>
+            int settled = 0;   // 1 = the worker or the rescue has already taken this Stop off the busy count
+            Task worker = Task.Run(() =>
             {
                 try
                 {
@@ -1151,9 +1176,57 @@ namespace SwewolfMediaPlayer
                 }
                 finally
                 {
-                    Interlocked.Decrement(ref _playerBusy);
+                    if (Interlocked.Exchange(ref settled, 1) == 0)
+                    {
+                        Interlocked.Decrement(ref _playerBusy);
+                    }
                 }
             });
+
+            if (await Task.WhenAny(worker, Task.Delay(StopTimeoutMs)) == worker)
+            {
+                await worker;
+                return;
+            }
+
+            if (Interlocked.Exchange(ref settled, 1) == 0)
+            {
+                Interlocked.Decrement(ref _playerBusy);
+                ReplaceStuckPlayer(player, worker);
+            }
+        }
+
+        // The player did not stop in time: see StopPlayerTask. Runs on the UI thread.
+        private void ReplaceStuckPlayer(MediaPlayer stuck, Task worker)
+        {
+            OpenTimingLog.Write($"STUCK: MediaPlayer.Stop did not finish in {StopTimeoutMs} ms, a new player takes over");
+            // Whatever the old player does later, it is let go of without anyone waiting for it.
+            _ = worker.ContinueWith(_ =>
+            {
+                try
+                {
+                    stuck.Dispose();
+                }
+                catch (Exception ex) when (ex is not OutOfMemoryException)
+                {
+                    // Nothing more to do for a player that was given up.
+                }
+            }, TaskScheduler.Default);
+
+            if (IsDisposed || !ReferenceEquals(_player, stuck) || _activeLib == null)
+            {
+                return;
+            }
+
+            AttachPlayer(_activeLib);   // the old player is left in the video window by being replaced there
+            _player!.Volume = trkVolume.Value;
+            if (!string.IsNullOrEmpty(_filePath))
+            {
+                _media = CreateMedia(_activeLib, _filePath, _isStream);
+                _player.Media = _media;   // so that Play starts the same address again
+            }
+            _mediaStartsAtEnd = false;
+            ShowStopped();
         }
 
         // LibVLC raises its events on its own threads: hand the work over to the UI thread.
@@ -1386,16 +1459,19 @@ namespace SwewolfMediaPlayer
             }
         }
 
-        private void EnsureCleanMedia(MediaPlayer player)
+        // force: a stream that is started again always gets a new Media. The old one remembers the tracks and the state of the adaptive stream
+        // (found 2026-11-13 on SVT1: after choosing a subtitle the audio or the picture was gone, and Stop and Play with the same Media did not bring
+        // it back, while another channel and back, which makes a new Media, did).
+        private void EnsureCleanMedia(MediaPlayer player, bool force = false)
         {
-            if (!_mediaStartsAtEnd || _activeLib == null)
+            if (!(_mediaStartsAtEnd || force) || _activeLib == null)
             {
                 return;
             }
 
             _mediaStartsAtEnd = false;
             Media? old = _media;
-            _media = CreateMedia(_activeLib, _filePath, false);
+            _media = CreateMedia(_activeLib, _filePath, _isStream);
             player.Media = _media;
             if (old != null)
             {
@@ -1488,6 +1564,15 @@ namespace SwewolfMediaPlayer
             MediaPlayer? player = _player;
             if (player == null)
             {
+                return;
+            }
+
+            // A stream is started again in exactly the way a click on its channel starts it (found 2026-11-13 on SVT1: Stop and then Play on the same
+            // player gave only the sound, while a click on the channel in the list always worked).
+            if (_isStream && !string.IsNullOrEmpty(_filePath))
+            {
+                OpenTimingLog.Write("Play after Stop on a stream: opened again like a click on the channel");
+                await OpenAnotherAsync(_filePath, _libraryPath, false);
                 return;
             }
 
