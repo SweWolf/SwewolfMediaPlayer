@@ -11,6 +11,7 @@
 //   2026-11-12  First version.
 //   2026-11-13  "Recently Watched" in the group drop-down: the last 10 channels that really played, newest first (RecentChannels.cs).
 //   2026-11-13  "Favorites" group (right-click: Add to Favorites / Remove from Favorites), before Recently Watched (FavoriteChannels.cs).
+//   2026-11-13  A gold star on the rows of the favorites (ShowFavoriteStars, a setting later).
 
 namespace SwewolfMediaPlayer
 {
@@ -29,6 +30,9 @@ namespace SwewolfMediaPlayer
         private string? _channelUserAgentFor;          // the stream address that needs _channelUserAgent
         private string? _channelUserAgent;
         private bool _channelListShown = true;
+        // A gold star on the rows of the favorites. A setting for this may come later: it will replace this property.
+        private bool ShowFavoriteStars => true;
+        private HashSet<string> _favoriteUrls = new(StringComparer.OrdinalIgnoreCase);   // FavoriteChannels in memory, for drawing the rows
         private const string FavoritesGroupName = "Favorites";   // first item after "All Groups": the channels the user marked
         private const string RecentGroupName = "Recently Watched";   // second item of the group drop-down: the last 10 channels that played
         private string? _channelListSource;            // the web address of the list the channels came from (null for a file); kept with a recording
@@ -89,6 +93,7 @@ namespace SwewolfMediaPlayer
         private void ShowChannelList(List<M3uEntry> entries)
         {
             _channels = entries;
+            _favoriteUrls = FavoriteChannels.All().ToHashSet(StringComparer.OrdinalIgnoreCase);
             _channelIndex = -1;
             _channelListShown = true;
             EnsureChannelList();
@@ -373,6 +378,27 @@ namespace SwewolfMediaPlayer
             Controls.SetChildIndex(_pnlChannels, Controls.GetChildIndex(grpControlPanel));
         }
 
+        // A filled five-pointed star, drawn as a polygon so that it does not depend on a font.
+        private static void DrawStar(Graphics g, Rectangle box)
+        {
+            var points = new PointF[10];
+            float cx = box.Left + box.Width / 2f, cy = box.Top + box.Height / 2f + box.Height * 0.04f;
+            float outer = box.Width / 2f, inner = outer * 0.42f;
+            for (int i = 0; i < 10; i++)
+            {
+                double angle = -Math.PI / 2 + i * Math.PI / 5;
+                float r = i % 2 == 0 ? outer : inner;
+                points[i] = new PointF(cx + (float)(r * Math.Cos(angle)), cy + (float)(r * Math.Sin(angle)));
+            }
+            var oldMode = g.SmoothingMode;
+            g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+            using (var brush = new SolidBrush(Color.FromArgb(255, 200, 40)))
+            {
+                g.FillPolygon(brush, points);
+            }
+            g.SmoothingMode = oldMode;
+        }
+
         private void DrawChannelRow(object? sender, DrawItemEventArgs e)
         {
             if (e.Index < 0 || _channels == null || _logos == null)
@@ -415,7 +441,15 @@ namespace SwewolfMediaPlayer
             // Name above, group below in grey.
             int left = box.Right + pad;
             int half = e.Bounds.Height / 2;
-            var nameBounds = new Rectangle(left, e.Bounds.Top + 2, Math.Max(0, e.Bounds.Right - left - pad), half - 2);
+            int textRight = e.Bounds.Right - pad;
+            if (ShowFavoriteStars && _favoriteUrls.Contains(channel.Url))
+            {
+                int starSize = LogicalToDeviceUnits(14);
+                var starBox = new Rectangle(e.Bounds.Right - pad - starSize, e.Bounds.Top + (e.Bounds.Height - starSize) / 2, starSize, starSize);
+                DrawStar(e.Graphics, starBox);
+                textRight = starBox.Left - pad / 2;
+            }
+            var nameBounds = new Rectangle(left, e.Bounds.Top + 2, Math.Max(0, textRight - left), half - 2);
             var groupBounds = new Rectangle(left, e.Bounds.Top + half, nameBounds.Width, half - 2);
             const TextFormatFlags flags = TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix | TextFormatFlags.SingleLine;
             Color text = current ? Color.FromArgb(120, 190, 255) : Color.FromArgb(230, 230, 230);
@@ -459,10 +493,12 @@ namespace SwewolfMediaPlayer
                 {
                     FavoriteChannels.Add(url);
                 }
+                _favoriteUrls = FavoriteChannels.All().ToHashSet(StringComparer.OrdinalIgnoreCase);
                 if (_cboChannelGroup?.SelectedIndex == 1)
                 {
                     ApplyChannelFilter();   // a channel removed from the Favorites list leaves it at once
                 }
+                _lstChannels?.Invalidate();
             };
             menu.Items.Add(favorite);
             menu.Items.Add(copy);
