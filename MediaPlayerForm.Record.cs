@@ -102,6 +102,10 @@ namespace SwewolfMediaPlayer
             string suggestion = $"{SafeFileName(StreamName(url))} {DateTime.Now:yyyy-MM-dd HH-mm}";
 
             RecLog($"Record clicked: {url}, .ts file {ts}, method {RecordWith}");
+
+            // At once, so the click is seen (the name dialog comes after a few seconds, when it is known that the stream can be recorded), and a
+            // short break in the picture is nothing wrong (the player may switch to the file or restart the stream).
+            ShowVideoMessage(RecordingStartedText);
             StreamRecorder recorder;
             if (RecordWith == RecordMethod.PlayerOnly)
             {
@@ -133,6 +137,7 @@ namespace SwewolfMediaPlayer
             {
                 RecLog($"FFmpeg could not be started: {error}");
                 recorder.Dispose();
+                HideStartedMessage(0);
                 MessageBox.Show(this, $"The recording could not be started.\n\n{error}", AppName, MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
             }
@@ -157,6 +162,7 @@ namespace SwewolfMediaPlayer
                     if (RecordWith == RecordMethod.FfmpegOnly)
                     {
                         UpdateRecordButton();
+                        HideStartedMessage(0);
                         MessageBox.Show(this, $"The stream cannot be recorded.\n\n{(why.Length > 0 ? why : "FFmpeg could not read it.")}", AppName, MessageBoxButtons.OK, MessageBoxIcon.Information);
                         return;
                     }
@@ -179,6 +185,7 @@ namespace SwewolfMediaPlayer
             string? target = AskRecordingName(folder, suggestion);
             if (target == null)
             {
+                HideStartedMessage(0);
                 RecLog("The name dialog was canceled: the recording is discarded");
                 // Cancel: no recording. FFmpeg has its own connection, so the live picture keeps playing without a break. When the player itself
                 // writes the file it was restarted for the recording, so it opens the live stream again.
@@ -196,16 +203,8 @@ namespace SwewolfMediaPlayer
                 return;
             }
 
-            // Tell that it records, and that a short break in the picture is nothing wrong (the player switches to the file a few seconds from now).
-            const string startedText = "Recording startedText\n(short interruptions may occur)";
-            ShowVideoMessage(startedText);
-            _ = Task.Delay(5000).ContinueWith(_ => Post(() =>
-            {
-                if (!IsDisposed && _loadingText == startedText)   // not when another message has replaced it
-                {
-                    HideLoading();
-                }
-            }));
+            // The name is chosen: the message stays a little longer, then goes (it is the warning that the picture may break now).
+            HideStartedMessage(3000);
 
             if (recorder.InPlayer)
             {
@@ -215,6 +214,26 @@ namespace SwewolfMediaPlayer
             _recWatchTimer = new System.Windows.Forms.Timer { Interval = 500 };
             _recWatchTimer.Tick += (_, _) => CheckRecordingReady();
             _recWatchTimer.Start();
+        }
+
+        private const string RecordingStartedText = "Recording started\n(short interruptions may occur)";
+
+        // Hides the "Recording started" message after a delay, unless another message has replaced it.
+        private void HideStartedMessage(int delayMs)
+        {
+            void Hide()
+            {
+                if (!IsDisposed && _loadingText == RecordingStartedText)
+                {
+                    HideLoading();
+                }
+            }
+            if (delayMs <= 0)
+            {
+                Hide();
+                return;
+            }
+            _ = Task.Delay(delayMs).ContinueWith(_ => Post(Hide));
         }
 
         // How a stream is recorded (2026-11-12). Auto: FFmpeg opens a connection of its own to the stream, and the file can be watched and sought in while
