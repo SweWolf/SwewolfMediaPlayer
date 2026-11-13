@@ -72,7 +72,8 @@ namespace SwewolfMediaPlayer
         {
             if (_recorder != null)
             {
-                await FinishRecordingAsync(true);
+                // The Record button toggles: it ends the recording and goes back to the live stream. (Stop saves it and stops everything.)
+                await FinishRecordingAsync(true, resumeLive: true);
                 return;
             }
             if (_player == null || !_isStream || !_recordShown || _restoringEnd)
@@ -230,7 +231,8 @@ namespace SwewolfMediaPlayer
 
         // Ends the recording: the player lets go of the .ts file, FFmpeg closes it, and it becomes the MP4 file. discard: no file is made.
         // Whatever goes wrong, the recording is over afterwards (so Stop and Close never get stuck), and the .ts file is kept.
-        private async Task FinishRecordingAsync(bool byUser, bool discard = false)
+        // resumeLive: afterwards the live stream plays again (the message stays on the screen for a few seconds first), instead of the player being stopped.
+        private async Task FinishRecordingAsync(bool byUser, bool discard = false, bool resumeLive = false)
         {
             StreamRecorder? recorder = _recorder;
             if (recorder == null || _recordFinishing)
@@ -240,7 +242,7 @@ namespace SwewolfMediaPlayer
 
             try
             {
-                await FinishRecordingCoreAsync(recorder, byUser, discard);
+                await FinishRecordingCoreAsync(recorder, byUser, discard, resumeLive);
             }
             catch (Exception ex)
             {
@@ -258,7 +260,7 @@ namespace SwewolfMediaPlayer
             }
         }
 
-        private async Task FinishRecordingCoreAsync(StreamRecorder recorder, bool byUser, bool discard)
+        private async Task FinishRecordingCoreAsync(StreamRecorder recorder, bool byUser, bool discard, bool resumeLive)
         {
             _recordFinishing = true;
             _recWatchTimer?.Stop();
@@ -322,11 +324,27 @@ namespace SwewolfMediaPlayer
                 return;
             }
 
-            // Back to the stream, stopped: Play watches it live again.
+            // Back to the stream.
             _filePath = url;
             _isStream = TryGetStreamUri(url, out _);
             ApplySeekState();
             Text = TitleBase();
+            if (resumeLive && _player != null && _activeLib != null)
+            {
+                // It plays live again at once; the message stays over it for 4 seconds (see HideLoading).
+                Media? old = _media;
+                _media = null;
+                ShowVideoMessage(message);
+                _holdMessageUntilTicks = Environment.TickCount64 + 4000;
+                StartMedia();
+                if (old != null)
+                {
+                    _ = Task.Run(old.Dispose);
+                }
+                return;
+            }
+
+            // Stopped: Play watches it live again.
             ShowStopped();
             ShowVideoMessage(message);
         }

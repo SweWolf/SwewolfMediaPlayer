@@ -265,8 +265,18 @@ namespace SwewolfMediaPlayer
             }
         }
 
+        // A message that must stay a little longer (the recording was saved) holds the hiding back until this time.
+        private long _holdMessageUntilTicks;
+
         private void HideLoading()
         {
+            long remaining = _holdMessageUntilTicks - Environment.TickCount64;
+            if (remaining > 0)
+            {
+                _ = Task.Delay((int)remaining + 50).ContinueWith(_ => Post(HideLoading));
+                return;
+            }
+
             _slowLoadTimer?.Stop();
             _slowLoadTimer?.Dispose();
             _slowLoadTimer = null;
