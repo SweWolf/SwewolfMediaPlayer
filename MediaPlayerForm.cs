@@ -1277,11 +1277,32 @@ namespace SwewolfMediaPlayer
             {
                 media.AddOption(":http-user-agent=" + _channelUserAgent);   // some streams of a channel list only play with the browser name they list
             }
-            if (!isStream && string.Equals(Path.GetExtension(path), ".gif", StringComparison.OrdinalIgnoreCase))
+            if (!isStream && (string.Equals(Path.GetExtension(path), ".gif", StringComparison.OrdinalIgnoreCase) || IsGrowingTransportStream(path)))
             {
                 media.AddOption(":demux=avformat");
             }
             return media;
+        }
+
+        // A transport stream file that another program is still writing (a download, a recording). LibVLC's own TS reader looks at the end of the
+        // file when it opens it, is confused by a file that grows, and says it is over before anything plays (the same file copied plays fine,
+        // found 2026-11-12). The FFmpeg demuxer does not do that. "Still writing" = changed in the last 20 seconds.
+        private static bool IsGrowingTransportStream(string path)
+        {
+            string ext = Path.GetExtension(path);
+            if (!ext.Equals(".ts", StringComparison.OrdinalIgnoreCase) && !ext.Equals(".m2ts", StringComparison.OrdinalIgnoreCase)
+                && !ext.Equals(".mts", StringComparison.OrdinalIgnoreCase))
+            {
+                return false;
+            }
+            try
+            {
+                return (DateTime.Now - File.GetLastWriteTime(path)).TotalSeconds < 20;
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                return false;
+            }
         }
 
         private void EnsureCleanMedia(MediaPlayer player)
