@@ -7,6 +7,7 @@
 //   2026-10-16  Resume (Yes / Ask / No) is its own drop-down; the length box is hidden, not disabled, when it does not apply.
 //   2026-10-16  Move the Resume Point Back by N seconds (default 10).
 //   2026-10-16  Resume = No hides the other settings of the group.
+//   2026-11-13  "Save Resume Point for" is the checkbox Resume Audio Files (off by default) with the minimum length in minutes.
 //   2026-10-23  Cover Picture Size for Music Files (Medium / Maximum) in the Player group.
 //   2026-10-27  Show Track Menus Only When There Is a Choice in the Player group.
 //   2026-11-08  Look of the Previous and Next Buttons (Modern / Classic) in the Player group.
@@ -60,19 +61,37 @@ namespace SwewolfMediaPlayer
         // Also used when the Resume group grows or shrinks (the length box is only there for "Video Files and Long Audio Files").
         private void ApplyLayout()
         {
-            // Resume = No: nothing is saved or offered, so the other settings of the group are not shown.
-            bool resumeOn = cboResumeMode.SelectedIndex != 2;
-            lblRewind.Visible = nudRewind.Visible = lblSeconds.Visible = resumeOn;
-            lblSaveResume.Visible = cboSaveResume.Visible = resumeOn;
+            // Video and audio files have their own settings. The rewind row is only there when something is saved at all;
+            // the audio rows only when Resume Audio Files is checked. Everything below moves up as rows disappear.
+            bool videoOn = cboResumeMode.SelectedIndex != 2;
+            bool audioOn = chkResumeAudio.Checked;
+            bool rewindOn = videoOn || audioOn;
+            lblRewind.Visible = nudRewind.Visible = lblSeconds.Visible = rewindOn;
+            lblAudioMode.Visible = cboAudioMode.Visible = audioOn;
+            lblAudioMinutes.Visible = nudAudioMinutes.Visible = lblMinutes.Visible = audioOn;
 
-            bool showLength = resumeOn && cboSaveResume.SelectedIndex == 1;
-            lblAudioMinutes.Visible = showLength;
-            nudAudioMinutes.Visible = showLength;
-            lblMinutes.Visible = showLength;
+            int y = 92;
+            if (rewindOn)
+            {
+                lblRewind.Top = lblSeconds.Top = y;
+                nudRewind.Top = y - 4;
+                y += 38;
+            }
+            chkResumeAudio.Top = y;
+            y += 30;
+            if (audioOn)
+            {
+                lblAudioMode.Top = y + 4;
+                cboAudioMode.Top = y;
+                y += 30;
+                lblAudioMinutes.Top = lblMinutes.Top = y + 4;
+                nudAudioMinutes.Top = y;
+                y += 30;
+            }
 
             grpOpen.Top = grpPlayer.Bottom + 12;
             grpResume.Top = grpOpen.Bottom + 12;
-            grpResume.Height = !resumeOn ? 82 : showLength ? 224 : 186;
+            grpResume.Height = y + 6;
             grpFrames.Top = grpResume.Bottom + 12;
             grpUpdate.Top = grpFrames.Bottom + 12;
 
@@ -94,13 +113,14 @@ namespace SwewolfMediaPlayer
             cboButtonLook.SelectedIndex = settings.ClassicTrackButtons ? 1 : 0;
             cboListSide.SelectedIndex = Math.Clamp(settings.ListSide, 0, 1);
             cboResumeMode.SelectedIndex = Math.Clamp(settings.ResumeWhenOpening, 0, 2);
-            cboSaveResume.SelectedIndex = Math.Clamp(settings.SaveResumePoint, 0, 1);
+            chkResumeAudio.Checked = settings.ResumeAudioFiles;
+            cboAudioMode.SelectedIndex = Math.Clamp(settings.ResumeAudioMode, 0, 1);
             nudRewind.Value = Math.Clamp(settings.ResumeRewindSeconds, (int)nudRewind.Minimum, (int)nudRewind.Maximum);
             nudAudioMinutes.Value = Math.Clamp(settings.ResumeAudioMinMinutes, (int)nudAudioMinutes.Minimum, (int)nudAudioMinutes.Maximum);
         }
 
-        // The number of minutes only matters for "Video Files and Long Audio Files": otherwise it is not shown.
-        private void cboSaveResume_SelectedIndexChanged(object? sender, EventArgs e)
+        // The number of minutes only matters for "Resume Audio Files": otherwise it is not shown.
+        private void chkResumeAudio_CheckedChanged(object? sender, EventArgs e)
         {
             ApplyLayout();
         }
@@ -125,7 +145,8 @@ namespace SwewolfMediaPlayer
             settings.ClassicTrackButtons = cboButtonLook.SelectedIndex == 1;
             settings.ListSide = Math.Max(0, cboListSide.SelectedIndex);
             settings.ResumeWhenOpening = Math.Max(0, cboResumeMode.SelectedIndex);
-            settings.SaveResumePoint = Math.Max(0, cboSaveResume.SelectedIndex);
+            settings.ResumeAudioFiles = chkResumeAudio.Checked;
+            settings.ResumeAudioMode = Math.Max(0, cboAudioMode.SelectedIndex);
             settings.ResumeRewindSeconds = (int)nudRewind.Value;
             settings.ResumeAudioMinMinutes = (int)nudAudioMinutes.Value;
             settings.Save();

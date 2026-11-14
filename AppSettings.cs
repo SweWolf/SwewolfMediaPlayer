@@ -13,6 +13,7 @@
 //   2026-10-16  SaveResumePoint and ResumeAudioMinMinutes (resume points in the shared library database).
 //   2026-10-16  ResumeWhenOpening (Yes / Ask / No); SaveResumePoint has two values now (the old "none" is the new No).
 //   2026-10-16  ResumeRewindSeconds (default 10).
+//   2026-11-13  SaveResumePoint (two choices) replaced by ResumeAudioFiles (off by default); an old SaveResumePoint in settings.json is ignored.
 //   2026-10-23  ShowTuneList (on by default).
 //   2026-10-23  CoverPictureSize (Medium by default).
 //   2026-10-26  ShowSubtitles (on by default): the default for videos with no choice of their own.
@@ -40,13 +41,17 @@ namespace SwewolfMediaPlayer
         // Whether a small picture of the video pops up while the pointer is on the seek bar.
         public bool ShowSeekBarThumbnails { get; set; } = true;
 
-        // What happens when a file is opened that has a saved resume point: 0 = Yes (continue without asking),
+        // What happens when a VIDEO file is opened that has a saved resume point (audio files: ResumeAudioFiles): 0 = Yes (continue without asking),
         // 1 = Ask (the default), 2 = No (start from the beginning).
         public int ResumeWhenOpening { get; set; } = 1;
 
-        // Which files get a resume point (where you stopped, saved in the library database): 0 = video and audio
-        // files, 1 = video files, and audio files of at least ResumeAudioMinMinutes (the default).
-        public int SaveResumePoint { get; set; } = 1;
+        // Video files always get a resume point (where you stopped, saved in the library database). Audio files (also a track
+        // of an audio CD does not count, see PositionWanted) only when ResumeAudioFiles is on, and only when they are at least
+        // ResumeAudioMinMinutes long (audio books, podcasts). Off by default: nobody wants to resume a song.
+        public bool ResumeAudioFiles { get; set; }
+
+        // What happens when an audio file with a saved position is opened (only when ResumeAudioFiles is on): 0 = Yes, 1 = Ask (the default).
+        public int ResumeAudioMode { get; set; } = 1;
         public int ResumeAudioMinMinutes { get; set; } = 10;
 
         // The saved position is this many seconds before the point where the user stopped (0 = the exact point).

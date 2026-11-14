@@ -24,25 +24,26 @@ shared with SweWolf File Explorer**. The format and the rules for the files are 
 
 ## Settings (Tools > Settings > Resume)
 
-**Resume** (what happens when a file with a saved position is opened):
+Video and audio files have **separate settings** (changed 2026-11-13; before, one Resume choice and a "Save Resume Point for" list covered both).
+
+**Resume Video Files** (what happens when a video with a saved position is opened):
 
 | Choice | Behavior |
 |---|---|
 | Yes | Continue from where you stopped, without asking. |
 | **Ask** (default) | "Do you want to resume from 1:30?" Yes continues, No starts from the beginning. |
-| No | Always start from the beginning, and nothing is saved (the other settings of the group are hidden). |
+| No | Always start from the beginning, and nothing is saved for video files. |
+
+**Resume Audio Files** (checkbox, **off by default**: nobody wants to resume a song; it is for audio books and podcasts). When it is checked:
+
+- **When Opening an Audio File:** Yes (continue without asking) or **Ask** (the default).
+- **Only if the File Is at Least** N minutes (default 10): shorter audio files never get a position.
+- A track of an audio CD (`.cda`) never resumes: every disc has an `E:\Track02.cda`, so the path does not say which disc it was.
+
+**The question "Do you want to resume?" has a countdown** (`CountdownMessageBox.cs`, 10 seconds): the Yes button shows "Yes [10]" and is pressed by itself when the time is up. Moving the mouse (more than 2 pixels), clicking or pressing a key stops the countdown, and the question waits as an ordinary message box. This is for someone who is away from the computer.
 
 **Move the Resume Point Back by** N seconds (default 10, 0 or more): the saved position is N seconds before the point where
-the user stopped (never before the start), so there is a little of what came before. Stopping at 2:00 saves 1:50.
-
-**Save Resume Point for** (which files get a position):
-
-| Choice | Saves a position for |
-|---|---|
-| Video and Audio Files | every video and audio file |
-| **Video Files and Long Audio Files** (default) | every video file, and audio files of at least N minutes (default 10: podcasts, audio books) |
-
-The box for N minutes is only shown for "Video Files and Long Audio Files". With Resume = No the other settings are hidden. Read marks are made in every case.
+the user stopped (never before the start), so there is a little of what came before. Stopping at 2:00 saves 1:50. The row is hidden when nothing is saved (video = No and audio unchecked). Read marks are made in every case.
 
 ## Where the file is remembered
 

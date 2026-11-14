@@ -28,6 +28,7 @@ namespace SwewolfMediaPlayer
         private const long ReadAfterMs = 60_000;
         private const long SavePositionEveryMs = 10_000;
         private const long MinResumeMs = 10_000;   // a position nearer the start than this is not worth offering
+        private const int ResumeCountdownSeconds = 10;   // the question "Do you want to resume?" answers Yes by itself after this
 
         private string _libraryPath = "";   // what the file is called in the library
         private long _playedMs;             // played in this session
@@ -44,7 +45,7 @@ namespace SwewolfMediaPlayer
         // Whether this file gets a resume point, by the setting. An audio file needs its length (known once it plays).
         private bool PositionWanted()
         {
-            if (!LibraryActive || SidPluginSetup.IsSidFile(_filePath) || _settings.ResumeWhenOpening == 2)
+            if (!LibraryActive || SidPluginSetup.IsSidFile(_filePath) || ResumeMode(_filePath) == 2)
             {
                 return false;   // Resume = No: nothing is saved
             }
@@ -52,9 +53,22 @@ namespace SwewolfMediaPlayer
             {
                 return false;   // a short clip is watched in one go: there is nothing to resume
             }
-            return _settings.SaveResumePoint == 0
-                || !IsAudioFile(_filePath)
+            return !IsAudioFile(_filePath)
                 || (_lengthMs > 0 && _lengthMs >= _settings.ResumeAudioMinMinutes * 60_000L);
+        }
+
+        // What happens with a saved position of this file: 0 = Yes, 1 = Ask, 2 = No (nothing is saved or offered). Video and audio files
+        // have their own settings. Audio files only resume when Resume Audio Files is on (and then only the long ones, see
+        // PositionWanted). A track of an audio CD never does: every disc has an E:\Track02.cda, so the path says nothing about which disc.
+        private int ResumeMode(string path)
+        {
+            if (!IsAudioFile(path))
+            {
+                return _settings.ResumeWhenOpening;
+            }
+            return _settings.ResumeAudioFiles && !Path.GetExtension(path).Equals(".cda", StringComparison.OrdinalIgnoreCase)
+                ? Math.Clamp(_settings.ResumeAudioMode, 0, 1)
+                : 2;
         }
 
         // A new file (or the same one again) starts: forget what was counted, and offer to continue where the user stopped.
@@ -87,7 +101,7 @@ namespace SwewolfMediaPlayer
                 return;
             }
 
-            if (!LibraryActive || _settings.ResumeWhenOpening == 2 || SidPluginSetup.IsSidFile(_filePath))
+            if (!LibraryActive || ResumeMode(_filePath) == 2 || SidPluginSetup.IsSidFile(_filePath))
             {
                 return;
             }
@@ -105,11 +119,16 @@ namespace SwewolfMediaPlayer
                 return;
             }
 
-            // Yes: continue without asking. Ask: ask first.
-            bool resume = _settings.ResumeWhenOpening == 0
-                || MessageBox.Show(this,
-                    $"Do you want to resume from {FormatTime(position, false)}?\n\nChoose No to start from the beginning.",
-                    AppName, MessageBoxButtons.YesNo, MessageBoxIcon.Question, MessageBoxDefaultButton.Button1) == DialogResult.Yes;
+            // An audio file that is not to be resumed by the setting (or is too short) is not offered, even if a position was saved earlier.
+            if (IsAudioFile(_filePath) && (length < _settings.ResumeAudioMinMinutes * 60_000L))
+            {
+                return;
+            }
+
+            // Yes: continue without asking. Ask: ask first; Yes is chosen by itself after 10 seconds if the user does nothing.
+            bool resume = ResumeMode(_filePath) == 0
+                || CountdownMessageBox.AskYesNo(this,
+                    $"Do you want to resume from {FormatTime(position, false)}?\n\nChoose No to start from the beginning.", AppName, ResumeCountdownSeconds);
             if (resume)
             {
                 _resumeAtMs = position;

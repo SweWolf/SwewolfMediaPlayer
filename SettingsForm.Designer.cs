@@ -37,8 +37,9 @@ namespace SwewolfMediaPlayer
             lblRewind = new Label();
             nudRewind = new NumericUpDown();
             lblSeconds = new Label();
-            lblSaveResume = new Label();
-            cboSaveResume = new ComboBox();
+            chkResumeAudio = new CheckBox();
+            lblAudioMode = new Label();
+            cboAudioMode = new ComboBox();
             lblAudioMinutes = new Label();
             nudAudioMinutes = new NumericUpDown();
             lblMinutes = new Label();
@@ -242,8 +243,9 @@ namespace SwewolfMediaPlayer
             grpResume.Controls.Add(lblRewind);
             grpResume.Controls.Add(nudRewind);
             grpResume.Controls.Add(lblSeconds);
-            grpResume.Controls.Add(lblSaveResume);
-            grpResume.Controls.Add(cboSaveResume);
+            grpResume.Controls.Add(chkResumeAudio);
+            grpResume.Controls.Add(lblAudioMode);
+            grpResume.Controls.Add(cboAudioMode);
             grpResume.Controls.Add(lblAudioMinutes);
             grpResume.Controls.Add(nudAudioMinutes);
             grpResume.Controls.Add(lblMinutes);
@@ -260,7 +262,7 @@ namespace SwewolfMediaPlayer
             lblResumeMode.Location = new Point(10, 28);
             lblResumeMode.Name = "lblResumeMode";
             lblResumeMode.TabIndex = 0;
-            lblResumeMode.Text = "&Resume";
+            lblResumeMode.Text = "&Resume Video Files";
             //
             // cboResumeMode
             //
@@ -272,7 +274,7 @@ namespace SwewolfMediaPlayer
             cboResumeMode.Size = new Size(120, 23);
             cboResumeMode.TabIndex = 1;
             cboResumeMode.SelectedIndexChanged += cboResumeMode_SelectedIndexChanged;
-            toolTip.SetToolTip(cboResumeMode, "What happens when you open a file you stopped in before.\r\nYes: continue from where you stopped, without asking.\r\nAsk: ask first.\r\nNo: always start from the beginning,\r\nand the player does not remember where you stopped.");
+            toolTip.SetToolTip(cboResumeMode, "What happens when you open a video file you stopped in before.\r\nYes: continue from where you stopped, without asking.\r\nAsk: ask first. Yes is chosen by itself after 10 seconds\r\nif you do not touch the mouse or the keyboard.\r\nNo: always start from the beginning,\r\nand the player does not remember where you stopped.");
             //
             // lblRewind
             //
@@ -300,51 +302,61 @@ namespace SwewolfMediaPlayer
             lblSeconds.TabIndex = 4;
             lblSeconds.Text = "seconds";
             //
-            // lblSaveResume
+            // chkResumeAudio
             //
-            lblSaveResume.AutoSize = true;
-            lblSaveResume.Location = new Point(10, 132);
-            lblSaveResume.Name = "lblSaveResume";
-            lblSaveResume.TabIndex = 5;
-            lblSaveResume.Text = "&Save Resume Point for";
+            chkResumeAudio.AutoSize = true;
+            chkResumeAudio.Location = new Point(10, 130);
+            chkResumeAudio.Name = "chkResumeAudio";
+            chkResumeAudio.TabIndex = 5;
+            chkResumeAudio.Text = "Resume &Audio Files";
+            chkResumeAudio.UseVisualStyleBackColor = true;
+            chkResumeAudio.CheckedChanged += chkResumeAudio_CheckedChanged;
+            toolTip.SetToolTip(chkResumeAudio, "Also remember where you stopped in audio files (songs, podcasts, audio books),\r\nbut only in files at least as long as the number of minutes below.\r\nVideo files are always remembered.\r\nThe position is kept in the library database\r\nthat SweWolf File Explorer uses too.");
             //
-            // cboSaveResume
+            // lblAudioMode
             //
-            cboSaveResume.DropDownStyle = ComboBoxStyle.DropDownList;
-            cboSaveResume.FormattingEnabled = true;
-            cboSaveResume.Items.AddRange(new object[] { "Video and Audio Files", "Video Files and Long Audio Files" });
-            cboSaveResume.Location = new Point(10, 150);
-            cboSaveResume.Name = "cboSaveResume";
-            cboSaveResume.Size = new Size(340, 23);
-            cboSaveResume.TabIndex = 6;
-            cboSaveResume.SelectedIndexChanged += cboSaveResume_SelectedIndexChanged;
-            toolTip.SetToolTip(cboSaveResume, "The player remembers where you stopped.\r\nIt starts after the file has played for 60 seconds.\r\nThe position is kept in the library database\r\nthat SweWolf File Explorer uses too.");
+            lblAudioMode.AutoSize = true;
+            lblAudioMode.Location = new Point(28, 164);
+            lblAudioMode.Name = "lblAudioMode";
+            lblAudioMode.TabIndex = 6;
+            lblAudioMode.Text = "When Opening an Audio File";
+            //
+            // cboAudioMode
+            //
+            cboAudioMode.DropDownStyle = ComboBoxStyle.DropDownList;
+            cboAudioMode.FormattingEnabled = true;
+            cboAudioMode.Items.AddRange(new object[] { "Yes", "Ask" });
+            cboAudioMode.Location = new Point(188, 160);
+            cboAudioMode.Name = "cboAudioMode";
+            cboAudioMode.Size = new Size(60, 23);
+            cboAudioMode.TabIndex = 7;
+            toolTip.SetToolTip(cboAudioMode, "Yes: continue from where you stopped, without asking.\r\nAsk: ask first. Yes is chosen by itself after 10 seconds\r\nif you do not touch the mouse or the keyboard.");
             //
             // lblAudioMinutes
             //
             lblAudioMinutes.AutoSize = true;
-            lblAudioMinutes.Location = new Point(10, 192);
+            lblAudioMinutes.Location = new Point(28, 194);
             lblAudioMinutes.Name = "lblAudioMinutes";
-            lblAudioMinutes.TabIndex = 7;
-            lblAudioMinutes.Text = "Long Audio Files Are &at Least";
+            lblAudioMinutes.TabIndex = 8;
+            lblAudioMinutes.Text = "Only if the File Is at Least";
             //
             // nudAudioMinutes
             //
-            nudAudioMinutes.Location = new Point(188, 188);
+            nudAudioMinutes.Location = new Point(188, 190);
             nudAudioMinutes.Maximum = new decimal(new int[] { 600, 0, 0, 0 });
             nudAudioMinutes.Minimum = new decimal(new int[] { 1, 0, 0, 0 });
             nudAudioMinutes.Name = "nudAudioMinutes";
             nudAudioMinutes.Size = new Size(60, 23);
-            nudAudioMinutes.TabIndex = 8;
+            nudAudioMinutes.TabIndex = 9;
             nudAudioMinutes.Value = new decimal(new int[] { 10, 0, 0, 0 });
             toolTip.SetToolTip(nudAudioMinutes, "Audio files of this length or longer get a resume point\r\n(for example podcasts and audio books).\r\nShorter ones do not.");
             //
             // lblMinutes
             //
             lblMinutes.AutoSize = true;
-            lblMinutes.Location = new Point(254, 192);
+            lblMinutes.Location = new Point(254, 194);
             lblMinutes.Name = "lblMinutes";
-            lblMinutes.TabIndex = 9;
+            lblMinutes.TabIndex = 10;
             lblMinutes.Text = "minutes";
             //
             // grpFrames
@@ -508,8 +520,9 @@ namespace SwewolfMediaPlayer
         private Label lblRewind;
         private NumericUpDown nudRewind;
         private Label lblSeconds;
-        private Label lblSaveResume;
-        private ComboBox cboSaveResume;
+        private CheckBox chkResumeAudio;
+        private Label lblAudioMode;
+        private ComboBox cboAudioMode;
         private Label lblAudioMinutes;
         private NumericUpDown nudAudioMinutes;
         private Label lblMinutes;
