@@ -5,6 +5,7 @@
 // History:
 //   2026-10-23  First version. Always on; a setting to turn it off or customize it may come later.
 //   2026-10-23  Cover picture size, Medium (75 percent) or Maximum (ApplyCoverSize; AppSettings.CoverPictureSize).
+//   2026-11-13  UseMnemonic off: an "&" in a title or album name (Heaven & Hell) was swallowed.
 //   2026-10-23  SID files show author, title and the name of the tune (MediaPlayerForm.TuneList.cs).
 
 namespace SwewolfMediaPlayer
@@ -78,6 +79,7 @@ namespace SwewolfMediaPlayer
                 _lblTrackInfo = new Label
                 {
                     AutoSize = true,
+                    UseMnemonic = false,   // "Heaven & Hell" must not lose its &
                     BackColor = Color.Black,
                     ForeColor = Color.FromArgb(30, 144, 255),
                     Font = new Font("Arial", 14F, FontStyle.Bold),

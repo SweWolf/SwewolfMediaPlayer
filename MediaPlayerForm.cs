@@ -698,7 +698,7 @@ namespace SwewolfMediaPlayer
 
         // An audio file has no picture of its own, so LibVLC shows black. If the file has embedded
         // cover art (e.g. an MP3 with an album picture), show that over the video area instead.
-        private static readonly string[] AudioExtensions = { ".mp3", ".flac", ".m4a", ".aac", ".ogg", ".oga", ".opus", ".wma", ".wav", ".aif", ".aiff" };
+        private static readonly string[] AudioExtensions = { ".mp3", ".flac", ".m4a", ".aac", ".ogg", ".oga", ".opus", ".wma", ".wav", ".aif", ".aiff", ".cda" };
 
         // Whether the user can jump around in the file: not in a stream, not in SID music (the plugin only
         // plays on) and not in anything else LibVLC reports as not seekable. When it is false the seek
