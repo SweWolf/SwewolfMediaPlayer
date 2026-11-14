@@ -668,6 +668,11 @@ namespace SwewolfMediaPlayer
             _player.Play(_media);
             OpenTimingLog.Write($"StartMedia: Media created and Play called, {stepWatch.ElapsedMilliseconds} ms");
 
+            if (!_isStream && Path.GetExtension(_filePath).Equals(".cda", StringComparison.OrdinalIgnoreCase))
+            {
+                _ = ShowCdTrackInfoAsync(_filePath, _media);
+            }
+
             if (!_isStream && SidPluginSetup.IsSidFile(_filePath))
             {
                 _ = ShowSidLengthAsync(_filePath);
@@ -1421,6 +1426,13 @@ namespace SwewolfMediaPlayer
 
         private Media CreateMedia(LibVLC lib, string path, bool isStream)
         {
+            if (!isStream && TryGetCdTrack(path, out string? cdLocation, out int cdTrack))
+            {
+                // A track of an audio CD: the .cda file is only a 44-byte stub, so LibVLC reads the disc itself.
+                Media cdMedia = new(lib, cdLocation!, FromType.FromLocation);
+                cdMedia.AddOption($":cdda-track={cdTrack}");
+                return cdMedia;
+            }
             Media media = new(lib, path, isStream ? FromType.FromLocation : FromType.FromPath);
             if (_nextStartSeconds is { } startAt && !isStream && IsRecordingPlayback)
             {
@@ -1443,6 +1455,44 @@ namespace SwewolfMediaPlayer
                 media.AddOption(":demux=avformat");
             }
             return media;
+        }
+
+        // E:\Track01.cda on a CD drive -> "cdda:///E:/" and track 1. The track number is in the stub (bytes 22-23), else in the name.
+        private static bool TryGetCdTrack(string path, out string? location, out int track)
+        {
+            location = null;
+            track = 0;
+            if (!Path.GetExtension(path).Equals(".cda", StringComparison.OrdinalIgnoreCase))
+            {
+                return false;
+            }
+            try
+            {
+                string root = Path.GetPathRoot(Path.GetFullPath(path)) ?? "";
+                if (root.Length < 2 || root[1] != ':' || new DriveInfo(root).DriveType != DriveType.CDRom)
+                {
+                    return false;
+                }
+                byte[] stub = File.ReadAllBytes(path);
+                if (stub.Length >= 24 && stub[8] == (byte)'C' && stub[9] == (byte)'D' && stub[10] == (byte)'D' && stub[11] == (byte)'A')
+                {
+                    track = stub[22] | (stub[23] << 8);
+                }
+                if (track <= 0)
+                {
+                    System.Text.RegularExpressions.Match m = System.Text.RegularExpressions.Regex.Match(Path.GetFileNameWithoutExtension(path), @"\d+");
+                    if (!m.Success || !int.TryParse(m.Value, out track))
+                    {
+                        return false;
+                    }
+                }
+                location = $"cdda:///{root[0]}:/";
+                return track > 0;
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException)
+            {
+                return false;
+            }
         }
 
         // A transport stream file that another program is still writing (a download, a recording). LibVLC's own TS reader looks at the end of the
