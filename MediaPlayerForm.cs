@@ -670,7 +670,7 @@ namespace SwewolfMediaPlayer
 
             if (!_isStream && Path.GetExtension(_filePath).Equals(".cda", StringComparison.OrdinalIgnoreCase))
             {
-                _ = ShowCdTrackInfoAsync(_filePath, _media);
+                ShowCdTrackInfo(_filePath);
             }
 
             if (!_isStream && SidPluginSetup.IsSidFile(_filePath))
