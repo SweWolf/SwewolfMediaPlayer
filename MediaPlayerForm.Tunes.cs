@@ -129,6 +129,11 @@ namespace SwewolfMediaPlayer
             {
                 return _channels[_channelIndex].Name;   // a channel of the channel list
             }
+            if (!_isStream && CdDiscInfo.InfoOf(_filePath) is { } cd)
+            {
+                // A track of an audio CD that the lookup knows: "Artist - Title". Otherwise (not known, offline) the file name, Track03.cda.
+                return string.IsNullOrWhiteSpace(cd.Artist) ? cd.Title!.Trim() : $"{cd.Artist.Trim()} - {cd.Title!.Trim()}";
+            }
             return _isStream && TryGetStreamUri(_filePath, out Uri? uri) ? uri!.Host : Path.GetFileName(_filePath);
         }
 

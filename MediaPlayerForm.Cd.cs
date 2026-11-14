@@ -11,6 +11,7 @@
 //   2026-11-13  Cover picture from MusicBrainz + the Cover Art Archive.
 //   2026-11-14  Shared with the File Explorer: titles and cover come from the shared CdDiscInfo (MusicBrainz only, shared cache, daily silent refresh);
 //               LibVLC's CDDB lookup and this program's own CdInfo folder are no longer used.
+//   2026-11-14  The window title is "Artist - Title" (TitleBase), and changes by itself when the lookup answers a little after the start.
 
 namespace SwewolfMediaPlayer
 {
@@ -34,6 +35,7 @@ namespace SwewolfMediaPlayer
         private void ShowCdTrackText(string path, int track)
         {
             CdTrackInfo? info = CdDiscInfo.InfoOf(path);   // starts the lookup when the disc is new or its information is old
+            Text = TitleBase();   // the window title: "Artist - Title", or Track03.cda until the lookup has an answer (then this runs again)
             if (info != null)
             {
                 ShowTrackInfo(info.Artist, info.Title, info.Album);
