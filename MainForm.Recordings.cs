@@ -8,6 +8,7 @@
 //
 // History:
 //   2026-11-12  First version.
+//   2026-11-15  The Unfinished Recordings menu (recordings left behind by a crash).
 
 namespace SwewolfMediaPlayer
 {
@@ -18,6 +19,47 @@ namespace SwewolfMediaPlayer
         private void RefreshRecordingsMenu()
         {
             menuMyRecordings.Visible = RecordingStore.Any();
+            RefreshUnfinishedMenu();
+        }
+
+        // Unfinished Recordings (to the right of My Recordings): only there when a recording was left behind (UnfinishedRecordings.cs). One item for each, with
+        // Recover, Play and Discard in its submenu.
+        private void RefreshUnfinishedMenu()
+        {
+            List<UnfinishedEntry> pending = UnfinishedStore.Pending();
+            menuUnfinished.Visible = pending.Count > 0;
+            menuUnfinished.DropDownItems.Clear();
+            foreach (UnfinishedEntry entry in pending)
+            {
+                UnfinishedEntry captured = entry;
+                string size = entry.SizeBytes >= 1_000_000_000 ? $"{entry.SizeBytes / 1e9:0.0} GB" : $"{entry.SizeBytes / 1e6:0} MB";
+                string name = entry.Channel.Length > 0 ? entry.Channel : "Recording";
+                var item = new ToolStripMenuItem($"{name.Replace("&", "&&")}, {entry.StartedAt:g} ({size})") { ToolTipText = entry.TsPath };
+                item.DropDownItems.Add(new ToolStripMenuItem("Recover", null, async (_, _) =>
+                {
+                    await UnfinishedActions.RecoverAsync(this, AppName, captured);
+                    RefreshRecordingsMenu();
+                }) { ToolTipText = "Save it as an MP4 file" });
+                item.DropDownItems.Add(new ToolStripMenuItem("Play", null, (_, _) => OpenUnfinished(captured)) { ToolTipText = "Play the recording as it is" });
+                item.DropDownItems.Add(new ToolStripMenuItem("Discard", null, (_, _) =>
+                {
+                    UnfinishedActions.Discard(this, AppName, captured);
+                    RefreshRecordingsMenu();
+                }) { ToolTipText = "Move it to the Recycle Bin" });
+                menuUnfinished.DropDownItems.Add(item);
+            }
+        }
+
+        private void OpenUnfinished(UnfinishedEntry entry)
+        {
+            if (File.Exists(entry.TsPath))
+            {
+                OpenMedia(entry.TsPath);
+            }
+            else
+            {
+                RefreshRecordingsMenu();
+            }
         }
 
         protected override void OnActivated(EventArgs e)

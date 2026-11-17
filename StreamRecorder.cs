@@ -218,6 +218,21 @@ namespace SwewolfMediaPlayer
             }
         }
 
+        // Moves a file to the Recycle Bin (so it can be restored). False when that did not work: the file is then still there.
+        public static bool TryRecycle(string path)
+        {
+            try
+            {
+                Microsoft.VisualBasic.FileIO.FileSystem.DeleteFile(path, Microsoft.VisualBasic.FileIO.UIOption.OnlyErrorDialogs,
+                    Microsoft.VisualBasic.FileIO.RecycleOption.SendToRecycleBin);
+                return !File.Exists(path);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException or OperationCanceledException)
+            {
+                return false;
+            }
+        }
+
         public static void TryDelete(string path)
         {
             try

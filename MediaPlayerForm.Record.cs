@@ -1,13 +1,14 @@
 // MediaPlayerForm.Record.cs: records the stream that plays (a live TV channel) to a file.
 //
-// The Record button (red circle, right of Stop; only for streams) starts FFmpeg at once (StreamRecorder.cs), which copies the stream into a
+// The Record button (red circle, a red square while it records; right of Stop; only for streams) starts FFmpeg at once (StreamRecorder.cs), which copies the stream into a
 // .ts file in the recording folder (the Windows Videos folder the first time, then the folder of the last recording). While it records, a
-// Save As dialog asks for the name of the MP4 file (the usual question when the file exists). A few seconds later the player switches from the
-// live stream to the .ts file, so you watch what is being stored; Pause only pauses what you see, the recording goes on. If the player
+// recording starts at once, with no question. A few seconds later the player switches from the live stream to the .ts file, so you watch what is being stored; Pause only pauses what you see, the recording goes on. If the player
 // reaches the end of the growing file (the recording was slow for a moment) it starts again where it was.
 //
-// Stop (or the Record button again) ends the recording: FFmpeg closes the .ts file, which is converted to the MP4 file with the name you chose, and
-// the .ts file is deleted. If the conversion fails the .ts file is kept and its place is shown. If the stream ends by itself the recording is
+// Stop (or the Record button again) ends the recording: FFmpeg closes the .ts file, then a Save As dialog asks for the name of the MP4 file (the usual
+// question when the file exists; the name suggested is the channel and the time). Cancel there asks "Discard the recording?": Yes moves the .ts file to the
+// Recycle Bin, No goes back to the name. When the stream ends by itself, or the window is closing, nobody is asked and the suggested name is used.
+// The .ts file is converted to the MP4 file and then deleted. If the conversion fails the .ts file is kept and its place is shown. If the stream ends by itself the recording is
 // saved in the same way. Closing the window while it records asks first. While it records, other files and channels cannot be opened.
 // A recording leaves no trace in the library (no read mark, no resume point). The seek bar and skip buttons are off while the .ts file plays.
 //
@@ -20,6 +21,7 @@
 // History:
 //   2026-11-12  First version.
 //   2026-11-12  Streams that refuse FFmpeg's second connection are recorded through the player's own connection.
+//   2026-11-15  The name is asked when the recording ends (not when it starts); Cancel asks whether to discard, and a discarded recording goes to the Recycle Bin.
 
 using LibVLCSharp.Shared;
 
@@ -29,8 +31,10 @@ namespace SwewolfMediaPlayer
     {
         private IconButton? btnRecord;
         private StreamRecorder? _recorder;          // the recording that runs, null = none
-        private string? _recordTarget;              // the MP4 file the user chose, null until the dialog is answered
-        private bool _recorderEndedEarly;           // FFmpeg ended while the name dialog was still open
+        private string? _recordTarget;              // the MP4 file the user chose when the recording ended, null until then
+        private string _recordSuggestion = "";      // the name suggested at the end (channel and time of the start) and used when nobody can be asked
+        private bool _recordStarting;               // the recording is being set up (the quick check, the restart through the player)
+        private bool _recorderEndedEarly;           // FFmpeg ended while the recording was still being set up
         private bool _recordFinishing;              // stopping and converting is going on
         private bool _recordShown;                  // what Visible of the button was set to (the getter says false while the control bar is hidden)
         private double? _nextStartSeconds;          // the next media of the .ts file starts here (after its end was reached)
@@ -71,6 +75,7 @@ namespace SwewolfMediaPlayer
             bool channelPlays = _channels == null || (_channelIndex >= 0 && _channelIndex < _channels.Count && _channels[_channelIndex].Url == _filePath);
             _recordShown = _recorder != null || (_isStream && channelPlays);
             btnRecord.Visible = _recordShown;
+            btnRecord.Icon = _recorder != null ? IconKind.RecordStop : IconKind.Record;
             btnRecord.BackColor = _recorder != null ? Color.FromArgb(110, 30, 30) : btnStop.BackColor;
             toolTip.SetToolTip(btnRecord, _recorder != null ? "Stop Recording and Save" : "Record (saves the stream to a file)");
         }
@@ -109,8 +114,7 @@ namespace SwewolfMediaPlayer
 
             RecLog($"Record clicked: {url}, .ts file {ts}, method {RecordWith}");
 
-            // At once, so the click is seen (the name dialog comes after a few seconds, when it is known that the stream can be recorded), and a
-            // short break in the picture is nothing wrong (the player may switch to the file or restart the stream).
+            // At once, so the click is seen, and a short break in the picture is nothing wrong (the player may switch to the file or restart the stream).
             ShowVideoMessage(RecordingStartedText);
             StreamRecorder recorder;
             if (RecordWith == RecordMethod.PlayerOnly)
@@ -150,6 +154,8 @@ namespace SwewolfMediaPlayer
 
             _recorder = recorder;
             _recordTarget = null;
+            _recordSuggestion = suggestion;
+            _recordStarting = true;
             _recorderEndedEarly = false;
             _recordFinishing = false;
             UpdateRecordButton();
@@ -163,6 +169,7 @@ namespace SwewolfMediaPlayer
                     string why = recorder.LastMessage;
                     RecLog($"FFmpeg got no data from the stream: {why}");
                     _recorder = null;
+                    _recordStarting = false;
                     recorder.Dispose();
                     StreamRecorder.TryDelete(ts);
                     if (RecordWith == RecordMethod.FfmpegOnly)
@@ -185,31 +192,25 @@ namespace SwewolfMediaPlayer
             {
                 return;   // the stream could not be opened again: said, and the recording is given up
             }
-            RecLog(recorder.InPlayer ? "The player writes the .ts file, the name dialog is shown" : "FFmpeg started, the name dialog is shown");
-
-            // The recording runs while the question is open.
-            string? target = AskRecordingName(folder, suggestion);
-            if (target == null)
+            _recordStarting = false;
+            RecLog(recorder.InPlayer ? "The player writes the .ts file" : "FFmpeg started");
+            try
             {
-                HideStartedMessage(0);
-                RecLog("The name dialog was canceled: the recording is discarded");
-                // Cancel: no recording. FFmpeg has its own connection, so the live picture keeps playing without a break. When the player itself
-                // writes the file it was restarted for the recording, so it opens the live stream again.
-                await FinishRecordingAsync(true, discard: true, resumeLive: recorder.InPlayer, keepPlaying: !recorder.InPlayer);
-                return;
+                UnfinishedStore.Add(ts, StreamName(url), url, _channelListSource, recorder.StartedAt, suggestion);   // stays if the program dies (see UnfinishedRecordings.cs)
             }
-
-            _recordTarget = target;
-            RecLog($"Name chosen: {target}, the .ts file is {RecAge(recorder)} s old, {RecSize(recorder.TsPath):N0} bytes");
-            RememberRecordFolder(Path.GetDirectoryName(target));
+            catch (Exception ex)
+            {
+                RecLog($"Could not write the unfinished entry: {ex.Message}");
+            }
+            RememberRecordFolder(folder);
             if (_recorderEndedEarly)
             {
-                RecLog("FFmpeg ended while the dialog was open");
+                RecLog("FFmpeg ended while the recording was being set up");
                 await FinishRecordingAsync(false);
                 return;
             }
 
-            // The name is chosen: the message stays a little longer, then goes (it is the warning that the picture may break now).
+            // The message stays a little longer, then goes (it is the warning that the picture may break now). The name is asked when the recording ends.
             HideStartedMessage(3000);
 
             if (recorder.InPlayer)
@@ -336,6 +337,12 @@ namespace SwewolfMediaPlayer
             return dialog.ShowDialog(this) == DialogResult.OK ? dialog.FileName : null;
         }
 
+        // The name of the MP4 file, asked when the recording has ended. Cancel in the Save As dialog is not "no": it asks whether to discard the recording,
+        // and No (the default) goes back to the name. Yes returns null: the caller moves the .ts file to the Recycle Bin.
+        private string? ChooseRecordingName(string folder, string suggestion) => RecordingNaming.Choose(this, AppName, folder, suggestion);
+
+        private static string UniqueTarget(string folder, string name) => RecordingNaming.UniqueTarget(folder, name);
+
         // Some seconds of the stream are on disk: watch the file instead of the live stream.
         private void CheckRecordingReady()
         {
@@ -396,9 +403,9 @@ namespace SwewolfMediaPlayer
             {
                 return;
             }
-            if (_recordTarget == null)
+            if (_recordStarting)
             {
-                _recorderEndedEarly = true;   // the name dialog is open: it is dealt with when it closes
+                _recorderEndedEarly = true;   // still being set up: it is dealt with when that is done
                 return;
             }
             _ = FinishRecordingAsync(false);
@@ -427,6 +434,7 @@ namespace SwewolfMediaPlayer
                 _tsPlayedOut = null;
                 _recorder = null;
                 _recordTarget = null;
+                _recordStarting = false;
                 _recordFinishing = false;
                 if (!IsDisposed)
                 {
@@ -458,7 +466,8 @@ namespace SwewolfMediaPlayer
             _recWatchTimer?.Stop();
             _soutPath = null;   // the stream that plays again afterwards must not be written to the file
             RecLog($"Finishing the recording (by the user: {byUser}, discard: {discard}), the .ts file is {RecSize(recorder.TsPath):N0} bytes");
-            string? target = discard ? null : _recordTarget;
+            string? target = null;
+            bool recycle = false;   // the user threw the recording away: the .ts file goes to the Recycle Bin (discard = given up for a technical reason: deleted)
             string url = recorder.Url;
             string ts = recorder.TsPath;
 
@@ -483,13 +492,53 @@ namespace SwewolfMediaPlayer
             await recorder.StopAsync();
             RecLog("FFmpeg has stopped");
 
-            string message;
+            string message = "";
             long size = RecSize(ts);
+            if (!discard && size > 0)
+            {
+                // The .ts file is complete now: this is the moment to ask for the name. Nobody is asked when the stream ended by itself (the user may be
+                // away) or the window is gone: the suggested name is used then.
+                if (byUser && !IsDisposed)
+                {
+                    HideLoading();
+                    target = ChooseRecordingName(RecordFolder(), _recordSuggestion);
+                    recycle = target == null;
+                }
+                else
+                {
+                    target = UniqueTarget(RecordFolder(), _recordSuggestion);
+                }
+                if (target != null)
+                {
+                    _recordTarget = target;
+                    RememberRecordFolder(Path.GetDirectoryName(target));
+                }
+                RecLog(target == null ? "The user discarded the recording" : $"Name: {target}");
+            }
+
             if (target == null || size == 0)
             {
-                StreamRecorder.TryDelete(ts);
-                message = discard ? "The recording was canceled."
-                    : "Nothing was recorded." + (recorder.LastMessage.Length > 0 ? $"\n\n{recorder.LastMessage}" : "");
+                if (recycle)
+                {
+                    // The player may still be playing the .ts file: it must let go before the file can be moved.
+                    if (playOn)
+                    {
+                        _tsPlayedOut = null;
+                        if (player != null && ReferenceEquals(player, _player))
+                        {
+                            await StopPlayerForRecordingAsync(player);
+                        }
+                    }
+                    message = StreamRecorder.TryRecycle(ts)
+                        ? "The recording was discarded.\nThe file is in the Recycle Bin."
+                        : $"The recording could not be moved to the Recycle Bin.\n\nThe .ts file was kept:\n{ts}";
+                }
+                else
+                {
+                    StreamRecorder.TryDelete(ts);
+                    message = discard ? "The recording was canceled."
+                        : "Nothing was recorded." + (recorder.LastMessage.Length > 0 ? $"\n\n{recorder.LastMessage}" : "");
+                }
             }
             else
             {
@@ -540,7 +589,9 @@ namespace SwewolfMediaPlayer
             recorder.Dispose();
             _recorder = null;
             _recordTarget = null;
+            _recordStarting = false;
             _recordFinishing = false;
+            UnfinishedStore.ForgetIfGone(ts);   // saved, discarded or nothing recorded; a .ts file that was kept stays in the Unfinished Recordings menu
             if (IsDisposed)
             {
                 return;
@@ -658,7 +709,7 @@ namespace SwewolfMediaPlayer
 
         private async Task FinishAndCloseAsync()
         {
-            await FinishRecordingAsync(true, discard: _recordTarget == null);
+            await FinishRecordingAsync(true);
             if (!IsDisposed)
             {
                 Close();

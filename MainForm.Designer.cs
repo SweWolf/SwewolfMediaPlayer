@@ -40,6 +40,7 @@
             menuIptv = new ToolStripMenuItem();
             menuOpenPlaylist = new ToolStripMenuItem();
             menuMyRecordings = new ToolStripMenuItem();
+            menuUnfinished = new ToolStripMenuItem();
             lblFile = new Label();
             txtFile = new TextBox();
             btnBrowse = new Button();
@@ -49,7 +50,7 @@
             //
             // menuStrip
             //
-            menuStrip.Items.AddRange(new ToolStripItem[] { menuTools, menuIptv, menuMyRecordings, menuHelp, menuNewVersion });
+            menuStrip.Items.AddRange(new ToolStripItem[] { menuTools, menuIptv, menuMyRecordings, menuUnfinished, menuHelp, menuNewVersion });
             menuStrip.Location = new Point(0, 0);
             menuStrip.Name = "menuStrip";
             menuStrip.Size = new Size(754, 24);
@@ -98,6 +99,13 @@
             menuMyRecordings.Text = "My Recordings";
             menuMyRecordings.Visible = false;
             menuMyRecordings.DropDownOpening += menuMyRecordings_DropDownOpening;
+            // 
+            // menuUnfinished
+            // 
+            menuUnfinished.Name = "menuUnfinished";
+            menuUnfinished.Size = new Size(130, 20);
+            menuUnfinished.Text = "Unfinished Recordings";
+            menuUnfinished.Visible = false;
             //
             // menuHelp
             //
@@ -209,6 +217,7 @@
         private ToolStripMenuItem menuIptv;
         private ToolStripMenuItem menuOpenPlaylist;
         private ToolStripMenuItem menuMyRecordings;
+        private ToolStripMenuItem menuUnfinished;
         private ToolStripMenuItem menuHelp;
         private ToolStripMenuItem menuAbout;
     }

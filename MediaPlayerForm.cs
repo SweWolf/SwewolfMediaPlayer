@@ -2093,7 +2093,7 @@ namespace SwewolfMediaPlayer
         }
 
         // ffmpeg.exe next to the program, or else the first one found in the PATH.
-        private static string? FindFfmpeg()
+        internal static string? FindFfmpeg()
         {
             string local = Path.Combine(AppContext.BaseDirectory, "ffmpeg.exe");
             if (File.Exists(local))
@@ -2686,7 +2686,7 @@ namespace SwewolfMediaPlayer
 
     // A button that draws its own icon, so it can be filled and take the colors of the dark theme.
     // BackColor is the button color, ForeColor the icon color.
-    internal enum IconKind { Play, Pause, Stop, Camera, Volume, Muted, PreviousTune, NextTune, More, Bookmark, PreviousChapter, NextChapter, Rewind, FastForward, Record }
+    internal enum IconKind { Play, Pause, Stop, Camera, Volume, Muted, PreviousTune, NextTune, More, Bookmark, PreviousChapter, NextChapter, Rewind, FastForward, Record, RecordStop }
 
     internal sealed class IconButton : Button
     {
@@ -2756,6 +2756,9 @@ namespace SwewolfMediaPlayer
                     break;
                 case IconKind.Record:   // a filled circle (the button is red)
                     g.FillEllipse(brush, R(0.04f, 0.04f, 0.92f, 0.92f));
+                    break;
+                case IconKind.RecordStop:   // a filled square while it records (the next click stops); the same size as the Stop button's square
+                    g.FillRectangle(brush, R(0.08f, 0.08f, 0.84f, 0.84f));
                     break;
                 case IconKind.PreviousChapter:   // a bar and one triangle, as VLC draws the chapter buttons
                     g.FillRectangle(brush, R(0.08f, 0.05f, 0.14f, 0.90f));

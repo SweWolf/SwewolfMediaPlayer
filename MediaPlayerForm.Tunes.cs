@@ -182,11 +182,10 @@ namespace SwewolfMediaPlayer
             LayoutControlBar();
         }
 
-        // The Save Frame button is only useful when there is a picture to save: a video, or an audio
-        // file that shows its cover art. SID music and audio without a picture have none.
+        // The Save Frame button is only for video: an audio file has no frame to save (decided 2026-11-16; before, a cover picture kept it visible).
         private void UpdateSaveFrameButton()
         {
-            _saveFrameShown = !IsAudioFile(_filePath) || picCover.Visible;
+            _saveFrameShown = !IsAudioFile(_filePath);
             btnSaveFrame.Visible = _saveFrameShown;
             LayoutControlBar();
         }
