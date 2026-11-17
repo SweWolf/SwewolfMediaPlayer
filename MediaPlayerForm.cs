@@ -710,10 +710,10 @@ namespace SwewolfMediaPlayer
 
         private void ApplySeekState()
         {
-            // What can never work for this file is hidden; the seek bar of a file that only plays on (SID music) stays
-            // as a read-only progress bar. This runs again for every file opened in the window (drop, explorer).
+            // What can never work for this file is hidden: no seek bar for a stream or for SID music (a file that only plays on).
+            // This runs again for every file opened in the window (drop, explorer).
             trkSeek.Enabled = CanSeek;
-            trkSeek.Visible = !_isStream;
+            trkSeek.Visible = !_isStream && !SidPluginSetup.IsSidFile(_filePath);
             UpdateRecordButton();
             _skipShown = CanSeek;
             if (btnSkipBack != null && btnSkipForward != null)

@@ -6,6 +6,7 @@
 //
 // History:
 //   2026-10-23  First version.
+//   2026-11-14  The top left texts: title, author and released (file order), without empty or "???" ones, each with its label.
 
 namespace SwewolfMediaPlayer
 {
@@ -48,6 +49,17 @@ namespace SwewolfMediaPlayer
             RefreshSidInfo();
         }
 
+        private static string? Labeled(string label, string? text)
+        {
+            return text == null ? null : $"{label}: {text}";
+        }
+
+        // A SID file says "unknown" with question marks ("<?>", "???"): such a text, and an empty one, is not shown.
+        private static string? KnownSidText(string? text)
+        {
+            return string.IsNullOrWhiteSpace(text) || text.All(c => c is '?' or '<' or '>' || char.IsWhiteSpace(c)) ? null : text.Trim();
+        }
+
         // Forget the texts of the previous file (called by ResetTunes).
         private void ResetSidInfo()
         {
@@ -64,8 +76,10 @@ namespace SwewolfMediaPlayer
             if (sid && _sidHeader != null)
             {
                 string? line = _tuneCount > 1 ? TuneTitle(_tuneIndex) ?? $"Tune {_tuneIndex + 1}" : TuneTitle(0);
-                string author = _sidHeader.Author == "<?>" ? "" : _sidHeader.Author;   // "<?>" is how a SID file says the author is unknown
-                ShowTrackInfo(author, _sidHeader.Title, line);
+                // The header's texts in the order of the file (title, author, released), the tune's own name last. Empty texts and "unknown" ones
+                // ("<?>", "???") are left out.
+                ShowTrackInfo(Labeled("Title", KnownSidText(_sidHeader.Title)), Labeled("Artist", KnownSidText(_sidHeader.Author)),
+                    Labeled("Copyright", KnownSidText(_sidHeader.Released)), Labeled("Tune", KnownSidText(line)));
             }
             else if (sid)
             {

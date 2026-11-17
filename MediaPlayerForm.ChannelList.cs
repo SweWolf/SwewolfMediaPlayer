@@ -10,6 +10,8 @@
 // History:
 //   2026-11-12  First version.
 //   2026-11-13  "Recently Watched" in the group drop-down: the last 10 channels that really played, newest first (RecentChannels.cs).
+//   2026-11-16  Hide Channel / Unhide Channel (right-click): hidden channels are left out of every view and are found in the last group,
+//               "Hidden Channels", which only exists while at least one channel is hidden (HiddenChannels.cs).
 //   2026-11-13  "Favorites" group (right-click: Add to Favorites / Remove from Favorites), before Recently Watched (FavoriteChannels.cs).
 //   2026-11-13  A gold star on the rows of the favorites (ShowFavoriteStars, a setting later).
 
@@ -33,6 +35,8 @@ namespace SwewolfMediaPlayer
         // A gold star on the rows of the favorites. A setting for this may come later: it will replace this property.
         private bool ShowFavoriteStars => true;
         private HashSet<string> _favoriteUrls = new(StringComparer.OrdinalIgnoreCase);   // FavoriteChannels in memory, for drawing the rows
+        private HashSet<string> _hiddenUrls = new(StringComparer.OrdinalIgnoreCase);   // HiddenChannels in memory
+        private const string HiddenGroupName = "Hidden Channels";   // the last item of the group drop-down, there only while a channel is hidden
         private const string FavoritesGroupName = "Favorites";   // first item after "All Groups": the channels the user marked
         private const string RecentGroupName = "Recently Watched";   // second item of the group drop-down: the last 10 channels that played
         private string? _channelListSource;            // the web address of the list the channels came from (null for a file); kept with a recording
@@ -94,6 +98,7 @@ namespace SwewolfMediaPlayer
         {
             _channels = entries;
             _favoriteUrls = FavoriteChannels.All().ToHashSet(StringComparer.OrdinalIgnoreCase);
+            _hiddenUrls = HiddenChannels.All().ToHashSet(StringComparer.OrdinalIgnoreCase);
             _channelIndex = -1;
             _channelListShown = true;
             EnsureChannelList();
@@ -109,6 +114,7 @@ namespace SwewolfMediaPlayer
             {
                 _cboChannelGroup.Items.Add(group);
             }
+            UpdateHiddenGroupItem();
             _cboChannelGroup.SelectedIndex = 0;
             _cboChannelGroup.EndUpdate();
             _txtChannelFilter!.Clear();
@@ -118,6 +124,36 @@ namespace SwewolfMediaPlayer
             UpdateChannelPanelSide();
             UpdateRecordButton();   // the list itself is not recorded: nothing plays until a channel is chosen
             LayoutControlBar();
+        }
+
+        // The index of "Hidden Channels" in the drop-down (the last item), when it is there.
+        private int HiddenGroupIndex => 3 + _channelGroups.Count;
+
+        private bool IsHidden(M3uEntry channel) => _hiddenUrls.Contains(channel.Url);
+
+        // "Hidden Channels" is shown only while this list has a hidden channel. When the last one is unhidden while the group is open, the list goes back to All Groups.
+        private void UpdateHiddenGroupItem()
+        {
+            if (_cboChannelGroup == null || _channels == null)
+            {
+                return;
+            }
+
+            bool any = _channels.Any(IsHidden);
+            bool there = _cboChannelGroup.Items.Count > HiddenGroupIndex;
+            if (any && !there)
+            {
+                _cboChannelGroup.Items.Add(HiddenGroupName);
+            }
+            else if (!any && there)
+            {
+                bool open = _cboChannelGroup.SelectedIndex == HiddenGroupIndex;
+                _cboChannelGroup.Items.RemoveAt(HiddenGroupIndex);
+                if (open)
+                {
+                    _cboChannelGroup.SelectedIndex = 0;
+                }
+            }
         }
 
         // A channel can be in several groups: "Entertainment;Family;General".
@@ -167,16 +203,27 @@ namespace SwewolfMediaPlayer
             int selected = _cboChannelGroup!.SelectedIndex;
             bool favorites = selected == 1;
             bool recent = selected == 2;
-            string? group = selected > 2 ? _channelGroups[selected - 3] : null;
+            bool hiddenView = selected == HiddenGroupIndex && _cboChannelGroup.Items.Count > HiddenGroupIndex;
+            string? group = selected > 2 && !hiddenView ? _channelGroups[selected - 3] : null;
 
             var rows = new List<object>();
-            if (favorites)
+            if (hiddenView)
+            {
+                for (int i = 0; i < _channels.Count; i++)
+                {
+                    if (IsHidden(_channels[i]) && (words.Length == 0 || words.All(w => _channels[i].Name.Contains(w, StringComparison.CurrentCultureIgnoreCase))))
+                    {
+                        rows.Add(i);
+                    }
+                }
+            }
+            else if (favorites)
             {
                 // In the order of the list; only those that this list has.
                 HashSet<string> urls = FavoriteChannels.All().ToHashSet(StringComparer.OrdinalIgnoreCase);
                 for (int i = 0; i < _channels.Count; i++)
                 {
-                    if (urls.Contains(_channels[i].Url) && (words.Length == 0 || words.All(w => _channels[i].Name.Contains(w, StringComparison.CurrentCultureIgnoreCase))))
+                    if (urls.Contains(_channels[i].Url) && !IsHidden(_channels[i]) && (words.Length == 0 || words.All(w => _channels[i].Name.Contains(w, StringComparison.CurrentCultureIgnoreCase))))
                     {
                         rows.Add(i);
                     }
@@ -188,7 +235,7 @@ namespace SwewolfMediaPlayer
                 foreach (string url in RecentChannels.All())
                 {
                     int i = _channels.FindIndex(c => string.Equals(c.Url, url, StringComparison.OrdinalIgnoreCase));
-                    if (i >= 0 && (words.Length == 0 || words.All(w => _channels[i].Name.Contains(w, StringComparison.CurrentCultureIgnoreCase))))
+                    if (i >= 0 && !IsHidden(_channels[i]) && (words.Length == 0 || words.All(w => _channels[i].Name.Contains(w, StringComparison.CurrentCultureIgnoreCase))))
                     {
                         rows.Add(i);
                     }
@@ -199,6 +246,10 @@ namespace SwewolfMediaPlayer
                 for (int i = 0; i < _channels.Count; i++)
                 {
                     M3uEntry channel = _channels[i];
+                    if (IsHidden(channel))
+                    {
+                        continue;
+                    }
                     if (group != null && !GroupsOf(channel).Contains(group, StringComparer.OrdinalIgnoreCase))
                     {
                         continue;
@@ -215,7 +266,8 @@ namespace SwewolfMediaPlayer
             _lstChannels.Items.Clear();
             _lstChannels.Items.AddRange(rows.ToArray());
             _lstChannels.EndUpdate();
-            _lblChannelsHeader!.Text = rows.Count == _channels.Count ? $"Channels ({rows.Count:N0})" : $"Channels ({rows.Count:N0} of {_channels.Count:N0})";
+            int total = hiddenView ? _channels.Count(IsHidden) : _channels.Count(c => !IsHidden(c));   // the hidden ones are not counted in the other views
+            _lblChannelsHeader!.Text = rows.Count == total ? $"Channels ({rows.Count:N0})" : $"Channels ({rows.Count:N0} of {total:N0})";
 
             // Keep the channel that plays in view when it is in the list (not in the recent list: the newest is on top).
             int at = _channelIndex >= 0 && !recent ? rows.IndexOf(_channelIndex) : -1;
@@ -510,7 +562,29 @@ namespace SwewolfMediaPlayer
                 }
                 _lstChannels?.Invalidate();
             };
+            var hide = new ToolStripMenuItem("Hide Channel");
+            hide.Click += (_, _) =>
+            {
+                if (url == null)
+                {
+                    return;
+                }
+                if (HiddenChannels.Contains(url))
+                {
+                    HiddenChannels.Remove(url);
+                }
+                else
+                {
+                    HiddenChannels.Add(url);
+                    FavoriteChannels.Remove(url);   // a hidden channel is not a favorite any more
+                    _favoriteUrls = FavoriteChannels.All().ToHashSet(StringComparer.OrdinalIgnoreCase);
+                }
+                _hiddenUrls = HiddenChannels.All().ToHashSet(StringComparer.OrdinalIgnoreCase);
+                UpdateHiddenGroupItem();   // a channel that plays goes on playing: only the list changes
+                ApplyChannelFilter();
+            };
             menu.Items.Add(favorite);
+            menu.Items.Add(hide);
             menu.Items.Add(copy);
             StyleMenu(menu);
             menu.Opening += (_, e) =>
@@ -526,6 +600,9 @@ namespace SwewolfMediaPlayer
                 url = _channels[index].Url;
                 copy.ToolTipText = url;
                 favorite.Text = FavoriteChannels.Contains(url) ? "Remove from Favorites" : "Add to Favorites";
+                bool hidden = HiddenChannels.Contains(url);
+                hide.Text = hidden ? "Unhide Channel" : "Hide Channel";
+                favorite.Visible = !hidden;   // a hidden channel is not shown in Favorites
             };
             return menu;
         }
