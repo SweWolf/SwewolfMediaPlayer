@@ -31,6 +31,8 @@
             components = new System.ComponentModel.Container();
             toolTip = new ToolTip(components);
             menuStrip = new MenuStrip();
+            menuMedia = new ToolStripMenuItem();
+            menuOpenDvd = new ToolStripMenuItem();
             menuTools = new ToolStripMenuItem();
             menuCreateShortcut = new ToolStripMenuItem();
             menuSettings = new ToolStripMenuItem();
@@ -50,11 +52,26 @@
             //
             // menuStrip
             //
-            menuStrip.Items.AddRange(new ToolStripItem[] { menuTools, menuIptv, menuMyRecordings, menuUnfinished, menuHelp, menuNewVersion });
+            menuStrip.Items.AddRange(new ToolStripItem[] { menuTools, menuMedia, menuIptv, menuMyRecordings, menuUnfinished, menuHelp, menuNewVersion });
             menuStrip.Location = new Point(0, 0);
             menuStrip.Name = "menuStrip";
             menuStrip.Size = new Size(754, 24);
             menuStrip.TabIndex = 4;
+            //
+            // menuMedia
+            //
+            menuMedia.DropDownItems.AddRange(new ToolStripItem[] { menuOpenDvd });
+            menuMedia.Name = "menuMedia";
+            menuMedia.Size = new Size(52, 20);
+            menuMedia.Text = "Media";
+            //
+            // menuOpenDvd
+            //
+            menuOpenDvd.Name = "menuOpenDvd";
+            menuOpenDvd.Size = new Size(180, 22);
+            menuOpenDvd.Text = "Open DVD";
+            menuOpenDvd.ToolTipText = "Play the DVD in the drive, with its menus.";
+            menuOpenDvd.Click += menuOpenDvd_Click;
             //
             // menuTools
             //
@@ -210,6 +227,8 @@
         private Button btnBrowse;
         private Button btnOpen;
         private MenuStrip menuStrip;
+        private ToolStripMenuItem menuMedia;
+        private ToolStripMenuItem menuOpenDvd;
         private ToolStripMenuItem menuTools;
         private ToolStripMenuItem menuCreateShortcut;
         private ToolStripMenuItem menuSettings;

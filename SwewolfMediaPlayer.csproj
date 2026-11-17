@@ -34,4 +34,9 @@
     <PackageReference Include="VideoLAN.LibVLC.Windows" Version="3.0.24" />
   </ItemGroup>
 
+  <!-- Plugins of VLC 3.0.24 (GPL) that the LibVLC package leaves out (DVD reader, AC-3 packetizer): they go into LibVLC's own plugin folders (access, packetizer) (see Resources\VlcDvd\README.txt). -->
+  <ItemGroup>
+    <None Include="Resources\VlcDvd\**\*.dll" Link="libvlc\win-x64\plugins\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
 </Project>

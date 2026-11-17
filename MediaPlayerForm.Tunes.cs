@@ -134,6 +134,10 @@ namespace SwewolfMediaPlayer
                 // A track of an audio CD that the lookup knows: "Artist - Title". Otherwise (not known, offline) the file name, Track03.cda.
                 return string.IsNullOrWhiteSpace(cd.Artist) ? cd.Title!.Trim() : $"{cd.Artist.Trim()} - {cd.Title!.Trim()}";
             }
+            if (IsDvd)
+            {
+                return DvdSupport.Title(_filePath);
+            }
             return _isStream && TryGetStreamUri(_filePath, out Uri? uri) ? uri!.Host : Path.GetFileName(_filePath);
         }
 
@@ -185,7 +189,7 @@ namespace SwewolfMediaPlayer
         // The Save Frame button is only for video: an audio file has no frame to save (decided 2026-11-16; before, a cover picture kept it visible).
         private void UpdateSaveFrameButton()
         {
-            _saveFrameShown = !IsAudioFile(_filePath);
+            _saveFrameShown = !IsAudioFile(_filePath) && !IsDvd;   // (a DVD has no file for FFmpeg to read the frame from)
             btnSaveFrame.Visible = _saveFrameShown;
             LayoutControlBar();
         }
@@ -237,8 +241,12 @@ namespace SwewolfMediaPlayer
             }
             if (btnBookmark != null)   // right of the camera button
             {
-                btnBookmark.Left = x + gap;
-                x = btnBookmark.Right;
+                btnBookmark.Visible = !IsDvd;   // a bookmark cannot point into a DVD (the disc is not a file)
+                if (btnBookmark.Visible)
+                {
+                    btnBookmark.Left = x + gap;
+                    x = btnBookmark.Right;
+                }
             }
 
             int left = x + LogicalToDeviceUnits(8);

@@ -34,6 +34,7 @@ namespace SwewolfMediaPlayer
         {
             _chapters = null;
             _chaptersChecked = false;
+            _dvdTitle = _dvdChapterCount = -2;   // (a DVD reads its chapters again)
             ShowChapterControls(false);
         }
 
@@ -43,6 +44,12 @@ namespace SwewolfMediaPlayer
             MediaPlayer? player = _player;
             if (player == null || _isStream)
             {
+                return;
+            }
+
+            if (IsDvd)
+            {
+                CheckDvdChapters(player);
                 return;
             }
 
@@ -138,7 +145,20 @@ namespace SwewolfMediaPlayer
                 return;
             }
 
-            SeekTo(_chapters[target].TimeOffset);
+            JumpToChapter(target);
+        }
+
+        // A DVD jumps by its own chapter numbers; a file seeks to the start time of the chapter.
+        private void JumpToChapter(int index)
+        {
+            if (IsDvd && _player != null)
+            {
+                _player.Chapter = index;
+            }
+            else
+            {
+                SeekTo(_chapters![index].TimeOffset);
+            }
         }
 
         private void AddChapterMenu()
@@ -156,7 +176,7 @@ namespace SwewolfMediaPlayer
                 int index = i;
                 string name = _chapters[i].Name is { } chapterName && !string.IsNullOrWhiteSpace(chapterName) ? chapterName : $"Chapter {i + 1}";
                 string text = $"{name}   ({FormatTime(_chapters[i].TimeOffset, false)})";
-                menu.DropDownItems.Add(TrackItem(text, index == current, () => SeekTo(_chapters[index].TimeOffset)));
+                menu.DropDownItems.Add(TrackItem(text, index == current, () => JumpToChapter(index)));
             }
             menuVideo.Items.Add(menu);
         }

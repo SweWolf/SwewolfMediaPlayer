@@ -55,6 +55,11 @@ namespace SwewolfMediaPlayer
                 return;
             }
 
+            if (IsDvd)
+            {
+                return;   // (no bookmark of a DVD yet)
+            }
+
             if (!File.Exists(_filePath))
             {
                 return;

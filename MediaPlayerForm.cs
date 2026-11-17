@@ -126,6 +126,7 @@ namespace SwewolfMediaPlayer
 
         private string _filePath;   // changes when another file is dropped on the window
         private bool _isStream;   // a web address (e.g. an HLS stream) and not a file
+        private bool IsDvd => !_isStream && DvdSupport.IsDvdPath(_filePath);   // a video DVD (VIDEO_TS.IFO of a disc or folder, or an .iso): LibVLC reads the disc itself, with its menus (DvdSupport.cs)
         private MediaPlayer? _player;
         private Media? _media;
         private System.Diagnostics.Stopwatch? _openWatch;   // timing log: runs from Play until the first time update
@@ -208,7 +209,7 @@ namespace SwewolfMediaPlayer
             _filePath = filePath;
             _libraryPath = libraryPath ?? filePath;
             _isStream = TryGetStreamUri(filePath, out Uri? uri);
-            Text = _isStream ? uri!.Host : Path.GetFileName(filePath);
+            Text = _isStream ? uri!.Host : DvdSupport.IsDvdPath(filePath) ? DvdSupport.Title(filePath) : Path.GetFileName(filePath);
             // A stream cannot be seeked or stepped back: the seek bar is of no use.
             ApplySeekState();
             ShowLoading("Loading the video engine...");
@@ -357,7 +358,7 @@ namespace SwewolfMediaPlayer
             _filePath = path;
             _libraryPath = libraryPath;
             _isStream = TryGetStreamUri(path, out Uri? uri);
-            Text = _isStream ? uri!.Host : Path.GetFileName(path);
+            Text = _isStream ? uri!.Host : DvdSupport.IsDvdPath(path) ? DvdSupport.Title(path) : Path.GetFileName(path);
             _vlcSeekable = true;
             ApplySeekState();
             txtStartAt.Clear();
@@ -658,10 +659,12 @@ namespace SwewolfMediaPlayer
             // Includes the time the resume prompt waits for the user, if it is shown.
             OpenTimingLog.Write($"StartMedia: library/resume, {stepWatch.ElapsedMilliseconds} ms");
             stepWatch.Restart();
-            if (IsGifFile && _trimVisible)
+            if ((IsGifFile || IsDvd) && _trimVisible)
             {
-                SetTrimVisible(false);   // a GIF is not trimmed
+                SetTrimVisible(false);   // a GIF or a DVD is not trimmed
             }
+            // The disc menus need the mouse; everything else keeps the right-click menu of the video area.
+            _player.EnableMouseInput = IsDvd;
             _media = CreateMedia(_activeLib, _filePath, _isStream);
             _mediaStartsAtEnd = false;
             _openWatch = System.Diagnostics.Stopwatch.StartNew();
@@ -888,6 +891,10 @@ namespace SwewolfMediaPlayer
             if (HandleChannelFilterKey(keyData, out bool filterKeyHandled))
             {
                 return filterKeyHandled || base.ProcessCmdKey(ref msg, keyData);
+            }
+            if (IsDvd && HandleDvdKey(keyData))
+            {
+                return true;
             }
             if (keyData == Keys.Space)
             {
@@ -1432,6 +1439,11 @@ namespace SwewolfMediaPlayer
                 Media cdMedia = new(lib, cdLocation!, FromType.FromLocation);
                 cdMedia.AddOption($":cdda-track={cdTrack}");
                 return cdMedia;
+            }
+            if (!isStream && DvdSupport.IsDvdPath(path))
+            {
+                // A video DVD: LibVLC reads the disc (or folder, or image) itself and shows its menus.
+                return new Media(lib, DvdSupport.Location(path), FromType.FromLocation);
             }
             Media media = new(lib, path, isStream ? FromType.FromLocation : FromType.FromPath);
             if (_nextStartSeconds is { } startAt && !isStream && IsRecordingPlayback)

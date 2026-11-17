@@ -74,6 +74,10 @@ namespace SwewolfMediaPlayer
                     path = args[i].Trim().Trim('"');
                 }
             }
+            if (!string.IsNullOrEmpty(path) && DvdSupport.TryResolve(path, out string dvdInfo))
+            {
+                path = dvdInfo;   // a DVD drive or folder (E:\) opens as a DVD
+            }
             if (!string.IsNullOrEmpty(path))
             {
                 if (MediaPlayerForm.TryGetStreamUri(path, out _) || File.Exists(path))

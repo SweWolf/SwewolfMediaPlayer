@@ -24,6 +24,32 @@ namespace SwewolfMediaPlayer
             _ = MediaPlayerForm.PreloadAsync();
         }
 
+        // Media > Open DVD: the one video DVD in the drives is played at once; with several the user chooses from a list at the menu item.
+        private void menuOpenDvd_Click(object? sender, EventArgs e)
+        {
+            List<DvdDisc> discs = DvdSupport.FindDiscs();
+            if (discs.Count == 0)
+            {
+                MessageBox.Show(this, DvdSupport.HasOpticalDrive()
+                    ? "No video DVD was found. Insert a DVD and try again."
+                    : "This computer has no DVD drive.", AppName, MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
+            if (discs.Count == 1)
+            {
+                OpenMedia(discs[0].InfoFile);
+                return;
+            }
+            var choose = new ContextMenuStrip();
+            foreach (DvdDisc disc in discs)
+            {
+                DvdDisc captured = disc;
+                choose.Items.Add(new ToolStripMenuItem(captured.Display.Replace("&", "&&"), null, (_, _) => OpenMedia(captured.InfoFile)));
+            }
+            choose.Closed += (_, _) => BeginInvoke(choose.Dispose);
+            choose.Show(menuStrip, new Point(menuMedia.Bounds.Left, menuMedia.Bounds.Bottom));
+        }
+
         private void menuCreateShortcut_Click(object? sender, EventArgs e)
         {
             using var form = new CreateShortcutForm(Application.ExecutablePath);
@@ -177,10 +203,15 @@ namespace SwewolfMediaPlayer
         // Opens a file or web address in a player window. Used by Open and by the IPTV menu (which leaves the box alone).
         private void OpenMedia(string path)
         {
+            // A DVD drive or folder (E: or E:\) is opened like Media > Open DVD.
+            if (DvdSupport.TryResolve(path, out string dvdInfo))
+            {
+                path = dvdInfo;
+            }
             // A web address (a stream) is not checked: only files must exist.
             if (!MediaPlayerForm.TryGetStreamUri(path, out _) && !File.Exists(path))
             {
-                MessageBox.Show(this, $"The file \"{path}\" does not exist.", AppName,
+                MessageBox.Show(this, Directory.Exists(path) ? $"No video DVD was found in \"{path}\"." : $"The file \"{path}\" does not exist.", AppName,
                     MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 txtFile.Focus();
                 return;

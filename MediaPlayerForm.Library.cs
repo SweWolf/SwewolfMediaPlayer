@@ -40,7 +40,7 @@ namespace SwewolfMediaPlayer
         private long _resumeStoredLengthMs;
         private bool _resumeIgnoreStoredLength;   // the start time was asked for by the explorer (Demo Play): it does not belong to a saved length
 
-        private bool LibraryActive => !_isStream && _libraryPath.Length > 0;
+        private bool LibraryActive => !_isStream && !IsDvd && _libraryPath.Length > 0;   // a DVD is not remembered: its position is not a time in a file
 
         // Whether this file gets a resume point, by the setting. An audio file needs its length (known once it plays).
         private bool PositionWanted()
