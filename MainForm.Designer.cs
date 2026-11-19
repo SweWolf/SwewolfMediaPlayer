@@ -41,6 +41,7 @@
             menuNewVersion = new ToolStripMenuItem();
             menuIptv = new ToolStripMenuItem();
             menuOpenPlaylist = new ToolStripMenuItem();
+            menuCheckChannels = new ToolStripMenuItem();
             menuMyRecordings = new ToolStripMenuItem();
             menuUnfinished = new ToolStripMenuItem();
             lblFile = new Label();
@@ -96,7 +97,7 @@
             //
             // menuIptv
             //
-            menuIptv.DropDownItems.AddRange(new ToolStripItem[] { menuOpenPlaylist });
+            menuIptv.DropDownItems.AddRange(new ToolStripItem[] { menuOpenPlaylist, menuCheckChannels });
             menuIptv.Name = "menuIptv";
             menuIptv.Size = new Size(41, 20);
             menuIptv.Text = "IPTV";
@@ -108,6 +109,14 @@
             menuOpenPlaylist.Text = "Open Playlist";
             menuOpenPlaylist.ToolTipText = "Open the public IPTV channel list (iptv-org).";
             menuOpenPlaylist.Click += menuOpenPlaylist_Click;
+            //
+            // menuCheckChannels
+            //
+            menuCheckChannels.Name = "menuCheckChannels";
+            menuCheckChannels.Size = new Size(180, 22);
+            menuCheckChannels.Text = "Check Channels";
+            menuCheckChannels.ToolTipText = "Find out which channels of the public IPTV list answer, in the background. The result is shown when you point at a channel.";
+            menuCheckChannels.Click += menuCheckChannels_Click;
             //
             // menuMyRecordings
             //
@@ -235,6 +244,7 @@
         private ToolStripMenuItem menuNewVersion;
         private ToolStripMenuItem menuIptv;
         private ToolStripMenuItem menuOpenPlaylist;
+        private ToolStripMenuItem menuCheckChannels;
         private ToolStripMenuItem menuMyRecordings;
         private ToolStripMenuItem menuUnfinished;
         private ToolStripMenuItem menuHelp;

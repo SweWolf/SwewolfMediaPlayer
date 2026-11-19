@@ -456,7 +456,7 @@ namespace SwewolfMediaPlayer
             lblWhenEnds.Name = "lblWhenEnds";
             lblWhenEnds.Size = new Size(106, 15);
             lblWhenEnds.TabIndex = 0;
-            lblWhenEnds.Text = "When the Video Ends";
+            lblWhenEnds.Text = "When the Media File Ends";
             // 
             // cboWhenEnds
             // 
@@ -468,7 +468,7 @@ namespace SwewolfMediaPlayer
             cboWhenEnds.Name = "cboWhenEnds";
             cboWhenEnds.Size = new Size(170, 23);
             cboWhenEnds.TabIndex = 1;
-            toolTip.SetToolTip(cboWhenEnds, "What the player does when a video has played to its end");
+            toolTip.SetToolTip(cboWhenEnds, "What the player does when a media file has played to its end.\r\nFor a playlist: what happens after the last item.");
             cboWhenEnds.SelectedIndexChanged += cboWhenEnds_SelectedIndexChanged;
             // 
             // grpTrim

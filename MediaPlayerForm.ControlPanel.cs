@@ -13,6 +13,7 @@
 //   2026-11-18  A player started with a file argument uses "Close Player" without saving it (UseCloseWhenEnds).
 //   2026-11-18  A file handed over to a running player through the pipe does the same (PlayFromPipeAsync).
 //   2026-10-26  A "Show Subtitles" check box was added and removed again the next day: the default is in Tools > Settings, the choice per file is
+//   2026-11-19  The label reads "When the Media File Ends", or "When the Playlist Ends" while a playlist is open (UpdateEndLabel).
 //               remembered in the library (MediaPlayerForm.Tracks.cs).
 
 namespace SwewolfMediaPlayer

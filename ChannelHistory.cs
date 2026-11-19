@@ -10,6 +10,7 @@
 //
 // History:
 //   2026-11-18  First version.
+//   2026-11-18  Results can be recorded without saving at once (save: false) and saved with Flush (Check Channels).
 
 using System.Text.Json;
 
@@ -39,7 +40,7 @@ namespace SwewolfMediaPlayer
             }
         }
 
-        public static void RecordWorked(string url)
+        public static void RecordWorked(string url, bool save = true)
         {
             lock (Gate)
             {
@@ -51,12 +52,12 @@ namespace SwewolfMediaPlayer
                 entry.LastWorked = DateTime.Now;
                 entry.FailingSince = null;
                 entry.FailCount = 0;
-                Save(all);
+                SaveOrMark(all, save);
             }
         }
 
         // Returns the entry as it is after this failure.
-        public static ChannelHistoryEntry RecordFailed(string url)
+        public static ChannelHistoryEntry RecordFailed(string url, bool save = true)
         {
             lock (Gate)
             {
@@ -69,13 +70,40 @@ namespace SwewolfMediaPlayer
                 entry.FailingSince ??= now;
                 entry.LastFailed = now;
                 entry.FailCount++;
-                Save(all);
+                SaveOrMark(all, save);
                 return entry;
+            }
+        }
+
+        // Check Channels records thousands of results: it asks for them to be saved every few seconds (Flush) instead of every time.
+        private static bool _dirty;
+
+        private static void SaveOrMark(Dictionary<string, ChannelHistoryEntry> all, bool save)
+        {
+            if (save)
+            {
+                Save(all);
+            }
+            else
+            {
+                _dirty = true;
+            }
+        }
+
+        public static void Flush()
+        {
+            lock (Gate)
+            {
+                if (_dirty && _all != null)
+                {
+                    Save(_all);
+                }
             }
         }
 
         private static void Save(Dictionary<string, ChannelHistoryEntry> all)
         {
+            _dirty = false;
             try
             {
                 Directory.CreateDirectory(Path.GetDirectoryName(FilePath)!);

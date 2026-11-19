@@ -36,6 +36,8 @@ namespace SwewolfMediaPlayer
             cboResumeMode = new ComboBox();
             lblRewind = new Label();
             nudRewind = new NumericUpDown();
+            lblNoticeSeconds = new Label();
+            nudNoticeSeconds = new NumericUpDown();
             lblSeconds = new Label();
             chkResumeAudio = new CheckBox();
             lblAudioMode = new Label();
@@ -57,6 +59,7 @@ namespace SwewolfMediaPlayer
             grpOpen.SuspendLayout();
             grpResume.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)nudRewind).BeginInit();
+            ((System.ComponentModel.ISupportInitialize)nudNoticeSeconds).BeginInit();
             ((System.ComponentModel.ISupportInitialize)nudAudioMinutes).BeginInit();
             grpFrames.SuspendLayout();
             grpUpdate.SuspendLayout();
@@ -80,9 +83,11 @@ namespace SwewolfMediaPlayer
             grpPlayer.Controls.Add(cboButtonLook);
             grpPlayer.Controls.Add(lblListSide);
             grpPlayer.Controls.Add(cboListSide);
+            grpPlayer.Controls.Add(lblNoticeSeconds);
+            grpPlayer.Controls.Add(nudNoticeSeconds);
             grpPlayer.Location = new Point(12, 12);
             grpPlayer.Name = "grpPlayer";
-            grpPlayer.Size = new Size(360, 292);
+            grpPlayer.Size = new Size(360, 346);
             grpPlayer.TabIndex = 0;
             grpPlayer.TabStop = false;
             grpPlayer.Text = "Player";
@@ -187,6 +192,25 @@ namespace SwewolfMediaPlayer
             cboListSide.Size = new Size(218, 23);
             cboListSide.TabIndex = 9;
             toolTip.SetToolTip(cboListSide, "Which side of the window the list of tunes (SID music)\r\nand the list of channels (an M3U list) are shown on.\r\nA player that is already open keeps its side until it is opened again.");
+            //
+            // lblNoticeSeconds
+            //
+            lblNoticeSeconds.AutoSize = true;
+            lblNoticeSeconds.Location = new Point(10, 292);
+            lblNoticeSeconds.Name = "lblNoticeSeconds";
+            lblNoticeSeconds.TabIndex = 10;
+            lblNoticeSeconds.Text = "Seconds to Show a Playlist Error";
+            //
+            // nudNoticeSeconds
+            //
+            nudNoticeSeconds.Location = new Point(10, 310);
+            nudNoticeSeconds.Maximum = new decimal(new int[] { 60, 0, 0, 0 });
+            nudNoticeSeconds.Minimum = new decimal(new int[] { 1, 0, 0, 0 });
+            nudNoticeSeconds.Name = "nudNoticeSeconds";
+            nudNoticeSeconds.Size = new Size(60, 23);
+            nudNoticeSeconds.TabIndex = 11;
+            nudNoticeSeconds.Value = new decimal(new int[] { 10, 0, 0, 0 });
+            toolTip.SetToolTip(nudNoticeSeconds, "When an item of a playlist cannot be played (missing or damaged), a message tells why.\r\nThis many seconds later the next item starts by itself. Next or Skip Now does not wait.");
             //
             // grpOpen
             //
@@ -489,6 +513,7 @@ namespace SwewolfMediaPlayer
             grpResume.ResumeLayout(false);
             grpResume.PerformLayout();
             ((System.ComponentModel.ISupportInitialize)nudRewind).EndInit();
+            ((System.ComponentModel.ISupportInitialize)nudNoticeSeconds).EndInit();
             ((System.ComponentModel.ISupportInitialize)nudAudioMinutes).EndInit();
             grpFrames.ResumeLayout(false);
             grpFrames.PerformLayout();
@@ -509,6 +534,8 @@ namespace SwewolfMediaPlayer
         private ComboBox cboButtonLook;
         private Label lblListSide;
         private ComboBox cboListSide;
+        private Label lblNoticeSeconds;
+        private NumericUpDown nudNoticeSeconds;
         private GroupBox grpOpen;
         private Label lblOpenFolder;
         private TextBox txtOpenFolder;

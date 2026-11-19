@@ -112,6 +112,7 @@ namespace SwewolfMediaPlayer
             cboCoverSize.SelectedIndex = Math.Clamp(settings.CoverPictureSize, 0, 1);
             cboButtonLook.SelectedIndex = settings.ClassicTrackButtons ? 1 : 0;
             cboListSide.SelectedIndex = Math.Clamp(settings.ListSide, 0, 1);
+            nudNoticeSeconds.Value = Math.Clamp(settings.PlaylistNoticeSeconds, (int)nudNoticeSeconds.Minimum, (int)nudNoticeSeconds.Maximum);
             cboResumeMode.SelectedIndex = Math.Clamp(settings.ResumeWhenOpening, 0, 2);
             chkResumeAudio.Checked = settings.ResumeAudioFiles;
             cboAudioMode.SelectedIndex = Math.Clamp(settings.ResumeAudioMode, 0, 1);
@@ -144,6 +145,7 @@ namespace SwewolfMediaPlayer
             settings.CoverPictureSize = Math.Max(0, cboCoverSize.SelectedIndex);
             settings.ClassicTrackButtons = cboButtonLook.SelectedIndex == 1;
             settings.ListSide = Math.Max(0, cboListSide.SelectedIndex);
+            settings.PlaylistNoticeSeconds = (int)nudNoticeSeconds.Value;
             settings.ResumeWhenOpening = Math.Max(0, cboResumeMode.SelectedIndex);
             settings.ResumeAudioFiles = chkResumeAudio.Checked;
             settings.ResumeAudioMode = Math.Max(0, cboAudioMode.SelectedIndex);

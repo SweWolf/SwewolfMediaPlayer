@@ -84,6 +84,7 @@
 //               SWEWOLF_VLC_LOG=1 writes LibVLC's own log into the timing log.
 //   2026-11-12  Record button for streams (MediaPlayerForm.Record.cs, StreamRecorder.cs): records to a .ts file, watch it meanwhile, Stop saves an MP4.
 //   2026-11-12  A saved recording goes into My Recordings (RecordingStore.cs, MainForm.Recordings.cs, RecordingsForm.cs) and the library keeps its stream address.
+//   2026-11-19  Playlist files (MediaPlayerForm.Playlist.cs): the end of an item goes to the next one (PlaylistItemEnded), a failed item is reported (EncounteredError), Stop ends the countdown.
 
 using System.ComponentModel;
 using System.Drawing.Drawing2D;
@@ -559,6 +560,7 @@ namespace SwewolfMediaPlayer
                 {
                     return;
                 }
+                _playlistFailsInRow = 0;   // an item plays: the "nothing plays" check of a repeating playlist starts again
                 _paused = false;
                 _stepTimeMs = -1;
                 ShowPlayPause(true);
@@ -592,6 +594,13 @@ namespace SwewolfMediaPlayer
                     OnEndReached();
                 }
             });
+            _player.EncounteredError += (s, a) => Post(() =>
+            {
+                if (ReferenceEquals(mine, _player) && _playlistMode && !_restoringEnd)
+                {
+                    OnPlaylistItemFailed(_channelIndex, "The file could not be played. It may be damaged or in a format the player does not support.");
+                }
+            });
             _player.SeekableChanged += (s, a) => Post(() =>
             {
                 _vlcSeekable = a.Seekable != 0;
@@ -611,6 +620,10 @@ namespace SwewolfMediaPlayer
                 if (!ReferenceEquals(mine, _player))
                 {
                     return;
+                }
+                if (a.Time > 0)
+                {
+                    _playlistItemPlayed = true;   // the item really plays (a damaged file "ends" at once instead)
                 }
                 if (!_paused)
                 {
@@ -886,6 +899,12 @@ namespace SwewolfMediaPlayer
             if (_trimming)
             {
                 return base.ProcessCmdKey(ref msg, keyData);
+            }
+            // F8 (alone) hides / shows the channel list or the playlist, also while typing in its filter box.
+            if (keyData == Keys.F8 && _channels != null)
+            {
+                SetChannelListShown(!_channelListShown);
+                return true;
             }
             // Typing in the filter box of the channel list: the keys are for the text, not for the player.
             if (HandleChannelFilterKey(keyData, out bool filterKeyHandled))
@@ -1295,6 +1314,12 @@ namespace SwewolfMediaPlayer
             if (IsRecordingPlayback && _recorder is { IsRunning: true } && !_recordFinishing)
             {
                 _ = ReopenRecordingAsync();
+                return;
+            }
+
+            // A playlist of this player: the next item starts (after the last one the end action decides; see MediaPlayerForm.Playlist.cs).
+            if (PlaylistItemEnded())
+            {
                 return;
             }
 
@@ -2486,6 +2511,7 @@ namespace SwewolfMediaPlayer
                 return;
             }
             _tuneAdvanceAtTicks = 0;
+            CancelPlaylistNotice();   // Stop is a regular stop: a countdown to the next item ends
             EndPreview(false);
             MediaPlayer? player = _player;
             if (player != null)

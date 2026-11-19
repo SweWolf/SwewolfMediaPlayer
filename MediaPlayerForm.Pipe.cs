@@ -10,6 +10,7 @@
 //   2026-10-20  First version.
 //   2026-10-21  The play command's StartMs starts a file at that time (Demo Play); --start-at and --no-resume do the same for a file on the command line.
 //   2026-10-21  While the explorer runs a playlist the two buttons next to the seek bar (the tune buttons of SID files) skip tracks: they send "skip"
+//   2026-11-19  TrackSkipping is also true while a playlist of this player runs; SkipTrack then moves in that playlist (the explorer's playlist is unchanged).
 //               (direction next / previous) and the explorer decides what plays; Page Up / Page Down (without tunes) and the media keys do the same.
 
 using System.Runtime.InteropServices;
@@ -54,7 +55,7 @@ namespace SwewolfMediaPlayer
         }
 
         /// <summary>True while the explorer runs a playlist in this window: the two buttons skip tracks instead of tunes.</summary>
-        internal bool TrackSkipping => _controlled && _pipe != null;
+        internal bool TrackSkipping => (_controlled && _pipe != null) || _playlistMode;
 
         private void SetControlled(bool value)
         {
@@ -66,6 +67,11 @@ namespace SwewolfMediaPlayer
         /// <summary>A button, Page Up / Page Down or a media key: the explorer is asked for the previous or next track (it decides what plays).</summary>
         private void SkipTrack(int direction)
         {
+            if (_playlistMode)
+            {
+                PlaylistSkip(direction);   // the playlist of this player (MediaPlayerForm.Playlist.cs)
+                return;
+            }
             _pipe?.Send(new { @event = "skip", direction = direction > 0 ? "next" : "previous" });
         }
 

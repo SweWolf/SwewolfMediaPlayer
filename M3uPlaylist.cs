@@ -14,6 +14,7 @@
 //
 // History:
 //   2026-11-12  First version.
+//   2026-11-19  IsAddress, IsFilePlaylist and ResolvePaths: a list of local files (the explorer's playlist) is played item after item.
 
 using System.Drawing.Drawing2D;
 using System.Net;
@@ -63,6 +64,50 @@ namespace SwewolfMediaPlayer
         public static bool LooksLikeChannelList(string text)
         {
             return text.Contains("#EXTINF", StringComparison.Ordinal) && !text.Contains("#EXT-X-", StringComparison.Ordinal);
+        }
+
+        // True for an address on the web (http / https) or another kind of address that is not a file on a disk (rtsp://, udp://, ...).
+        public static bool IsAddress(string entry)
+        {
+            return Uri.TryCreate(entry, UriKind.Absolute, out Uri? uri) && uri.Scheme.Length > 1 && uri.Scheme != Uri.UriSchemeFile;
+        }
+
+        // A playlist of files (the explorer's .m3u8, not a list of TV channels): at least one entry is a file on a disk. The caller does not
+        // treat it as a channel list, but plays the items one after the other.
+        public static bool IsFilePlaylist(List<M3uEntry> entries)
+        {
+            return entries.Any(e => !IsAddress(e.Url));
+        }
+
+        // The file entries of a playlist file with full paths: a relative path is relative to the folder of the playlist, file:// addresses
+        // become paths. (Addresses on the web are left as they are.)
+        public static List<M3uEntry> ResolvePaths(List<M3uEntry> entries, string playlistPath)
+        {
+            string folder = Path.GetDirectoryName(Path.GetFullPath(playlistPath)) ?? "";
+            var result = new List<M3uEntry>(entries.Count);
+            foreach (M3uEntry entry in entries)
+            {
+                string url = entry.Url;
+                if (IsAddress(url))
+                {
+                    result.Add(entry);
+                    continue;
+                }
+                if (Uri.TryCreate(url, UriKind.Absolute, out Uri? fileUri) && fileUri.Scheme == Uri.UriSchemeFile)
+                {
+                    url = fileUri.LocalPath;
+                }
+                try
+                {
+                    url = Path.GetFullPath(Path.IsPathRooted(url) ? url : Path.Combine(folder, url));
+                }
+                catch (Exception ex) when (ex is ArgumentException or NotSupportedException or PathTooLongException)
+                {
+                    // An entry that is not a valid path stays as it is: it will be reported as not found when its turn comes.
+                }
+                result.Add(entry with { Url = url });
+            }
+            return result;
         }
 
         private static readonly Regex Attribute = new("([A-Za-z0-9_-]+)=\"([^\"]*)\"", RegexOptions.Compiled);

@@ -14,6 +14,7 @@
 //   2026-10-23  Tune names from HVSC's STIL in the window title and the Tune menu; a list of the tunes on the right (MediaPlayerForm.TuneList.cs).
 //   2026-11-06  Exact rule for the back button: more than 3 s restarts, 3 s or less goes to the previous track; a double-click always goes to the previous.
 //   2026-10-25  LayoutControlBar also places the chapter buttons (MediaPlayerForm.Chapters.cs), right of the tune buttons.
+//   2026-11-19  Previous / next buttons skip items while a playlist plays; the end of the last tune goes on in the playlist; Previous does not restart during a playlist message.
 
 using LibVLCSharp.Shared;
 
@@ -60,7 +61,7 @@ namespace SwewolfMediaPlayer
         // at 3 seconds or less they go to the previous file or tune (a double-click always does). True if it went back to the start.
         private bool RestartIfPlayedAWhile()
         {
-            if (_player == null || !CanSeek || _player.Time <= 3000)
+            if (_player == null || !CanSeek || _player.Time <= 3000 || _noticeShown)   // (during a playlist message Previous always goes back)
             {
                 return false;
             }
@@ -74,9 +75,14 @@ namespace SwewolfMediaPlayer
             if (btnPrevTune == null || btnNextTune == null) return;
 
             ShowTuneControls(_tuneCount > 1);
-            toolTip.SetToolTip(btnPrevTune, TrackSkipping ? "Previous Track" : "Previous Tune (Page Up)");
-            toolTip.SetToolTip(btnNextTune, TrackSkipping ? "Next Track" : "Next Tune (Page Down)");
-            if (TrackSkipping)
+            toolTip.SetToolTip(btnPrevTune, _playlistMode ? "Previous Item (Page Up)" : TrackSkipping ? "Previous Track" : "Previous Tune (Page Up)");
+            toolTip.SetToolTip(btnNextTune, _playlistMode ? "Next Item (Page Down)" : TrackSkipping ? "Next Track" : "Next Tune (Page Down)");
+            if (_playlistMode)
+            {
+                btnPrevTune.Enabled = true;   // on the first item it plays the item again
+                btnNextTune.Enabled = _channels != null && _channelIndex + 1 < _channels.Count;
+            }
+            else if (TrackSkipping)
             {
                 btnPrevTune.Enabled = btnNextTune.Enabled = true;
             }
@@ -324,6 +330,7 @@ namespace SwewolfMediaPlayer
             int next = _tuneIndex + 1;
             if (next >= _tuneCount)
             {
+                if (PlaylistItemEnded()) return;   // a playlist of this player goes on with its next item
                 if (ReportEnded()) return;   // the explorer's playlist goes on: it sends the next file
                 if (EffectiveEndAction == EndAction.ClosePlayer)
                 {

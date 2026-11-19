@@ -71,6 +71,21 @@ namespace SwewolfMediaPlayer
             OpenMedia(IptvPlaylistUrl);
         }
 
+        private CheckChannelsForm? _checkChannels;
+
+        private void menuCheckChannels_Click(object? sender, EventArgs e)
+        {
+            if (_checkChannels == null || _checkChannels.IsDisposed)
+            {
+                _checkChannels = new CheckChannelsForm(IptvPlaylistUrl) { Icon = Icon };
+                _checkChannels.Show(this);
+            }
+            else
+            {
+                _checkChannels.Activate();
+            }
+        }
+
         private void menuAbout_Click(object? sender, EventArgs e)
         {
             using var form = new AboutForm();

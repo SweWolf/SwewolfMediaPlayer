@@ -43,6 +43,28 @@ namespace SwewolfMediaPlayer
             }
         }
 
+        public static void AddMany(IEnumerable<string> urls)
+        {
+            lock (Gate)
+            {
+                List<string> list = Load();
+                var have = new HashSet<string>(list, StringComparer.OrdinalIgnoreCase);
+                bool changed = false;
+                foreach (string url in urls)
+                {
+                    if (have.Add(url))
+                    {
+                        list.Add(url);
+                        changed = true;
+                    }
+                }
+                if (changed)
+                {
+                    Save(list);
+                }
+            }
+        }
+
         public static void Remove(string url)
         {
             lock (Gate)

@@ -16,6 +16,8 @@
 //               "Hidden Channels", which only exists while at least one channel is hidden (HiddenChannels.cs).
 //   2026-11-13  "Favorites" group (right-click: Add to Favorites / Remove from Favorites), before Recently Watched (FavoriteChannels.cs).
 //   2026-11-13  A gold star on the rows of the favorites (ShowFavoriteStars, a setting later).
+//   2026-11-19  F8 hides / shows the list; the X says "Hide the Channel List" or "Hide the Playlist".
+//   2026-11-19  A .m3u / .m3u8 of local files is a playlist, not a channel list: the same panel without filter, group and favorites (MediaPlayerForm.Playlist.cs).
 
 namespace SwewolfMediaPlayer
 {
@@ -61,7 +63,7 @@ namespace SwewolfMediaPlayer
             {
                 return true;
             }
-            if (text == null || !M3uPlaylist.LooksLikeChannelList(text))
+            if (text == null || text.Contains("#EXT-X-", StringComparison.Ordinal))
             {
                 HideLoading();
                 return false;   // an HLS stream, or a file that cannot be read: the player tries it as it is
@@ -72,10 +74,26 @@ namespace SwewolfMediaPlayer
             {
                 return true;
             }
+
+            // A list of files on a disk (the explorer's playlist) plays item after item. It does not need #EXTINF lines.
+            bool isFileList = M3uPlaylist.IsFilePlaylist(entries);
+            if (!isFileList && !M3uPlaylist.LooksLikeChannelList(text))
+            {
+                HideLoading();
+                return false;
+            }
             if (entries.Count == 0)
             {
                 HideLoading();
                 MessageBox.Show(this, "The list does not contain any channels.", AppName, MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return true;
+            }
+            if (isFileList)
+            {
+                HideLoading();
+                _channelListSource = null;
+                Text = Path.GetFileName(pathOrUrl);
+                ShowPlaylist(M3uPlaylist.ResolvePaths(entries, pathOrUrl), Path.GetFileNameWithoutExtension(pathOrUrl));
                 return true;
             }
 
@@ -98,6 +116,7 @@ namespace SwewolfMediaPlayer
 
         private void ShowChannelList(List<M3uEntry> entries)
         {
+            LeavePlaylistMode();
             _channels = entries;
             _favoriteUrls = FavoriteChannels.All().ToHashSet(StringComparer.OrdinalIgnoreCase);
             _hiddenUrls = HiddenChannels.All().ToHashSet(StringComparer.OrdinalIgnoreCase);
@@ -166,6 +185,7 @@ namespace SwewolfMediaPlayer
 
         private void HideChannelList()
         {
+            LeavePlaylistMode();
             _channels = null;
             _channelListSource = null;
             _channelIndex = -1;
@@ -198,6 +218,21 @@ namespace SwewolfMediaPlayer
         {
             if (_channels == null || _lstChannels == null)
             {
+                return;
+            }
+
+            if (_playlistMode)
+            {
+                var all = new List<object>(_channels.Count);
+                for (int i = 0; i < _channels.Count; i++)
+                {
+                    all.Add(i);
+                }
+                _lstChannels.BeginUpdate();
+                _lstChannels.Items.Clear();
+                _lstChannels.Items.AddRange(all.ToArray());
+                _lstChannels.EndUpdate();
+                _lblChannelsHeader!.Text = $"Playlist ({all.Count:N0})" + (_playlistName.Length > 0 ? " - " + _playlistName : "");
                 return;
             }
 
@@ -319,9 +354,17 @@ namespace SwewolfMediaPlayer
             _lstChannels.MouseClick += (s, e) =>
             {
                 int row = _lstChannels.IndexFromPoint(e.Location);
-                if (row >= 0 && e.Button == MouseButtons.Left)
+                if (row >= 0 && e.Button == MouseButtons.Left && !_playlistMode)
                 {
                     _ = PlayChannelAsync((int)_lstChannels.Items[row]);
+                }
+            };
+            _lstChannels.MouseDoubleClick += (s, e) =>
+            {
+                int row = _lstChannels.IndexFromPoint(e.Location);
+                if (row >= 0 && e.Button == MouseButtons.Left && _playlistMode)
+                {
+                    _ = PlayPlaylistItemAsync((int)_lstChannels.Items[row]);   // a playlist: two clicks jump to an item
                 }
             };
             _lstChannels.ContextMenuStrip = CreateChannelMenu();
@@ -400,6 +443,7 @@ namespace SwewolfMediaPlayer
                 BackColor = dark,
                 Padding = new Padding(LogicalToDeviceUnits(6), LogicalToDeviceUnits(6), LogicalToDeviceUnits(6), LogicalToDeviceUnits(4)),
             };
+            _channelFilterRow = filterRow;
             filterRow.Controls.Add(_txtChannelFilter);   // the filling control first, then the one docked to the right
             var gap = new Panel { Dock = DockStyle.Right, Width = LogicalToDeviceUnits(6), BackColor = dark };
             filterRow.Controls.Add(gap);
@@ -412,7 +456,8 @@ namespace SwewolfMediaPlayer
                 BackColor = dark,
                 ForeColor = light,
                 Font = new Font(Font, FontStyle.Bold),
-                Padding = new Padding(LogicalToDeviceUnits(8), 0, 0, 0),
+                Padding = new Padding(LogicalToDeviceUnits(8), 0, LogicalToDeviceUnits(36), 0),   // keeps clear of the X
+                AutoEllipsis = true,
                 Text = "Channels",
                 TextAlign = ContentAlignment.MiddleLeft,
             };
@@ -425,7 +470,8 @@ namespace SwewolfMediaPlayer
             _lblChannelsHeader.SizeChanged += (s, e) => PlaceClose();
             PlaceClose();
             closeList.Click += (s, e) => SetChannelListShown(false);
-            toolTip.SetToolTip(closeList, "Close the Channel List");
+            _closeListButton = closeList;
+            UpdateListToggleTexts();
 
             _pnlChannels = new Panel
             {
@@ -499,7 +545,7 @@ namespace SwewolfMediaPlayer
             }
             else
             {
-                string letter = channel.Name.Length > 0 ? char.ToUpperInvariant(channel.Name[0]).ToString() : "?";
+                string letter = _playlistMode ? (index + 1).ToString() : channel.Name.Length > 0 ? char.ToUpperInvariant(channel.Name[0]).ToString() : "?";
                 TextRenderer.DrawText(e.Graphics, letter, e.Font, box, Color.FromArgb(110, 110, 110),
                     TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPrefix);
             }
@@ -508,7 +554,7 @@ namespace SwewolfMediaPlayer
             int left = box.Right + pad;
             int half = e.Bounds.Height / 2;
             int textRight = e.Bounds.Right - pad;
-            if (ShowFavoriteStars && _favoriteUrls.Contains(channel.Url))
+            if (ShowFavoriteStars && !_playlistMode && _favoriteUrls.Contains(channel.Url))
             {
                 int starSize = LogicalToDeviceUnits(14);
                 var starBox = new Rectangle(e.Bounds.Right - pad - starSize, e.Bounds.Top + (e.Bounds.Height - starSize) / 2, starSize, starSize);
@@ -594,7 +640,9 @@ namespace SwewolfMediaPlayer
                 favorite.Text = FavoriteChannels.Contains(url) ? "Remove from Favorites" : "Add to Favorites";
                 bool hidden = HiddenChannels.Contains(url);
                 hide.Text = hidden ? "Unhide Channel" : "Hide Channel";
-                favorite.Visible = !hidden;   // a hidden channel is not shown in Favorites
+                favorite.Visible = !hidden && !_playlistMode;   // a hidden channel is not shown in Favorites
+                hide.Visible = !_playlistMode;
+                copy.Text = _playlistMode ? "Copy File Path" : "Copy Stream Address";
             };
             return menu;
         }
@@ -651,7 +699,7 @@ namespace SwewolfMediaPlayer
                 return;
             }
             _channelTipRow = row;
-            string text = row >= 0 && (int)_lstChannels.Items[row] is int i && i < _channels.Count ? ChannelHistoryText(_channels[i].Url) : "";
+            string text = row >= 0 && (int)_lstChannels.Items[row] is int i && i < _channels.Count ? (_playlistMode ? _channels[i].Url : ChannelHistoryText(_channels[i].Url)) : "";
             toolTip.Hide(_lstChannels);
             toolTip.SetToolTip(_lstChannels, text.Length > 0 ? text : null);
         }
@@ -768,7 +816,9 @@ namespace SwewolfMediaPlayer
                 return;
             }
             bool shown = _channelListShown;
-            menuVideo.Items.Add(TrackItem("Show Channel List", shown, () => SetChannelListShown(!shown)));
+            ToolStripMenuItem toggle = TrackItem(_playlistMode ? "Show Playlist" : "Show Channel List", shown, () => SetChannelListShown(!shown));
+            toggle.ShortcutKeyDisplayString = "F8";
+            menuVideo.Items.Add(toggle);
         }
     }
 }
