@@ -10,6 +10,8 @@
 //   2026-10-15  New option "Close Player": the window closes when the video ends.
 //   2026-10-23  While the Trim group box is open, the end action is always the last frame (EffectiveEndAction).
 //   2026-10-26  A small X in the upper right corner closes the group box (CloseXButton.cs); the Trim group box has one too.
+//   2026-11-18  A player started with a file argument uses "Close Player" without saving it (UseCloseWhenEnds).
+//   2026-11-18  A file handed over to a running player through the pipe does the same (PlayFromPipeAsync).
 //   2026-10-26  A "Show Subtitles" check box was added and removed again the next day: the default is in Tools > Settings, the choice per file is
 //               remembered in the library (MediaPlayerForm.Tracks.cs).
 
@@ -44,8 +46,31 @@ namespace SwewolfMediaPlayer
             ApplyCoverSize();
         }
 
+        private bool _settingEndActionByCode;   // true while the program (not the user) sets the drop-down list: nothing is saved then
+
+        // A player started with a file on the command line (another program, e.g. the File Explorer, plays a file or a playlist)
+        // always closes when the file ends, so it is never stuck on a repeat or on the last frame. This is not saved:
+        // only a choice the user makes in the Control Panel is.
+        public void UseCloseWhenEnds()
+        {
+            _settingEndActionByCode = true;
+            try
+            {
+                _whenEnds = EndAction.ClosePlayer;
+                cboWhenEnds.SelectedIndex = (int)EndAction.ClosePlayer;
+            }
+            finally
+            {
+                _settingEndActionByCode = false;
+            }
+        }
+
         private void cboWhenEnds_SelectedIndexChanged(object? sender, EventArgs e)
         {
+            if (_settingEndActionByCode)
+            {
+                return;
+            }
             if (cboWhenEnds.SelectedIndex >= 0)
             {
                 _whenEnds = (EndAction)cboWhenEnds.SelectedIndex;

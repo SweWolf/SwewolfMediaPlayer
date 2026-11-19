@@ -126,6 +126,7 @@ namespace SwewolfMediaPlayer
                 return;
             }
 
+            UseCloseWhenEnds();   // a file handed over by another program: close at the end, not saved
             SetControlled(command.Playlist);
             _noResumeOnce = command.NoResume;   // the explorer says: a file that follows another one in a playlist starts from the beginning
             _startAtOnceMs = command.StartMs;   // Demo Play

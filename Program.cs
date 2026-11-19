@@ -98,6 +98,7 @@ namespace SwewolfMediaPlayer
                     _ = MediaPlayerForm.PreloadAsync();
                     var window = new MediaPlayerForm(fullPath, string.IsNullOrEmpty(libraryPath) ? null : libraryPath) { Icon = LoadIcon() };
                     window.SetFirstFileOptions(startAtMs, noResume);
+                    window.UseCloseWhenEnds();   // started with a file (e.g. from the explorer): close at the end, not saved
                     PlayerPipe? pipe = first ? new PlayerPipe() : null;
                     window.AttachPipe(pipe);
                     pipe?.Start();
