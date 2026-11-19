@@ -5,6 +5,7 @@
 //
 // History:
 //   2026-11-16  First version.
+//   2026-11-19  RemoveMany (Check Channels: unhide the hidden channels that work again).
 
 using System.Text.Json;
 
@@ -71,6 +72,19 @@ namespace SwewolfMediaPlayer
             {
                 List<string> list = Load();
                 if (list.RemoveAll(u => string.Equals(u, url, StringComparison.OrdinalIgnoreCase)) > 0)
+                {
+                    Save(list);
+                }
+            }
+        }
+
+        public static void RemoveMany(IEnumerable<string> urls)
+        {
+            lock (Gate)
+            {
+                var gone = new HashSet<string>(urls, StringComparer.OrdinalIgnoreCase);
+                List<string> list = Load();
+                if (list.RemoveAll(gone.Contains) > 0)
                 {
                     Save(list);
                 }

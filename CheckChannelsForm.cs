@@ -10,6 +10,8 @@
 //
 // History:
 //   2026-11-18  First version.
+//   2026-11-19  The check box "Check the Hidden Channels Instead" asks only the hidden channels (of this list), and afterwards the button offers a list of
+//               the ones that answer, to bring back (UnhideForm: all are ticked, Select All / Select None).
 
 using System.Collections.Concurrent;
 
@@ -23,7 +25,9 @@ namespace SwewolfMediaPlayer
         private readonly string _listUrl;
         private readonly Label _lblStatus = new();
         private readonly ProgressBar _bar = new();
-        private readonly CheckBox _chkAgain = new();
+        private readonly CheckBox _chkAgain = new(), _chkHidden = new();
+        private bool _hiddenRun;   // the run that is going or was done asked the hidden channels
+        private readonly ConcurrentDictionary<string, string> _workedHidden = new(StringComparer.OrdinalIgnoreCase);   // address -> name
         private readonly Button _btnStart = new(), _btnStop = new(), _btnHide = new(), _btnClose = new();
         private readonly System.Windows.Forms.Timer _timer = new() { Interval = 500 };
 
@@ -71,8 +75,21 @@ namespace SwewolfMediaPlayer
             _chkAgain.Text = "Check Again Channels Checked in the Last 24 Hours";
             _chkAgain.AutoSize = true;
             _chkAgain.Location = new Point(12, 6);
-            var checkHost = new Panel { Dock = DockStyle.Top, Height = 30 };
+            _chkHidden.Text = "Check the Hidden Channels Instead";
+            _chkHidden.AutoSize = true;
+            _chkHidden.Location = new Point(12, 32);
+            var checkHost = new Panel { Dock = DockStyle.Top, Height = 58 };
             checkHost.Controls.Add(_chkAgain);
+            checkHost.Controls.Add(_chkHidden);
+            _chkHidden.CheckedChanged += (_, _) =>
+            {
+                _chkAgain.Enabled = !_chkHidden.Checked;
+                if (!_btnHide.Enabled)
+                {
+                    _btnHide.Text = _chkHidden.Checked ? "Bring Back Channels That Work" : "Hide Channels That Failed";
+                }
+            };
+            new ToolTip().SetToolTip(_chkHidden, "Asks only the channels you have hidden. Afterwards you can bring back the ones that answer.");
 
             _btnStart.Text = "Start";
             _btnStop.Text = "Stop";
@@ -96,11 +113,21 @@ namespace SwewolfMediaPlayer
             Controls.Add(barHost);
             Controls.Add(_lblStatus);
             Controls.Add(info);
-            ClientSize = new Size(520, 100 + 60 + 34 + 30 + 52);
+            ClientSize = new Size(520, 100 + 60 + 34 + 58 + 52);
 
             _btnStart.Click += async (_, _) => await RunAsync();
             _btnStop.Click += (_, _) => _stop?.Cancel();
-            _btnHide.Click += (_, _) => HideFailed();
+            _btnHide.Click += (_, _) =>
+            {
+                if (_hiddenRun)
+                {
+                    BringBackWorking();
+                }
+                else
+                {
+                    HideFailed();
+                }
+            };
             _btnClose.Click += (_, _) => Close();
             AcceptButton = _btnStart;
             CancelButton = _btnClose;
@@ -152,10 +179,22 @@ namespace SwewolfMediaPlayer
             var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             var todo = new List<M3uEntry>();
             _skipped = _fresh = _unknown = 0;
+            _hiddenRun = _chkHidden.Checked;
+            _workedHidden.Clear();
             foreach (M3uEntry entry in M3uPlaylist.Parse(text))
             {
                 if (!seen.Add(entry.Url))
                 {
+                    continue;
+                }
+                if (_hiddenRun)
+                {
+                    // Only the hidden channels, whatever was checked recently (the list is short).
+                    if (hidden.Contains(entry.Url) && (entry.Url.StartsWith("http://", StringComparison.OrdinalIgnoreCase)
+                        || entry.Url.StartsWith("https://", StringComparison.OrdinalIgnoreCase)) && !IsGeoBlocked(entry))
+                    {
+                        todo.Add(entry);
+                    }
                     continue;
                 }
                 if (!entry.Url.StartsWith("http://", StringComparison.OrdinalIgnoreCase) && !entry.Url.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
@@ -184,6 +223,13 @@ namespace SwewolfMediaPlayer
             _bar.Maximum = Math.Max(1, _todo);
             _bar.Value = 0;
             _btnHide.Enabled = false;
+            _btnHide.Text = _hiddenRun ? "Bring Back Channels That Work" : "Hide Channels That Failed";
+            if (_todo == 0 && _hiddenRun)
+            {
+                _lblStatus.Text = "None of the hidden channels can be checked here: there are none in this list, or they are geo-blocked.";
+                _btnStart.Enabled = true;
+                return;
+            }
             if (_todo == 0)
             {
                 _lblStatus.Text = $"Nothing to check: {_fresh:N0} channels were checked in the last 24 hours, {_skipped:N0} are hidden or geo-blocked.";
@@ -195,6 +241,7 @@ namespace SwewolfMediaPlayer
             _stop = new CancellationTokenSource();
             _btnStop.Enabled = true;
             _chkAgain.Enabled = false;
+            _chkHidden.Enabled = false;
             _timer.Start();
             UpdateStatus();
             try
@@ -219,8 +266,9 @@ namespace SwewolfMediaPlayer
             }
             _btnStop.Enabled = false;
             _btnStart.Enabled = true;
-            _chkAgain.Enabled = true;
-            _btnHide.Enabled = !_failedUrls.IsEmpty;
+            _chkAgain.Enabled = !_chkHidden.Checked;
+            _chkHidden.Enabled = true;
+            _btnHide.Enabled = _hiddenRun ? !_workedHidden.IsEmpty : !_failedUrls.IsEmpty;
             UpdateStatus();
         }
 
@@ -248,6 +296,10 @@ namespace SwewolfMediaPlayer
             {
                 Interlocked.Exchange(ref _consecutiveFailures, 0);
                 ChannelHistory.RecordWorked(entry.Url, save: false);
+                if (_hiddenRun)
+                {
+                    _workedHidden[entry.Url] = entry.Name;
+                }
                 Interlocked.Increment(ref _worked);
                 Interlocked.Increment(ref _done);
                 return;
@@ -262,7 +314,10 @@ namespace SwewolfMediaPlayer
                 return;
             }
             ChannelHistory.RecordFailed(entry.Url, save: false);
-            _failedUrls.Add(entry.Url);
+            if (!_hiddenRun)
+            {
+                _failedUrls.Add(entry.Url);
+            }
             Interlocked.Increment(ref _failed);
             Interlocked.Increment(ref _done);
         }
@@ -294,11 +349,95 @@ namespace SwewolfMediaPlayer
         {
             _bar.Value = Math.Min(_bar.Maximum, _done);
             string line = $"Checked {_done:N0} of {_todo:N0}: {_worked:N0} answer, {_failed:N0} do not." +
-                $"\nSkipped: {_fresh:N0} checked recently, {_skipped:N0} hidden or geo-blocked, {_unknown:N0} that cannot be checked this way.";
+                (_hiddenRun ? "\nOnly the hidden channels are checked."
+                    : $"\nSkipped: {_fresh:N0} checked recently, {_skipped:N0} hidden or geo-blocked, {_unknown:N0} that cannot be checked this way.");
             _lblStatus.Text = _note.Length > 0 ? _note + "\n" + line : line;
             if (_running && ++_ticks % 10 == 0)
             {
                 ChannelHistory.Flush();
+            }
+        }
+
+        // The hidden channels that answered: a list to choose from (all ticked), the ticked ones come back in the channel list.
+        private void BringBackWorking()
+        {
+            var items = _workedHidden.OrderBy(p => p.Value, StringComparer.CurrentCultureIgnoreCase).ToList();
+            if (items.Count == 0)
+            {
+                return;
+            }
+            using var dialog = new UnhideForm(items.Select(p => (p.Key, p.Value)).ToList()) { Icon = Icon };
+            if (dialog.ShowDialog(this) != DialogResult.OK || dialog.Chosen.Count == 0)
+            {
+                return;
+            }
+            HiddenChannels.RemoveMany(dialog.Chosen);
+            foreach (string url in dialog.Chosen)
+            {
+                _workedHidden.TryRemove(url, out _);
+            }
+            _btnHide.Enabled = !_workedHidden.IsEmpty;
+            _note = $"{dialog.Chosen.Count:N0} channels were brought back (open channel lists show the change the next time they are opened).";
+            UpdateStatus();
+        }
+
+        // The list of hidden channels that work again.
+        private sealed class UnhideForm : Form
+        {
+            private readonly CheckedListBox _list = new() { CheckOnClick = true, Dock = DockStyle.Fill, IntegralHeight = false };
+            private readonly List<string> _urls;
+
+            public List<string> Chosen => _list.CheckedIndices.Cast<int>().Select(i => _urls[i]).ToList();
+
+            public UnhideForm(List<(string Url, string Name)> items)
+            {
+                Text = "Bring Back Channels";
+                FormBorderStyle = FormBorderStyle.Sizable;
+                MinimizeBox = false;
+                MaximizeBox = false;
+                ShowInTaskbar = false;
+                StartPosition = FormStartPosition.CenterParent;
+                AutoScaleMode = AutoScaleMode.Dpi;
+                ClientSize = new Size(460, 420);
+                MinimumSize = Size;
+
+                _urls = items.Select(i => i.Url).ToList();
+                foreach ((string url, string name) in items)
+                {
+                    _list.Items.Add(name, true);
+                }
+
+                var info = new Label
+                {
+                    Dock = DockStyle.Top,
+                    Height = 44,
+                    Padding = new Padding(12, 10, 12, 0),
+                    Text = $"{items.Count:N0} hidden channels answer again. Tick the ones to bring back.",
+                };
+                var all = new Button { Text = "Select All", AutoSize = true, MinimumSize = new Size(80, 28) };
+                var none = new Button { Text = "Select None", AutoSize = true, MinimumSize = new Size(80, 28) };
+                var ok = new Button { Text = "Bring Back", AutoSize = true, MinimumSize = new Size(80, 28), DialogResult = DialogResult.OK };
+                var cancel = new Button { Text = "Cancel", AutoSize = true, MinimumSize = new Size(80, 28), DialogResult = DialogResult.Cancel };
+                all.Click += (_, _) => SetAll(true);
+                none.Click += (_, _) => SetAll(false);
+                var buttons = new FlowLayoutPanel { Dock = DockStyle.Bottom, Height = 44, Padding = new Padding(12, 8, 12, 4) };
+                buttons.Controls.AddRange(new Control[] { all, none, ok, cancel });
+                var listHost = new Panel { Dock = DockStyle.Fill, Padding = new Padding(12, 0, 12, 0) };
+                listHost.Controls.Add(_list);
+
+                Controls.Add(listHost);
+                Controls.Add(buttons);
+                Controls.Add(info);
+                AcceptButton = ok;
+                CancelButton = cancel;
+            }
+
+            private void SetAll(bool on)
+            {
+                for (int i = 0; i < _list.Items.Count; i++)
+                {
+                    _list.SetItemChecked(i, on);
+                }
             }
         }
 
