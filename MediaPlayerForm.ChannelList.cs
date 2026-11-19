@@ -10,6 +10,8 @@
 // History:
 //   2026-11-12  First version.
 //   2026-11-13  "Recently Watched" in the group drop-down: the last 10 channels that really played, newest first (RecentChannels.cs).
+//   2026-11-18  Channel history (ChannelHistory.cs): a tooltip on each row says when the channel last worked or since when it fails, and after
+//               three failures in a row (the first at least a day ago) the user is offered to hide the channel.
 //   2026-11-16  Hide Channel / Unhide Channel (right-click): hidden channels are left out of every view and are found in the last group,
 //               "Hidden Channels", which only exists while at least one channel is hidden (HiddenChannels.cs).
 //   2026-11-13  "Favorites" group (right-click: Add to Favorites / Remove from Favorites), before Recently Watched (FavoriteChannels.cs).
@@ -432,6 +434,8 @@ namespace SwewolfMediaPlayer
                 BackColor = back,
                 Visible = false,
             };
+            _lstChannels.MouseMove += (s, e) => UpdateChannelTip(e.Location);
+            _lstChannels.MouseLeave += (s, e) => _channelTipRow = -1;
             _pnlChannels.Controls.Add(_lstChannels);   // the filling control first, then the ones docked to the top (the last added is the top one)
             _pnlChannels.Controls.Add(filterRow);
             _pnlChannels.Controls.Add(_lblChannelsHeader);
@@ -569,19 +573,7 @@ namespace SwewolfMediaPlayer
                 {
                     return;
                 }
-                if (HiddenChannels.Contains(url))
-                {
-                    HiddenChannels.Remove(url);
-                }
-                else
-                {
-                    HiddenChannels.Add(url);
-                    FavoriteChannels.Remove(url);   // a hidden channel is not a favorite any more
-                    _favoriteUrls = FavoriteChannels.All().ToHashSet(StringComparer.OrdinalIgnoreCase);
-                }
-                _hiddenUrls = HiddenChannels.All().ToHashSet(StringComparer.OrdinalIgnoreCase);
-                UpdateHiddenGroupItem();   // a channel that plays goes on playing: only the list changes
-                ApplyChannelFilter();
+                SetChannelHidden(url, !HiddenChannels.Contains(url));
             };
             menu.Items.Add(favorite);
             menu.Items.Add(hide);
@@ -605,6 +597,63 @@ namespace SwewolfMediaPlayer
                 favorite.Visible = !hidden;   // a hidden channel is not shown in Favorites
             };
             return menu;
+        }
+
+        // Hides a channel (or shows it again). A channel that plays goes on playing: only the list changes.
+        private void SetChannelHidden(string url, bool hide)
+        {
+            if (hide)
+            {
+                HiddenChannels.Add(url);
+                FavoriteChannels.Remove(url);   // a hidden channel is not a favorite any more
+                _favoriteUrls = FavoriteChannels.All().ToHashSet(StringComparer.OrdinalIgnoreCase);
+            }
+            else
+            {
+                HiddenChannels.Remove(url);
+            }
+            _hiddenUrls = HiddenChannels.All().ToHashSet(StringComparer.OrdinalIgnoreCase);
+            UpdateHiddenGroupItem();
+            ApplyChannelFilter();
+        }
+
+        // The tooltip of a row: when the channel last worked, or since when it fails.
+        private static string ChannelHistoryText(string url)
+        {
+            ChannelHistoryEntry? h = ChannelHistory.Get(url);
+            if (h == null)
+            {
+                return "";
+            }
+            var lines = new List<string>();
+            if (h.FailingSince != null)
+            {
+                lines.Add($"Not working since {h.FailingSince:yyyy-MM-dd HH:mm} ({h.FailCount} {(h.FailCount == 1 ? "failure" : "failures")} in a row)");
+            }
+            if (h.LastWorked != null)
+            {
+                lines.Add($"Last worked {h.LastWorked:yyyy-MM-dd HH:mm}");
+            }
+            return string.Join("\n", lines);
+        }
+
+        private int _channelTipRow = -1;
+
+        private void UpdateChannelTip(Point at)
+        {
+            if (_lstChannels == null || _channels == null)
+            {
+                return;
+            }
+            int row = _lstChannels.IndexFromPoint(at);
+            if (row == _channelTipRow)
+            {
+                return;
+            }
+            _channelTipRow = row;
+            string text = row >= 0 && (int)_lstChannels.Items[row] is int i && i < _channels.Count ? ChannelHistoryText(_channels[i].Url) : "";
+            toolTip.Hide(_lstChannels);
+            toolTip.SetToolTip(_lstChannels, text.Length > 0 ? text : null);
         }
 
         private async Task PlayChannelAsync(int index)
@@ -638,6 +687,7 @@ namespace SwewolfMediaPlayer
             if (playing >= 2)
             {
                 RecentChannels.Add(channel.Url);
+                ChannelHistory.RecordWorked(channel.Url);
                 if (_cboChannelGroup?.SelectedIndex == 2)
                 {
                     ApplyChannelFilter();
@@ -646,7 +696,36 @@ namespace SwewolfMediaPlayer
             }
             if (!IsDisposed && _channelIndex == index && _player != null && !_player.IsPlaying && _channelListShown)
             {
+                // Offline: the computer is the problem, not the channel, so nothing is recorded.
+                if (!await InternetCheck.IsOnlineAsync())
+                {
+                    if (!IsDisposed && _channelIndex == index)
+                    {
+                        ShowVideoMessage($"{channel.Name} does not seem to play.\nThe computer seems to be offline.");
+                    }
+                    return;
+                }
+                if (IsDisposed || _channelIndex != index)
+                {
+                    return;
+                }
+
+                ChannelHistoryEntry history = ChannelHistory.RecordFailed(channel.Url);
                 ShowVideoMessage($"{channel.Name} does not seem to play.\nMany channels in such lists are offline or blocked. Try another one.");
+                _lstChannels?.Invalidate();
+
+                // A channel that keeps failing (three times in a row, the first at least a day ago) can be hidden. "No" asks again at the next failure.
+                if (history.FailCount >= 3 && history.FailingSince != null && DateTime.Now - history.FailingSince.Value >= TimeSpan.FromDays(1)
+                    && !HiddenChannels.Contains(channel.Url))
+                {
+                    DialogResult answer = MessageBox.Show(this,
+                        $"{channel.Name} has failed {history.FailCount} times in a row since {history.FailingSince:yyyy-MM-dd}.\n\nHide this channel?\nYou can find it again in the Hidden Channels group.",
+                        AppName, MessageBoxButtons.YesNo, MessageBoxIcon.Question, MessageBoxDefaultButton.Button2);
+                    if (answer == DialogResult.Yes && !IsDisposed)
+                    {
+                        SetChannelHidden(channel.Url, true);
+                    }
+                }
             }
         }
 
