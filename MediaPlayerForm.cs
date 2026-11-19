@@ -84,6 +84,8 @@
 //               SWEWOLF_VLC_LOG=1 writes LibVLC's own log into the timing log.
 //   2026-11-12  Record button for streams (MediaPlayerForm.Record.cs, StreamRecorder.cs): records to a .ts file, watch it meanwhile, Stop saves an MP4.
 //   2026-11-12  A saved recording goes into My Recordings (RecordingStore.cs, MainForm.Recordings.cs, RecordingsForm.cs) and the library keeps its stream address.
+//   2026-11-19  Quality menu for HLS channels with several qualities: Auto, Highest, Lowest or a height (MediaPlayerForm.Quality.cs).
+//   2026-11-19  A stream that ends (a channel dropping the connection) no longer closes a player that was started with a file/URL.
 //   2026-11-19  Playlist files (MediaPlayerForm.Playlist.cs): the end of an item goes to the next one (PlaylistItemEnded), a failed item is reported (EncounteredError), Stop ends the countdown.
 
 using System.ComponentModel;
@@ -1334,7 +1336,8 @@ namespace SwewolfMediaPlayer
                 return;
             }
 
-            if (player != null && !_previewing && EffectiveEndAction == EndAction.ClosePlayer)
+            // Not for a stream: a channel that drops the connection is a failure, not "the file ended". The window stays (ShowStopped below).
+            if (player != null && !_previewing && !_isStream && EffectiveEndAction == EndAction.ClosePlayer)
             {
                 // Closed from the message loop, not from inside the LibVLC event.
                 BeginInvoke(Close);
@@ -1486,6 +1489,11 @@ namespace SwewolfMediaPlayer
             if (isStream && path == _channelUserAgentFor && !string.IsNullOrEmpty(_channelUserAgent))
             {
                 media.AddOption(":http-user-agent=" + _channelUserAgent);   // some streams of a channel list only play with the browser name they list
+            }
+            if (isStream)
+            {
+                StartVariantsLookup(path);   // the qualities for the Quality menu (MediaPlayerForm.Quality.cs)
+                AddQualityOptions(media);
             }
             if (!isStream && (string.Equals(Path.GetExtension(path), ".gif", StringComparison.OrdinalIgnoreCase) || IsGrowingTransportStream(path)))
             {
@@ -2440,6 +2448,7 @@ namespace SwewolfMediaPlayer
                 menuVideo.Items.Add(subtitles);
             }
             AddDefaultTracksMenuItem();
+            AddQualityMenu();
             AddChannelMenu();
             AddTuneMenu();
             AddChapterMenu();
