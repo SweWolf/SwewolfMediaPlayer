@@ -86,6 +86,7 @@
 //   2026-11-12  A saved recording goes into My Recordings (RecordingStore.cs, MainForm.Recordings.cs, RecordingsForm.cs) and the library keeps its stream address.
 //   2026-11-19  Quality menu for HLS channels with several qualities: Auto, Highest, Lowest or a height (MediaPlayerForm.Quality.cs).
 //   2026-11-19  A stream that ends (a channel dropping the connection) no longer closes a player that was started with a file/URL.
+//   2026-11-20  A file or DVD that LibVLC cannot open shows a message (ShowOpenFailed) instead of "Opening the file..." for ever.
 //   2026-11-19  Playlist files (MediaPlayerForm.Playlist.cs): the end of an item goes to the next one (PlaylistItemEnded), a failed item is reported (EncounteredError), Stop ends the countdown.
 
 using System.ComponentModel;
@@ -601,6 +602,10 @@ namespace SwewolfMediaPlayer
                 if (ReferenceEquals(mine, _player) && _playlistMode && !_restoringEnd)
                 {
                     OnPlaylistItemFailed(_channelIndex, "The file could not be played. It may be damaged or in a format the player does not support.");
+                }
+                else if (ReferenceEquals(mine, _player) && !_playlistMode && !_isStream && !_restoringEnd && _recorder == null && !_previewing)
+                {
+                    ShowOpenFailed();   // a file (or DVD) that LibVLC cannot open: say so, instead of "Opening the file..." for ever
                 }
             });
             _player.SeekableChanged += (s, a) => Post(() =>
@@ -1579,6 +1584,16 @@ namespace SwewolfMediaPlayer
             {
                 _ = Task.Run(old.Dispose);
             }
+        }
+
+        // LibVLC could not open what was asked for (damaged file, a DVD image without a VIDEO_TS folder in its root, ...): the window says so
+        // and stays usable (Open another file, Close).
+        private void ShowOpenFailed()
+        {
+            ShowStopped();
+            ShowVideoMessage(IsDvd
+                ? "The DVD could not be opened.\n\nThe disc or image may be damaged, or the image is not a standard DVD image\n(a DVD image needs its VIDEO_TS folder in the root)."
+                : "The file could not be played.\n\nIt may be damaged or in a format the player does not support.");
         }
 
         private void ShowStopped()
