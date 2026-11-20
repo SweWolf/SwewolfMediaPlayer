@@ -150,7 +150,12 @@ namespace SwewolfMediaPlayer
             using var dialog = new OpenFileDialog
             {
                 Title = "Select a Media File",
-                Filter = "Media Files|*.mp4;*.mkv;*.avi;*.mov;*.wmv;*.webm;*.mp3;*.wav;*.flac;*.m4a;*.ogg;*.sid;*.gif;*.m3u;*.m3u8;*.cda|All Files|*.*"
+                Filter = "Media Files|*.mp4;*.mkv;*.avi;*.mov;*.wmv;*.webm;*.mp3;*.wav;*.flac;*.m4a;*.ogg;*.sid;*.gif;*.m3u;*.m3u8;*.cda"
+                    + "|Video Files|*.mp4;*.mkv;*.avi;*.mov;*.wmv;*.webm"
+                    + "|Audio Files|*.mp3;*.wav;*.flac;*.m4a;*.ogg;*.sid;*.cda"
+                    + "|GIF Images|*.gif"
+                    + "|Playlists|*.m3u;*.m3u8"
+                    + "|All Files|*.*"
             };
 
             // Where the dialog starts: the folder of the file in the box, or the folder typed there; else the folder last browsed in this run; else the
