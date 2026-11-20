@@ -1,7 +1,7 @@
 // MediaPlayerForm.Playlist.cs: a playlist file (.m3u / .m3u8 whose entries are files on a disk, like the ones the SweWolf File Explorer
 // saves) opened in the player. The items play one after the other; the list is shown in the same panel as the channel list.
 //
-//  - The list is static in this version: no reordering. Clicking a row twice jumps to that item.
+//  - The list is static in this version: no reordering. Clicking a row jumps to that item.
 //  - When an item ends the next one starts. After the last one "When the Playlist Ends" decides (the same drop-down as "When the Media
 //    File Ends" for a single file): Repeat starts again with item 1, Close Player closes the window, the others stay on the last item.
 //  - An item that cannot be played (missing, damaged) is skipped, but not silently: a message in the video area tells which file and why,
@@ -28,6 +28,45 @@ namespace SwewolfMediaPlayer
         private Panel? _channelFilterRow;    // the filter box and group drop-down above the rows: not used for a playlist
 
         // Shown when a playlist file is opened. Nothing plays by itself: the first item starts here.
+        // The playlist of an audio CD: the rows show "Artist - Title" as soon as the shared lookup knows it (it may answer a little after the start),
+        // and the header the name of the disc. Called when the playlist opens and when the lookup has something new (OnCdInfoUpdated).
+        private void RefreshCdNames()
+        {
+            if (!_playlistMode || _channels == null || _channels.Count == 0
+                || !_channels.All(c => Path.GetExtension(c.Url).Equals(".cda", StringComparison.OrdinalIgnoreCase)))
+            {
+                return;
+            }
+
+            HookCdInfo();
+            bool changed = false;
+            for (int i = 0; i < _channels.Count; i++)
+            {
+                CdTrackInfo? info = CdDiscInfo.InfoOf(_channels[i].Url);
+                if (info == null)
+                {
+                    continue;
+                }
+                string name = string.IsNullOrWhiteSpace(info.Artist) ? info.Title!.Trim() : $"{info.Artist.Trim()} - {info.Title!.Trim()}";
+                if (name != _channels[i].Name)
+                {
+                    _channels[i] = _channels[i] with { Name = name };
+                    changed = true;
+                }
+            }
+            string? disc = CdDiscInfo.DriveTitle(Path.GetPathRoot(_channels[0].Url) ?? "");
+            if (!string.IsNullOrEmpty(disc) && disc != _playlistName)
+            {
+                _playlistName = disc;
+                changed = true;
+            }
+            if (changed)
+            {
+                ApplyChannelFilter();   // the header; the rows are drawn again
+                _lstChannels?.Invalidate();
+            }
+        }
+
         private CloseXButton? _closeListButton;   // the X in the header of the panel
 
         // The X says what it hides: the playlist or the channel list (F8 does the same).
@@ -60,6 +99,7 @@ namespace SwewolfMediaPlayer
             UpdateEndLabel();
             RefreshNavButtons();
             LayoutControlBar();
+            RefreshCdNames();
             _ = PlayPlaylistItemAsync(0);
         }
 

@@ -354,17 +354,10 @@ namespace SwewolfMediaPlayer
             _lstChannels.MouseClick += (s, e) =>
             {
                 int row = _lstChannels.IndexFromPoint(e.Location);
-                if (row >= 0 && e.Button == MouseButtons.Left && !_playlistMode)
+                if (row >= 0 && e.Button == MouseButtons.Left)
                 {
-                    _ = PlayChannelAsync((int)_lstChannels.Items[row]);
-                }
-            };
-            _lstChannels.MouseDoubleClick += (s, e) =>
-            {
-                int row = _lstChannels.IndexFromPoint(e.Location);
-                if (row >= 0 && e.Button == MouseButtons.Left && _playlistMode)
-                {
-                    _ = PlayPlaylistItemAsync((int)_lstChannels.Items[row]);   // a playlist: two clicks jump to an item
+                    // A channel plays; in a playlist one click jumps to that item (the list itself is not changed).
+                    _ = _playlistMode ? PlayPlaylistItemAsync((int)_lstChannels.Items[row]) : PlayChannelAsync((int)_lstChannels.Items[row]);
                 }
             };
             _lstChannels.ContextMenuStrip = CreateChannelMenu();

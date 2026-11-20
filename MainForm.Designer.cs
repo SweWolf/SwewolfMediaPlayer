@@ -70,8 +70,8 @@
             //
             menuOpenDvd.Name = "menuOpenDvd";
             menuOpenDvd.Size = new Size(180, 22);
-            menuOpenDvd.Text = "Open DVD";
-            menuOpenDvd.ToolTipText = "Play the DVD in the drive, with its menus.";
+            menuOpenDvd.Text = "Open DVD/CD";
+            menuOpenDvd.ToolTipText = "Play the DVD in the drive, with its menus, or the audio CD from the first track to the last.";
             menuOpenDvd.Click += menuOpenDvd_Click;
             //
             // menuTools

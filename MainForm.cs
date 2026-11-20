@@ -24,27 +24,48 @@ namespace SwewolfMediaPlayer
             _ = MediaPlayerForm.PreloadAsync();
         }
 
-        // Media > Open DVD: the one video DVD in the drives is played at once; with several the user chooses from a list at the menu item.
+        // Media > Open DVD/CD: the one video DVD or audio CD in the drives is played at once (a CD from its first track to its last, as a playlist);
+        // with several discs the user chooses from a list at the menu item.
         private void menuOpenDvd_Click(object? sender, EventArgs e)
         {
-            List<DvdDisc> discs = DvdSupport.FindDiscs();
+            var discs = new List<(string Display, Func<string?> Path)>();
+            foreach (DvdDisc dvd in DvdSupport.FindDiscs())
+            {
+                DvdDisc captured = dvd;
+                discs.Add((captured.Display, () => captured.InfoFile));
+            }
+            foreach (AudioCd cd in CdPlaylist.FindDiscs())
+            {
+                AudioCd captured = cd;
+                discs.Add((captured.Display, () => CdPlaylist.Write(captured)));
+            }
             if (discs.Count == 0)
             {
                 MessageBox.Show(this, DvdSupport.HasOpticalDrive()
-                    ? "No video DVD was found. Insert a DVD and try again."
-                    : "This computer has no DVD drive.", AppName, MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    ? "No video DVD or audio CD was found. Insert a disc and try again."
+                    : "This computer has no DVD or CD drive.", AppName, MessageBoxButtons.OK, MessageBoxIcon.Information);
                 return;
+            }
+            void Open(Func<string?> path)
+            {
+                string? file = path();
+                if (file == null)
+                {
+                    MessageBox.Show(this, "The track list of the disc could not be made.", AppName, MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    return;
+                }
+                OpenMedia(file);
             }
             if (discs.Count == 1)
             {
-                OpenMedia(discs[0].InfoFile);
+                Open(discs[0].Path);
                 return;
             }
             var choose = new ContextMenuStrip();
-            foreach (DvdDisc disc in discs)
+            foreach (var disc in discs)
             {
-                DvdDisc captured = disc;
-                choose.Items.Add(new ToolStripMenuItem(captured.Display.Replace("&", "&&"), null, (_, _) => OpenMedia(captured.InfoFile)));
+                Func<string?> path = disc.Path;
+                choose.Items.Add(new ToolStripMenuItem(disc.Display.Replace("&", "&&"), null, (_, _) => Open(path)));
             }
             choose.Closed += (_, _) => BeginInvoke(choose.Dispose);
             choose.Show(menuStrip, new Point(menuMedia.Bounds.Left, menuMedia.Bounds.Bottom));
@@ -227,6 +248,10 @@ namespace SwewolfMediaPlayer
             if (DvdSupport.TryResolve(path, out string dvdInfo))
             {
                 path = dvdInfo;
+            }
+            else if (CdPlaylist.TryResolve(path, out string cdList))
+            {
+                path = cdList;   // an audio CD drive (E: or E:\): the tracks play from the first to the last
             }
             // A web address (a stream) is not checked: only files must exist.
             if (!MediaPlayerForm.TryGetStreamUri(path, out _) && !File.Exists(path))
