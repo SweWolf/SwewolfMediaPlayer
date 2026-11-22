@@ -88,6 +88,7 @@
 //   2026-11-19  A stream that ends (a channel dropping the connection) no longer closes a player that was started with a file/URL.
 //   2026-11-20  A file or DVD that LibVLC cannot open shows a message (ShowOpenFailed) instead of "Opening the file..." for ever.
 //   2026-11-19  Playlist files (MediaPlayerForm.Playlist.cs): the end of an item goes to the next one (PlaylistItemEnded), a failed item is reported (EncounteredError), Stop ends the countdown.
+//   2026-11-21  In full screen the control bar floats over the bottom of the video when the pointer goes there (MediaPlayerForm.FloatingBar.cs).
 
 using System.ComponentModel;
 using System.Drawing.Drawing2D;
@@ -1166,7 +1167,7 @@ namespace SwewolfMediaPlayer
                 FormBorderStyle = FormBorderStyle.Sizable;
                 WindowState = _windowStateBeforeFullScreen;
             }
-            pnlControls.Visible = !fullScreen;
+            SetFloatingBar(fullScreen);   // MediaPlayerForm.FloatingBar.cs
             grpTrim.Visible = _trimVisible && !fullScreen;
             grpControlPanel.Visible = _panelVisible && !fullScreen;
             if (_grpStreamInfo != null)
@@ -2209,7 +2210,7 @@ namespace SwewolfMediaPlayer
             }
 
             // The press that just closed the menu is not a click on the video.
-            if (menuWasOpen || ActiveForm != this || !IsOver(videoView, cursor))
+            if (menuWasOpen || ActiveForm != this || !IsOver(videoView, cursor) || IsOverFloatingBar(cursor))
             {
                 return;
             }
@@ -2249,6 +2250,7 @@ namespace SwewolfMediaPlayer
             bool buttonDown = (GetAsyncKeyState(VK_LBUTTON) & 0x8000) != 0
                 || (GetAsyncKeyState(VK_RBUTTON) & 0x8000) != 0
                 || (GetAsyncKeyState(VK_MBUTTON) & 0x8000) != 0;
+            UpdateFloatingBar(position, position != _lastCursorPosition, buttonDown, now);
             if (position != _lastCursorPosition || buttonDown)
             {
                 _lastCursorPosition = position;
@@ -2257,7 +2259,7 @@ namespace SwewolfMediaPlayer
                 return;
             }
 
-            bool canHide = _hideCursorWhenIdle && ActiveForm == this && !menuVideo.Visible && IsOver(videoView, position);
+            bool canHide = _hideCursorWhenIdle && ActiveForm == this && !menuVideo.Visible && IsOver(videoView, position) && !IsOverFloatingBar(position);
             SetCursorHidden(canHide && now - _lastCursorActivityTicks >= CursorHideDelayMs);
             if (_cursorHidden && _blankCursor != null)
             {
@@ -2396,7 +2398,7 @@ namespace SwewolfMediaPlayer
             _rightButtonWasDown = down;
 
             Point cursor = Cursor.Position;
-            if (released && (ActiveForm == this || menuVideo.Visible) && IsOver(videoView, cursor) && !IsOverMenu(cursor))
+            if (released && (ActiveForm == this || menuVideo.Visible) && IsOver(videoView, cursor) && !IsOverMenu(cursor) && !IsOverFloatingBar(cursor))
             {
                 // A right click somewhere else moves the menu there.
                 if (menuVideo.Visible)
