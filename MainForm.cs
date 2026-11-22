@@ -13,7 +13,9 @@ namespace SwewolfMediaPlayer
         {
             InitializeComponent();
             Icon = Program.LoadIcon();
+            MediaPlayerForm.StyleMenu(menuStrip);   // the same dark menus as the player (clearer lines between groups)
             RefreshRecordingsMenu();   // there only when a recording has been made
+            RefreshRecentMenu();
             if (!string.IsNullOrEmpty(initialPath))
             {
                 txtFile.Text = initialPath;
@@ -262,7 +264,43 @@ namespace SwewolfMediaPlayer
                 return;
             }
 
+            RecentFiles.Add(path);   // (only real files qualify: not addresses, the playlist of a CD, or a disc)
+            RefreshRecentMenu();
             new MediaPlayerForm(path) { Icon = Icon }.Show(this);
+        }
+
+        // Media > Recent Media Files: the last nine files, newest first, numbered 1 to 9 (the digit is the shortcut key), then a separator and
+        // Clear List, which asks first. The full path is the tooltip of an item. Empty list: the menu item is greyed out.
+        private void RefreshRecentMenu()
+        {
+            menuRecent.DropDownItems.Clear();
+            List<string> files = RecentFiles.All();
+            menuRecent.Enabled = files.Count > 0;
+            if (files.Count == 0)
+            {
+                return;
+            }
+
+            for (int i = 0; i < files.Count && i < RecentFiles.Max; i++)
+            {
+                string path = files[i];
+                string name = Path.GetFileName(path);
+                var item = new ToolStripMenuItem($"&{i + 1} {(name.Length > 0 ? name : path).Replace("&", "&&")}") { ToolTipText = path };
+                item.Click += (_, _) => OpenMedia(path);
+                menuRecent.DropDownItems.Add(item);
+            }
+            menuRecent.DropDownItems.Add(new ToolStripSeparator());
+            var clear = new ToolStripMenuItem("Clear List") { ToolTipText = "Remove all files from this list." };
+            clear.Click += (_, _) =>
+            {
+                if (MessageBox.Show(this, "Do you want to clear the list of recent media files?", "Confirm Clear List",
+                        MessageBoxButtons.YesNo, MessageBoxIcon.Question, MessageBoxDefaultButton.Button2) == DialogResult.Yes)
+                {
+                    RecentFiles.Clear();
+                    RefreshRecentMenu();
+                }
+            };
+            menuRecent.DropDownItems.Add(clear);
         }
     }
 }

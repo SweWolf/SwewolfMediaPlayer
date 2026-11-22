@@ -33,6 +33,7 @@
             menuStrip = new MenuStrip();
             menuMedia = new ToolStripMenuItem();
             menuOpenDvd = new ToolStripMenuItem();
+            menuRecent = new ToolStripMenuItem();
             menuTools = new ToolStripMenuItem();
             menuCreateShortcut = new ToolStripMenuItem();
             menuSettings = new ToolStripMenuItem();
@@ -61,7 +62,7 @@
             //
             // menuMedia
             //
-            menuMedia.DropDownItems.AddRange(new ToolStripItem[] { menuOpenDvd });
+            menuMedia.DropDownItems.AddRange(new ToolStripItem[] { menuOpenDvd, menuRecent });
             menuMedia.Name = "menuMedia";
             menuMedia.Size = new Size(52, 20);
             menuMedia.Text = "Media";
@@ -73,6 +74,13 @@
             menuOpenDvd.Text = "Open DVD/CD";
             menuOpenDvd.ToolTipText = "Play the DVD in the drive, with its menus, or the audio CD from the first track to the last.";
             menuOpenDvd.Click += menuOpenDvd_Click;
+            //
+            // menuRecent (its items are made in code: MainForm.RefreshRecentMenu)
+            //
+            menuRecent.Name = "menuRecent";
+            menuRecent.Size = new Size(180, 22);
+            menuRecent.Text = "Recent Media Files";
+            menuRecent.ToolTipText = "The media files you opened most recently.";
             //
             // menuTools
             //
@@ -237,6 +245,7 @@
         private Button btnOpen;
         private MenuStrip menuStrip;
         private ToolStripMenuItem menuMedia;
+        private ToolStripMenuItem menuRecent;
         private ToolStripMenuItem menuOpenDvd;
         private ToolStripMenuItem menuTools;
         private ToolStripMenuItem menuCreateShortcut;

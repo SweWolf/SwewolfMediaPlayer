@@ -2491,15 +2491,20 @@ namespace SwewolfMediaPlayer
             return item;
         }
 
-        // Dark colors for the menu and its submenus.
-        private static void StyleMenu(ToolStrip menu)
+        // Dark colors for the menu and its submenus. The lines between groups are brighter and have more room (see DarkMenuRenderer).
+        internal static void StyleMenu(ToolStrip menu)
         {
-            menu.Renderer = new ToolStripProfessionalRenderer(new DarkColorTable()) { RoundedEdges = false };
+            menu.Renderer = new DarkMenuRenderer(new DarkColorTable()) { RoundedEdges = false };
             menu.BackColor = Color.FromArgb(43, 43, 43);
             menu.ForeColor = Color.FromArgb(230, 230, 230);
             foreach (ToolStripItem item in menu.Items)
             {
-                if (item is ToolStripDropDownItem dropDownItem)
+                if (item is ToolStripSeparator separator)
+                {
+                    separator.AutoSize = false;
+                    separator.Height = 9;   // a little air above and below the line (the default is only 6 px)
+                }
+                else if (item is ToolStripDropDownItem dropDownItem)
                 {
                     StyleMenu(dropDownItem.DropDown);
                 }
@@ -2898,6 +2903,25 @@ namespace SwewolfMediaPlayer
     }
 
     // Colors for the right-click menu in the dark theme.
+    // The line between two groups of menu items: the standard one is dark gray on dark gray and hard to see. Same idea as the menus of
+    // SweWolf File Explorer (2026-11-22): one clear line, a little in from the sides.
+    internal sealed class DarkMenuRenderer : ToolStripProfessionalRenderer
+    {
+        public DarkMenuRenderer(ProfessionalColorTable colors) : base(colors) { }
+
+        protected override void OnRenderSeparator(ToolStripSeparatorRenderEventArgs e)
+        {
+            if (e.Vertical)
+            {
+                base.OnRenderSeparator(e);
+                return;
+            }
+            int y = e.Item.Height / 2;
+            using var pen = new Pen(Color.FromArgb(135, 135, 135));
+            e.Graphics.DrawLine(pen, 8, y, e.Item.Width - 8, y);
+        }
+    }
+
     internal sealed class DarkColorTable : ProfessionalColorTable
     {
         private static readonly Color Back = Color.FromArgb(43, 43, 43);
