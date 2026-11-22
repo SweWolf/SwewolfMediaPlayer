@@ -8,6 +8,8 @@
 //
 // History:
 //   2026-11-21  First version.
+//   2026-11-21  Back from full screen the bar is docked last in the list again (at the very bottom, under the group boxes).
+//   2026-11-22  The title bar with the close button at the top edge is the same idea (MediaPlayerForm.FloatingTitle.cs).
 
 namespace SwewolfMediaPlayer
 {
@@ -17,14 +19,13 @@ namespace SwewolfMediaPlayer
 
         private bool _barShown;                    // the floating bar is on the screen (full screen only)
         private long _barActiveTicks;              // the last time the pointer moved or was pressed over the bar
-        private int _barChildIndex;                // where the bar sat in the z-order while docked
 
         // Full screen on: the bar leaves the docked layout and waits, hidden. Full screen off: it is docked at the bottom again.
         private void SetFloatingBar(bool fullScreen)
         {
+            SetFloatingTitle(fullScreen);   // MediaPlayerForm.FloatingTitle.cs
             if (fullScreen)
             {
-                _barChildIndex = Controls.GetChildIndex(pnlControls);
                 pnlControls.Visible = false;
                 pnlControls.Dock = DockStyle.None;
                 btnMore.Visible = false;   // its menu (Trim, Control Panel) does not apply in full screen
@@ -37,8 +38,21 @@ namespace SwewolfMediaPlayer
                 videoView.SizeChanged -= VideoViewResized;
                 videoView.LocationChanged -= VideoViewResized;
                 _barShown = false;
+                // WinForms docks the control with the highest index first, so the one that goes last in the list sits at the very bottom edge,
+                // with the Trim, Control Panel and Stream Info group boxes above it. (A remembered index is not enough: group boxes that are
+                // created later, like Stream Info, are put in between.)
+                // WinForms works out the index of a control again from the order of the real windows, and a control that has not been shown yet
+                // has no window (the Trim and Control Panel group boxes, until they are shown the first time): it would not be counted, and the bar
+                // would end up in front of them. So they get their windows first.
+                foreach (Control control in Controls)
+                {
+                    if (!control.IsHandleCreated)
+                    {
+                        _ = control.Handle;
+                    }
+                }
                 pnlControls.Dock = DockStyle.Bottom;
-                Controls.SetChildIndex(pnlControls, Math.Min(_barChildIndex, Controls.Count - 1));
+                Controls.SetChildIndex(pnlControls, Controls.Count - 1);
                 btnMore.Visible = true;
                 pnlControls.Visible = true;
             }
@@ -49,6 +63,7 @@ namespace SwewolfMediaPlayer
             if (_fullScreen)
             {
                 PlaceFloatingBar();
+                PlaceFloatingTitle();
             }
         }
 
@@ -89,7 +104,7 @@ namespace SwewolfMediaPlayer
         // True when the pointer is over the visible floating bar (so that a click or the hidden pointer there is not treated as one on the video).
         private bool IsOverFloatingBar(Point screenPoint)
         {
-            return _fullScreen && _barShown && BarScreenArea().Contains(screenPoint);
+            return _fullScreen && ((_barShown && BarScreenArea().Contains(screenPoint)) || IsOverFloatingTitle(screenPoint));
         }
 
         // Called by the 30 ms timer (CheckCursorIdle) with the pointer state.
@@ -100,6 +115,7 @@ namespace SwewolfMediaPlayer
                 return;
             }
 
+            UpdateFloatingTitle(position, moved, buttonDown, now);
             bool over = BarScreenArea().Contains(position);
             bool holding = menuVideo.Visible || (buttonDown && pnlControls.ContainsFocus && _barShown);
             if (over && (moved || buttonDown))
