@@ -39,6 +39,8 @@
             menuSettings = new ToolStripMenuItem();
             menuHelp = new ToolStripMenuItem();
             menuAbout = new ToolStripMenuItem();
+            menuViewHelp = new ToolStripMenuItem();
+            menuHelpSeparator = new ToolStripSeparator();
             menuNewVersion = new ToolStripMenuItem();
             menuIptv = new ToolStripMenuItem();
             menuOpenPlaylist = new ToolStripMenuItem();
@@ -152,10 +154,23 @@
             //
             // menuHelp
             //
-            menuHelp.DropDownItems.AddRange(new ToolStripItem[] { menuAbout });
+            menuHelp.DropDownItems.AddRange(new ToolStripItem[] { menuViewHelp, menuHelpSeparator, menuAbout });
             menuHelp.Name = "menuHelp";
             menuHelp.Size = new Size(44, 20);
             menuHelp.Text = "Help";
+            //
+            // menuViewHelp
+            //
+            menuViewHelp.Name = "menuViewHelp";
+            menuViewHelp.ShortcutKeys = Keys.F1;
+            menuViewHelp.Size = new Size(180, 22);
+            menuViewHelp.Text = "SweWolf Media Player Help";
+            menuViewHelp.Click += menuViewHelp_Click;
+            //
+            // menuHelpSeparator
+            //
+            menuHelpSeparator.Name = "menuHelpSeparator";
+            menuHelpSeparator.Size = new Size(177, 6);
             //
             // menuAbout
             //
@@ -268,5 +283,7 @@
         private ToolStripMenuItem menuUnfinished;
         private ToolStripMenuItem menuHelp;
         private ToolStripMenuItem menuAbout;
+        private ToolStripMenuItem menuViewHelp;
+        private ToolStripSeparator menuHelpSeparator;
     }
 }

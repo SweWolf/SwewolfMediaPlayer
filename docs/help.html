@@ -1,0 +1,560 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc 3.11" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>SweWolf Media Player Help</title>
+  <style>
+
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: 1.5em;}
+div.column{flex: auto;}
+@media screen {
+div.columns{gap: min(4vw, 1.5em);}
+div.column{overflow-x: auto;}
+}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+
+ul.task-list[class]{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+font-size: inherit;
+width: 0.8em;
+margin: 0 0.8em 0.2em -1.6em;
+vertical-align: middle;
+}
+</style>
+  <style type="text/css">:root {--text: #1f2328;--muted: #59636e;--bg: #ffffff;--line: #d1d9e0;--code-bg: #f3f4f6;--link: #0969da;}@media (prefers-color-scheme: dark) {:root {--text: #e6edf3;--muted: #9198a1;--bg: #0d1117;--line: #3d444d;--code-bg: #1f242c;--link: #4493f8;}}html { background: var(--bg); }body {max-width: 50rem;margin: 0 auto;padding: 1.5rem 1rem 4rem;font-family: "Segoe UI", system-ui, sans-serif;font-size: 16px;line-height: 1.6;color: var(--text);background: var(--bg);}h1, h2, h3, h4 { line-height: 1.25; margin: 2rem 0 0.75rem; }h1 { font-size: 2rem; margin-top: 0.5rem; }h2 { font-size: 1.5rem; padding-bottom: 0.3rem; border-bottom: 1px solid var(--line); }h3 { font-size: 1.2rem; }h4 { font-size: 1rem; }a { color: var(--link); text-decoration: none; }a:hover { text-decoration: underline; }code, pre {font-family: Consolas, "Cascadia Mono", monospace;font-size: 0.9em;background: var(--code-bg);border-radius: 4px;}code { padding: 0.1em 0.35em; }pre { padding: 0.75rem 1rem; overflow-x: auto; }pre code { padding: 0; }table { border-collapse: collapse; margin: 1rem 0; }th, td { border: 1px solid var(--line); padding: 0.35rem 0.75rem; text-align: left; }th { background: var(--code-bg); }</style>
+</head>
+<body>
+<h1 id="swewolf-media-player-help">SweWolf Media Player Help</h1>
+<p>SweWolf Media Player plays video, music, DVDs, audio CDs, playlists
+and live TV channels. It remembers where you stopped, lets you step
+through a video one frame at a time, and saves any frame as a
+picture.</p>
+<h2 id="contents">Contents</h2>
+<ul>
+<li><a href="#getting-started">Getting Started</a></li>
+<li><a href="#the-main-window">The Main Window</a></li>
+<li><a href="#the-player-window">The Player Window</a>
+<ul>
+<li><a href="#the-control-bar">The Control Bar</a></li>
+<li><a href="#the-right-click-menu">The Right-Click Menu</a></li>
+<li><a href="#full-screen">Full Screen</a></li>
+<li><a href="#when-the-media-file-ends">When the Media File
+Ends</a></li>
+</ul></li>
+<li><a href="#frame-stepping-and-saving-frames">Frame Stepping and
+Saving Frames</a></li>
+<li><a href="#resuming-where-you-stopped">Resuming Where You
+Stopped</a></li>
+<li><a href="#audio-video-and-subtitle-tracks">Audio, Video and Subtitle
+Tracks</a></li>
+<li><a href="#chapters">Chapters</a></li>
+<li><a href="#playback-speed">Playback Speed</a></li>
+<li><a href="#music">Music</a></li>
+<li><a href="#playlists">Playlists</a></li>
+<li><a href="#dvds-and-audio-cds">DVDs and Audio CDs</a></li>
+<li><a href="#live-tv-channels-iptv">Live TV Channels (IPTV)</a>
+<ul>
+<li><a href="#the-channel-list">The Channel List</a></li>
+<li><a href="#check-channels">Check Channels</a></li>
+<li><a href="#recording-a-channel">Recording a Channel</a></li>
+<li><a href="#my-recordings-and-unfinished-recordings">My Recordings and
+Unfinished Recordings</a></li>
+</ul></li>
+<li><a href="#bookmarks">Bookmarks</a></li>
+<li><a href="#settings">Settings</a></li>
+<li><a href="#create-shortcut">Create Shortcut</a></li>
+<li><a href="#command-line">Command Line</a></li>
+<li><a href="#keyboard-shortcuts">Keyboard Shortcuts</a></li>
+<li><a href="#where-the-program-keeps-its-files">Where the Program Keeps
+Its Files</a></li>
+<li><a href="#troubleshooting">Troubleshooting</a></li>
+</ul>
+<h2 id="getting-started">Getting Started</h2>
+<h3 id="what-you-need">What You Need</h3>
+<ul>
+<li>Windows 10 or Windows 11.</li>
+<li><strong>FFmpeg</strong> is optional. Download it from <a href="https://ffmpeg.org/download.html">ffmpeg.org</a> and either put
+<code>ffmpeg.exe</code> in the same folder as the player, or install it
+so that it is on the system PATH. Without FFmpeg the player still plays
+everything, but these features do not work: the thumbnail previews on
+the seek bar, saving the very last frame of a video, and recording a
+live TV channel. The player tells you once, the first time it starts, if
+FFmpeg is missing.</li>
+<li><strong>VLC media player</strong> is optional, and only needed for
+SID music (Commodore 64). See <a href="#music">Music</a>.</li>
+</ul>
+<h3 id="your-first-video">Your First Video</h3>
+<ol type="1">
+<li>Click <strong>Browse…</strong> and choose a video or music file, or
+drag a file into the main window.</li>
+<li>Click <strong>Open</strong>. The player window opens and the file
+starts playing.</li>
+</ol>
+<p>You can also start a file from Windows with <strong>Open
+with</strong>, or from SweWolf File Explorer.</p>
+<h2 id="the-main-window">The Main Window</h2>
+<p>The main window is where you choose what to play.</p>
+<ul>
+<li><strong>Media File</strong>: the file or web address to play. Type
+or paste it, click <strong>Browse…</strong>, or drag a file here. A web
+address can be a stream, or a list of channels (<code>.m3u</code> or
+<code>.m3u8</code>).</li>
+<li><strong>Open</strong>: opens the player window and plays it.</li>
+</ul>
+<p>The menus:</p>
+<ul>
+<li><strong>Tools &gt; Settings</strong>: the program’s options. See <a href="#settings">Settings</a>.</li>
+<li><strong>Tools &gt; Create Shortcut…</strong>: see <a href="#create-shortcut">Create Shortcut</a>.</li>
+<li><strong>Media &gt; Open DVD/CD</strong>: plays the DVD or audio CD
+in the drive. See <a href="#dvds-and-audio-cds">DVDs and Audio
+CDs</a>.</li>
+<li><strong>Media &gt; Recent Media Files</strong>: the last nine files
+you opened, with <strong>Clear List</strong> (it asks first). Only the
+list is cleared, not the files.</li>
+<li><strong>IPTV</strong>: the public live TV channel list. See <a href="#live-tv-channels-iptv">Live TV Channels (IPTV)</a>.</li>
+<li><strong>My Recordings</strong> and <strong>Unfinished
+Recordings</strong>: they appear when there is something to show. See <a href="#my-recordings-and-unfinished-recordings">My Recordings and
+Unfinished Recordings</a>.</li>
+<li><strong>Help</strong>: this help (F1) and
+<strong>About</strong>.</li>
+<li><strong>New Version Available</strong>: appears at the right end of
+the menu bar when a newer version has been released. Click it to open
+the download page.</li>
+</ul>
+<h2 id="the-player-window">The Player Window</h2>
+<p>The player window shows the picture on top and the control bar at the
+bottom. For music it shows the cover picture instead of a video.</p>
+<p>Double-click the video to switch to full screen and back. The mouse
+pointer disappears over the video when you have not moved it for a
+moment.</p>
+<h3 id="the-control-bar">The Control Bar</h3>
+<p>From left to right, the buttons you will normally use:</p>
+<ul>
+<li><strong>Play/Pause</strong> (Space): plays, or pauses. While a video
+is paused you can step frame by frame.</li>
+<li><strong>Stop</strong>: stops and goes back to the beginning.</li>
+<li><strong>Skip Back 1 Minute</strong> and <strong>Skip Ahead 1
+Minute</strong>: shown for files you can jump around in.</li>
+<li><strong>Previous</strong> and <strong>Next</strong>: shown for files
+with several tunes, for a playlist, and for the playlist of SweWolf File
+Explorer (Page Up and Page Down).</li>
+<li><strong>Record</strong>: shown for live TV channels. See <a href="#recording-a-channel">Recording a Channel</a>.</li>
+<li><strong>Save Frame</strong> (S): saves the picture on screen as a
+PNG file.</li>
+<li><strong>Add Bookmark</strong> (Ctrl+D): see <a href="#bookmarks">Bookmarks</a>.</li>
+<li><strong>Mute</strong> (M) and the <strong>volume</strong>
+slider.</li>
+<li>The <strong>seek bar</strong>, with the time. Click or drag it to
+jump. Point at it to see a small picture of that moment (needs FFmpeg;
+turn it off in the settings).</li>
+<li>The <strong>speed box</strong>: see <a href="#playback-speed">Playback Speed</a>.</li>
+<li><strong>More Options</strong>: the same menu as the right-click
+menu.</li>
+</ul>
+<h3 id="the-right-click-menu">The Right-Click Menu</h3>
+<p>Right-click the video or the control bar. Which items you see depends
+on the file:</p>
+<ul>
+<li><strong>Audio Track</strong>, <strong>Video Track</strong>,
+<strong>Subtitle Track</strong> and <strong>Use Default Tracks</strong>.
+See <a href="#audio-video-and-subtitle-tracks">Audio, Video and Subtitle
+Tracks</a>.</li>
+<li><strong>Chapters</strong>, for files that have them.</li>
+<li><strong>Tune</strong>, for files with several tunes.</li>
+<li><strong>Quality</strong>, for live channels that offer several
+qualities.</li>
+<li><strong>Visualization</strong>, for music: moving graphics instead
+of the cover picture. Press <strong>Esc</strong> to turn it off. It is
+not remembered: a new player window starts without one.</li>
+<li><strong>Control Panel</strong>: shows the <strong>Control
+Panel</strong> under the control bar.</li>
+</ul>
+<p>Right-click the <strong>Save Frame</strong> button for <strong>Set as
+Preview Picture…</strong>, <strong>Save Without Asking for a
+Folder</strong> and <strong>Open Folder</strong>.</p>
+<h3 id="full-screen">Full Screen</h3>
+<p>Press <strong>F</strong> (or <strong>Alt+Enter</strong>, or
+double-click the video). Move the mouse to the bottom edge to show the
+control bar, and to the top edge to show the title bar with a close
+button. Press <strong>Esc</strong> to leave full screen.</p>
+<p>In <strong>Tools &gt; Settings</strong> you can choose to open every
+video in full screen. Music never opens in full screen.</p>
+<h3 id="when-the-media-file-ends">When the Media File Ends</h3>
+<p>The <strong>Control Panel</strong> has a drop-down, <strong>When the
+Media File Ends</strong> (for a playlist it says <strong>When the
+Playlist Ends</strong>). The choices are:</p>
+<ul>
+<li><strong>Show the Last Frame</strong>: the video stays on its last
+picture. This is the default.</li>
+<li><strong>Show a Black Screen</strong>.</li>
+<li><strong>Repeat</strong>: starts again from the beginning (for a
+playlist, from the first item).</li>
+<li><strong>Close Player</strong>: closes the window.</li>
+</ul>
+<p>The choice is remembered. A player that was started with a file (for
+example from SweWolf File Explorer) always closes at the end, and does
+not save that choice.</p>
+<h2 id="frame-stepping-and-saving-frames">Frame Stepping and Saving
+Frames</h2>
+<p>While a video is <strong>paused</strong>, press
+<strong>Right</strong> to go one frame forward and <strong>Left</strong>
+to go one frame back.</p>
+<p><strong>Save Frame</strong> (S, or the camera button) saves the
+picture you see as a PNG file. A Save As window asks for the file name;
+it starts in the folder you chose in <strong>Tools &gt;
+Settings</strong> (the Windows Pictures folder by default). Right-click
+the button and choose <strong>Save Without Asking for a Folder</strong>
+to skip the question and save with a ready-made name.</p>
+<p>At the very end of a video, <strong>Save Frame</strong> saves the
+real last frame of the file. This needs FFmpeg.</p>
+<p><strong>Set as Preview Picture…</strong> (right-click the Save Frame
+button) saves the frame as a PNG file named after the video with
+<code>-poster</code> added (for example
+<code>My Video-poster.png</code>), in the same folder as the video, as a
+preview picture for it.</p>
+<h2 id="resuming-where-you-stopped">Resuming Where You Stopped</h2>
+<p>The player remembers where you stopped in every video, and offers to
+continue the next time you open it. A video counts as watched after it
+has played for a minute or to its end, so SweWolf File Explorer can mark
+it too. The positions are kept in the library file that SweWolf File
+Explorer shares.</p>
+<p>In <strong>Tools &gt; Settings &gt; Resume</strong>:</p>
+<ul>
+<li><strong>Resume Video Files</strong>: <strong>Yes</strong> continues
+at once, <strong>Ask</strong> asks first (and chooses Yes after 10
+seconds if you do not touch the mouse or the keyboard),
+<strong>No</strong> always starts from the beginning and remembers
+nothing.</li>
+<li><strong>Move the Resume Point Back by</strong>: the saved position
+is this many seconds before where you stopped, so you see a little of
+what came before. Use 0 for the exact point.</li>
+<li><strong>Resume Audio Files</strong>: also remember songs, podcasts
+and audio books, but only files that are at least the number of minutes
+given in <strong>Only if the File Is at Least</strong>. <strong>When
+Opening an Audio File</strong> works like <strong>Resume Video
+Files</strong>.</li>
+</ul>
+<h2 id="audio-video-and-subtitle-tracks">Audio, Video and Subtitle
+Tracks</h2>
+<p>Many files hold several audio languages, video angles or subtitles.
+Choose them in the right-click menu. Press <strong>C</strong> to turn
+the subtitles on or off.</p>
+<p>The player <strong>remembers your choice for each file</strong>, and
+uses it the next time the file opens. <strong>Use Default
+Tracks</strong> forgets the choice for that file.</p>
+<p>In <strong>Tools &gt; Settings &gt; Player</strong>:</p>
+<ul>
+<li><strong>Turn On Subtitles When a Video Opens</strong>: shows the
+subtitles of a video the first time you open it. Your own choice for a
+video is used instead.</li>
+<li><strong>Show Track Menus Only When There Is a Choice</strong>: hides
+the track menus for files that have nothing to choose between. When it
+is off, the three menus are always shown and are greyed out when the
+file has none.</li>
+</ul>
+<h2 id="chapters">Chapters</h2>
+<p>For a file that has chapters, press <strong>N</strong> for the next
+chapter and <strong>P</strong> for the previous one, or use the
+<strong>Chapters</strong> menu. The menu does not appear for files
+without chapters.</p>
+<h2 id="playback-speed">Playback Speed</h2>
+<p>The speed box left of the time shows the speed. Click its arrows or
+use the mouse wheel over it to step through the speeds, or press
+<strong>+</strong> and <strong>-</strong> (also <strong>]</strong> and
+<strong>[</strong>). <strong>Backspace</strong> goes back to normal
+speed.</p>
+<p>The speed is not remembered: every new file starts at normal speed.
+The box is off for files you cannot jump in, such as live streams and
+SID music.</p>
+<h2 id="music">Music</h2>
+<p>Music files show their cover picture, taken from the file’s tags or
+from a picture in the same folder. In <strong>Tools &gt; Settings &gt;
+Player</strong>, <strong>Cover Picture Size for Music Files</strong>
+chooses <strong>Medium</strong> or <strong>Maximum</strong>.</p>
+<p>Files with several tunes (SID music, Commodore 64) get
+<strong>Previous</strong> and <strong>Next</strong> buttons (Page Up and
+Page Down), the <strong>Tune</strong> menu, and a list of the tunes
+beside the picture. When a tune has played to its known length, the next
+one starts by itself after 3 seconds. In <strong>Tools &gt;
+Settings</strong>, <strong>Side of the Tune and Channel Lists</strong>
+puts the list on the left or on the right, and <strong>Look of the
+Previous and Next Buttons</strong> chooses a modern or a classic
+look.</p>
+<p><strong>SID music needs VLC media player.</strong> The first time you
+open a SID file, the player copies the SID plugin from your own VLC
+installation. If VLC is not installed, the player tells you so. Install
+<a href="https://www.videolan.org/vlc/">VLC</a> and open the file
+again.</p>
+<h2 id="playlists">Playlists</h2>
+<p>Open an <code>.m3u</code> or <code>.m3u8</code> playlist of files on
+your disks in the <strong>Media File</strong> box, like any other file.
+The items play one after the other, and the list is shown beside the
+picture. Click a row to jump to it. Press <strong>F8</strong> to hide or
+show the list.</p>
+<p>If an item cannot be played because it is missing or damaged, a
+message in the video area says which file and why, counts down, and then
+the next item starts. <strong>Skip Now</strong> and the
+<strong>Next</strong> button do not wait. In <strong>Tools &gt;
+Settings</strong>, <strong>Seconds to Show a Playlist Error</strong>
+sets the countdown (10 seconds by default). If every item in the list
+fails, the list is not repeated.</p>
+<p>At the end of the list, <strong>When the Playlist Ends</strong>
+decides what happens (see <a href="#when-the-media-file-ends">When the
+Media File Ends</a>).</p>
+<h2 id="dvds-and-audio-cds">DVDs and Audio CDs</h2>
+<p><strong>Media &gt; Open DVD/CD</strong> plays the DVD in the drive,
+with its menus, or the audio CD from the first track to the last. You
+can also give the player a DVD drive or folder, such as
+<code>E:\</code>.</p>
+<ul>
+<li>With a <strong>DVD</strong>, the mouse works in the picture. Up,
+Down and Enter move in the disc menu, and <strong>D</strong> opens the
+main menu of the disc.</li>
+<li>With an <strong>audio CD</strong>, the artist, title, album and
+cover picture are looked up from MusicBrainz and the Cover Art Archive.
+Only the disc’s fingerprint is sent. What was found is kept on your
+computer, so a disc you have played before is known at once, also
+without internet.</li>
+</ul>
+<h2 id="live-tv-channels-iptv">Live TV Channels (IPTV)</h2>
+<p><strong>IPTV &gt; Open Playlist</strong> opens the public channel
+list from <a href="https://github.com/iptv-org/iptv">iptv-org</a>, a
+free list of TV channels on the internet. The channels are streamed from
+their owners. Some of them stop working or change over time.</p>
+<h3 id="the-channel-list">The Channel List</h3>
+<p>The list is shown beside the picture (press <strong>F8</strong> to
+hide or show it). Each row has the logo of the channel, its name and its
+group. Click a row to play it.</p>
+<ul>
+<li>The <strong>text box</strong> filters by name. Every word you type
+must be in the name.</li>
+<li>The <strong>drop-down</strong> narrows the list to one group. It
+also holds <strong>Favorites</strong>, <strong>Recently Watched</strong>
+(the last 10 channels that really played) and <strong>Hidden
+Channels</strong>.</li>
+<li>Right-click a channel for <strong>Add to Favorites</strong>,
+<strong>Hide Channel</strong> and <strong>Copy Stream Address</strong>.
+A gold star marks a favorite.</li>
+<li>Point at a row to see when the channel last worked, or since when it
+does not.</li>
+<li>After a channel has failed three times in a row, the player offers
+to hide it.</li>
+<li>Choose <strong>Quality</strong> in the right-click menu if a channel
+offers several. <strong>Auto</strong> is the default; the others are
+<strong>Highest</strong>, <strong>Lowest</strong>, or a fixed top height
+such as 720p.</li>
+</ul>
+<p><strong>IPTV &gt; Reset Channel List…</strong> forgets the channels
+that the list owner has removed from the public list but that were kept
+here, and loads the list again as it is on the web now. It asks
+first.</p>
+<h3 id="check-channels">Check Channels</h3>
+<p><strong>IPTV &gt; Check Channels</strong> goes through the whole list
+in the background and asks every channel whether it answers. The result
+is shown when you point at a channel. The list has over 11,000 channels,
+so it can take a long time. You can stop it at any moment and continue
+later.</p>
+<p>The next run skips the channels that already have a result from the
+last 24 hours (a check box asks for all of them). Hidden channels,
+channels marked “[Geo-blocked]” and addresses that are not
+<code>http</code> or <code>https</code> are skipped. If many channels in
+a row fail, the internet connection is tested, and the check stops when
+it is down, so nothing is wrongly marked as failing.</p>
+<p>After a run, <strong>Hide Long-Failing Channels</strong> hides the
+channels that have failed for 14 days or more. <strong>Check the Hidden
+Channels Instead</strong> asks only the hidden channels, and afterwards
+offers to bring back the ones that answer.</p>
+<h3 id="recording-a-channel">Recording a Channel</h3>
+<p>Click the red <strong>Record</strong> button (it turns into a red
+square while recording). FFmpeg starts at once and stores the stream in
+a file. A few seconds later you watch what is being stored;
+<strong>Pause</strong> only pauses what you see, the recording goes on.
+Short interruptions may occur.</p>
+<p>Click the button again, or <strong>Stop</strong>, to end the
+recording. A Save As window asks for the name of the MP4 file (the
+channel and the time are suggested). If you cancel, the player asks
+whether to discard the recording. Recording needs FFmpeg. The quality
+cannot be changed while recording.</p>
+<h3 id="my-recordings-and-unfinished-recordings">My Recordings and
+Unfinished Recordings</h3>
+<p><strong>My Recordings</strong> appears in the main window after your
+first recording. It lists the latest nine recordings, newest first, and
+<strong>All Recordings</strong>, a window with the whole list. There you
+can <strong>Play</strong>, <strong>Open Folder</strong>, <strong>Find
+File</strong> (if the file was moved or renamed), <strong>Copy Source
+Address</strong> and <strong>Remove from List</strong> (the file
+stays).</p>
+<p><strong>Unfinished Recordings</strong> appears if the player or the
+computer stopped while recording. The recording up to that moment is
+kept. Choose <strong>Recover</strong> to turn it into an MP4 file,
+<strong>Play</strong> to watch it as it is, or <strong>Discard</strong>
+(asks first; the file goes to the Recycle Bin).</p>
+<h2 id="bookmarks">Bookmarks</h2>
+<p><strong>Add Bookmark</strong> (Ctrl+D) saves a bookmark to the
+current spot in the video, in the Bookmarks folder of SweWolf File
+Explorer. It shows at the top of the explorer’s folder tree, and opens
+the video at that point.</p>
+<h2 id="settings">Settings</h2>
+<p><strong>Tools &gt; Settings</strong> has these groups.</p>
+<h3 id="player">Player</h3>
+<ul>
+<li><strong>Start Player in Full Screen Mode for Video Files</strong>:
+every video opens in full screen. Music never does.</li>
+<li><strong>Show Thumbnail Previews on the Seek Bar</strong>: needs
+FFmpeg.</li>
+<li><strong>Turn On Subtitles When a Video Opens</strong>, <strong>Show
+Track Menus Only When There Is a Choice</strong>: see <a href="#audio-video-and-subtitle-tracks">Audio, Video and Subtitle
+Tracks</a>.</li>
+<li><strong>Cover Picture Size for Music Files</strong>, <strong>Look of
+the Previous and Next Buttons</strong>, <strong>Side of the Tune and
+Channel Lists</strong>: see <a href="#music">Music</a>. A player that is
+already open keeps its old look until it is opened again.</li>
+<li><strong>Seconds to Show a Playlist Error</strong>: see <a href="#playlists">Playlists</a>.</li>
+</ul>
+<h3 id="open-a-media-file">Open a Media File</h3>
+<ul>
+<li><strong>Default Start Folder for Browsing</strong>: the folder where
+<strong>Browse…</strong> starts. The Windows Videos folder is the
+default. Leave it blank to start in the last folder you used, also after
+the program has been closed.</li>
+</ul>
+<h3 id="resume">Resume</h3>
+<p>See <a href="#resuming-where-you-stopped">Resuming Where You
+Stopped</a>.</p>
+<h3 id="saved-frames">Saved Frames</h3>
+<ul>
+<li><strong>Default Folder for Saved Frames</strong>: where the Save
+Frame window starts. The Windows Pictures folder is the default. Leave
+it blank to start in the folder of the video.</li>
+</ul>
+<h3 id="updates">Updates</h3>
+<ul>
+<li><strong>Check for New Version at Startup</strong>: the program asks
+GitHub whether a newer version has been released. Only the version
+number is compared; nothing about you is sent.</li>
+</ul>
+<h2 id="create-shortcut">Create Shortcut</h2>
+<p><strong>Tools &gt; Create Shortcut…</strong> adds a shortcut to the
+program on your <strong>Desktop</strong>, in the <strong>Start Menu
+(Programs)</strong>, or in the <strong>Send To Menu</strong> of Windows.
+Choose whether it is for the current user only or for all users (this
+may need administrator privileges; a Send To shortcut is always for the
+current user). The shortcut points to the program that is running
+now.</p>
+<h2 id="command-line">Command Line</h2>
+<p>Give the program a file or a web address, for example through
+<strong>Open with</strong> or a shortcut:</p>
+<pre><code>SwewolfMediaPlayer.exe &quot;C:\Videos\My Video.mp4&quot;</code></pre>
+<p>The player opens at once, skips the main window, plays the file and
+closes when it has ended. If a player window is already open, the file
+is handed to that one. A file that does not exist is reported.</p>
+<h2 id="keyboard-shortcuts">Keyboard Shortcuts</h2>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>What it does</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>F1</td>
+<td>Open this help</td>
+</tr>
+<tr>
+<td>Space, K, Pause</td>
+<td>Play or pause</td>
+</tr>
+<tr>
+<td>Left / Right (paused)</td>
+<td>One frame back / forward</td>
+</tr>
+<tr>
+<td>S</td>
+<td>Save the current frame</td>
+</tr>
+<tr>
+<td>F, Alt+Enter</td>
+<td>Full screen on or off</td>
+</tr>
+<tr>
+<td>Esc</td>
+<td>Leave full screen, close a panel, or close the player</td>
+</tr>
+<tr>
+<td>X</td>
+<td>Close the player</td>
+</tr>
+<tr>
+<td>M</td>
+<td>Mute or unmute</td>
+</tr>
+<tr>
+<td>C</td>
+<td>Subtitles on or off</td>
+</tr>
+<tr>
+<td>N / P</td>
+<td>Next / previous chapter</td>
+</tr>
+<tr>
+<td>+ / - (or ] / [)</td>
+<td>Faster / slower</td>
+</tr>
+<tr>
+<td>Backspace</td>
+<td>Normal speed</td>
+</tr>
+<tr>
+<td>Page Up / Page Down</td>
+<td>Previous / next tune, track or playlist item</td>
+</tr>
+<tr>
+<td>F8</td>
+<td>Show or hide the channel list or the playlist</td>
+</tr>
+<tr>
+<td>Ctrl+D</td>
+<td>Add a bookmark</td>
+</tr>
+</tbody>
+</table>
+<p>A key that types a letter, such as M or X, does not act while you are
+typing in a text box.</p>
+<h2 id="where-the-program-keeps-its-files">Where the Program Keeps Its
+Files</h2>
+<ul>
+<li><strong>Settings, the library, recordings and logs</strong>:
+<code>%AppData%\SweWolfSoftware\SwewolfMediaPlayer\</code>. The library
+file, which remembers the files you have opened, your resume points and
+your track choices, is shared with SweWolf File Explorer.</li>
+<li><strong>Caches</strong>, such as the information about an audio CD,
+which the program can recreate by itself:
+<code>%LocalAppData%\SweWolfSoftware\</code>.</li>
+</ul>
+<h2 id="troubleshooting">Troubleshooting</h2>
+<p><strong>The seek bar shows no picture when I point at it.</strong>
+The previews need FFmpeg, and only work for video files. See <a href="#what-you-need">What You Need</a>.</p>
+<p><strong>Save Frame does not save the last picture of a
+video.</strong> This needs FFmpeg too.</p>
+<p><strong>A SID file will not play.</strong> SID music needs the SID
+plugin of VLC media player. Install VLC and open the file again.</p>
+<p><strong>A channel does not play.</strong> Channels on the internet
+come and go. Try another quality, or use <strong>IPTV &gt; Check
+Channels</strong> to find the ones that work. A channel that has failed
+for a long time can be hidden.</p>
+<p><strong>A file does not play at all.</strong> The player uses the VLC
+engine, which plays nearly everything. If a file is damaged, it will not
+play in any player.</p>
+<p><strong>I hear no sound.</strong> Look at the <strong>Mute</strong>
+button and the volume slider. If the file has several audio tracks, try
+another one in the right-click menu.</p>
+<p><strong>I do not see the resume question.</strong> The setting
+<strong>Resume Video Files</strong> may be <strong>Yes</strong> or
+<strong>No</strong>. Files that are shorter than a minute never get a
+resume point.</p>
+</body>
+</html>

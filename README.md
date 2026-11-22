@@ -29,6 +29,7 @@ It is built on the VLC engine (LibVLC), so it plays nearly every format. It work
 - **Settings** (**Tools > Settings**): full screen for video, thumbnails, subtitles, resume, the look of the buttons, the side of the lists, the saved-frames folder, the start folder for browsing, and checking for a new version at startup
 - **Create Shortcut** (**Tools > Create Shortcut...**): add the program to your Desktop, Start Menu or Send To menu
 - **Drag and drop**: drop a file on the window, or use **Open with**
+- **Help** (**Help > SweWolf Media Player Help**, F1): a complete user guide
 
 ---
 
@@ -66,6 +67,8 @@ It is built on the VLC engine (LibVLC), so it plays nearly every format. It work
 
 1. Start the program and choose a file in the **Media File** box (**Browse...**, or drag one in), then click **Open**. The player window opens
 2. Right-click the control bar or the video for the other options, such as tracks, quality and visualizations
+
+For all the details, press **F1** in the application or see [docs/help.md](docs/help.md).
 
 ### Command Line
 

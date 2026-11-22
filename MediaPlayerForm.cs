@@ -908,6 +908,11 @@ namespace SwewolfMediaPlayer
             {
                 return base.ProcessCmdKey(ref msg, keyData);
             }
+            if (keyData == Keys.F1)
+            {
+                HelpFiles.OpenHelp(AppName);
+                return true;
+            }
             // F8 (alone) hides / shows the channel list or the playlist, also while typing in its filter box.
             if (keyData == Keys.F8 && _channels != null)
             {

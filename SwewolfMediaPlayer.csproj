@@ -14,7 +14,7 @@
     <Company>SweWolf Software</Company>
     <Copyright>SweWolf Software</Copyright>
     <Authors>SweWolf</Authors>
-    <Description>A media player with frame stepping, frame saving and trimming</Description>
+    <Description>A media player with frame stepping and frame saving</Description>
     <!-- 64-bit Windows on Intel/AMD only. Only the x64 LibVLC files are copied: fewer files for the virus scanner
          to check at the first start, and a smaller download. (ARM PCs run the x64 program in emulation.) -->
     <PlatformTarget>x64</PlatformTarget>
@@ -25,6 +25,14 @@
 
   <ItemGroup>
     <EmbeddedResource Include="Resources\SwewolfMediaPlayer.ico" LogicalName="SwewolfMediaPlayer.ico" />
+    <!-- Help > SweWolf Media Player Help (F1). Rebuild it from help.md with docs\build-help.cmd -->
+    <Content Include="docs\help.html" Link="Help\help.html">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <!-- Also embedded in the EXE: HelpFiles.cs saves it to %AppData% and opens it when the Help folder is missing -->
+    <EmbeddedResource Include="docs\help.html">
+      <LogicalName>Help/help.html</LogicalName>
+    </EmbeddedResource>
   </ItemGroup>
 
   <ItemGroup>

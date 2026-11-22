@@ -120,6 +120,8 @@ namespace SwewolfMediaPlayer
             }
         }
 
+        private void menuViewHelp_Click(object? sender, EventArgs e) => HelpFiles.OpenHelp(AppName);
+
         private void menuAbout_Click(object? sender, EventArgs e)
         {
             using var form = new AboutForm();
