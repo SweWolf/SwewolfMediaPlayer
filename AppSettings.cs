@@ -23,6 +23,7 @@
 //   2026-11-10  MediaStartFolder (the Windows Videos folder by default; blank = the last folder used) and LastMediaFolder.
 //   2026-11-12  ListSide (right by default): the side of the tune list and the channel list.
 //   2026-11-19  PlaylistNoticeSeconds (10 by default): how long the message about a playlist item that cannot be played stays.
+//   2026-11-22  FfmpegNoticeShown (false by default): the one-time message that FFmpeg is not installed has been shown.
 
 using System.Text.Json;
 
@@ -91,6 +92,9 @@ namespace SwewolfMediaPlayer
 
         // How many seconds the message about a playlist item that cannot be played stays before the next item starts (1 to 60, default 10).
         public int PlaylistNoticeSeconds { get; set; } = 10;
+
+        // Whether the one-time message that FFmpeg is not installed has been shown (see FfmpegNotice.cs).
+        public bool FfmpegNoticeShown { get; set; }
 
         // The folder of the last recording of a stream (the Record button): the Save As dialog starts there, and the .ts file is written there while
         // it records. The Windows Videos folder until the first recording.

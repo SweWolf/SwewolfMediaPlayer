@@ -94,6 +94,8 @@ namespace SwewolfMediaPlayer
                         return;
                     }
 
+                    FfmpegNotice.ShowOnce();
+
                     // Load the video engine while the window is being made (the main window does the same).
                     _ = MediaPlayerForm.PreloadAsync();
                     var window = new MediaPlayerForm(fullPath, string.IsNullOrEmpty(libraryPath) ? null : libraryPath) { Icon = LoadIcon() };
@@ -109,6 +111,7 @@ namespace SwewolfMediaPlayer
                 MessageBox.Show($"The file \"{path}\" does not exist.", "SweWolf Media Player",
                     MessageBoxButtons.OK, MessageBoxIcon.Warning);
             }
+            FfmpegNotice.ShowOnce();
             Application.Run(new MainForm(path));
         }
 
