@@ -15,6 +15,7 @@
 // History:
 //   2026-11-12  First version.
 //   2026-11-19  IsAddress, IsFilePlaylist and ResolvePaths: a list of local files (the explorer's playlist) is played item after item.
+//   2026-11-22  LoadTextAsync adds the channels the owner has removed (ChannelMaster.cs).
 
 using System.Drawing.Drawing2D;
 using System.Net;
@@ -161,7 +162,19 @@ namespace SwewolfMediaPlayer
         }
 
         // Reads a local file or downloads a web address (with the disk copy and the change check). Returns null when neither works.
+        // A list from the web also gets the channels that its owner has removed (see ChannelMaster.cs).
         public static async Task<string?> LoadTextAsync(string pathOrUrl)
+        {
+            string? text = await LoadUpstreamAsync(pathOrUrl);
+            if (text != null && Uri.TryCreate(pathOrUrl.Trim(), UriKind.Absolute, out Uri? web) && (web.Scheme == "http" || web.Scheme == "https"))
+            {
+                string address = pathOrUrl.Trim();
+                return await Task.Run(() => ChannelMaster.Merge(address, text));
+            }
+            return text;
+        }
+
+        private static async Task<string?> LoadUpstreamAsync(string pathOrUrl)
         {
             string text = pathOrUrl.Trim();
             if (!Uri.TryCreate(text, UriKind.Absolute, out Uri? uri) || (uri.Scheme != "http" && uri.Scheme != "https"))

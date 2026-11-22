@@ -43,6 +43,7 @@
             menuIptv = new ToolStripMenuItem();
             menuOpenPlaylist = new ToolStripMenuItem();
             menuCheckChannels = new ToolStripMenuItem();
+            menuResetList = new ToolStripMenuItem();
             menuMyRecordings = new ToolStripMenuItem();
             menuUnfinished = new ToolStripMenuItem();
             lblFile = new Label();
@@ -105,7 +106,7 @@
             //
             // menuIptv
             //
-            menuIptv.DropDownItems.AddRange(new ToolStripItem[] { menuOpenPlaylist, menuCheckChannels });
+            menuIptv.DropDownItems.AddRange(new ToolStripItem[] { menuOpenPlaylist, menuCheckChannels, menuResetList });
             menuIptv.Name = "menuIptv";
             menuIptv.Size = new Size(41, 20);
             menuIptv.Text = "IPTV";
@@ -125,6 +126,14 @@
             menuCheckChannels.Text = "Check Channels";
             menuCheckChannels.ToolTipText = "Find out which channels of the public IPTV list answer, in the background. The result is shown when you point at a channel.";
             menuCheckChannels.Click += menuCheckChannels_Click;
+            //
+            // menuResetList
+            //
+            menuResetList.Name = "menuResetList";
+            menuResetList.Size = new Size(180, 22);
+            menuResetList.Text = "Reset Channel List...";
+            menuResetList.ToolTipText = "Forget the channels that were removed from the public IPTV list and load the list again, as it is on the web now.";
+            menuResetList.Click += menuResetList_Click;
             //
             // menuMyRecordings
             //
@@ -254,6 +263,7 @@
         private ToolStripMenuItem menuIptv;
         private ToolStripMenuItem menuOpenPlaylist;
         private ToolStripMenuItem menuCheckChannels;
+        private ToolStripMenuItem menuResetList;
         private ToolStripMenuItem menuMyRecordings;
         private ToolStripMenuItem menuUnfinished;
         private ToolStripMenuItem menuHelp;

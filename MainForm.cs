@@ -109,6 +109,17 @@ namespace SwewolfMediaPlayer
             }
         }
 
+        private void menuResetList_Click(object? sender, EventArgs e)
+        {
+            if (MessageBox.Show(this, "Channels that the owner has removed from the public IPTV list, but that are still kept here, will be forgotten.\n\n"
+                + "The list is then loaded again as it is on the web now. Do you want to continue?", AppName,
+                MessageBoxButtons.YesNo, MessageBoxIcon.Question, MessageBoxDefaultButton.Button2) == DialogResult.Yes)
+            {
+                ChannelMaster.Reset(IptvPlaylistUrl);
+                OpenMedia(IptvPlaylistUrl);
+            }
+        }
+
         private void menuAbout_Click(object? sender, EventArgs e)
         {
             using var form = new AboutForm();
