@@ -50,7 +50,7 @@ namespace SwewolfMediaPlayer
             FormBorderStyle = FormBorderStyle.FixedDialog;
             MaximizeBox = false;
             MinimizeBox = false;
-            StartPosition = FormStartPosition.CenterParent;
+            StartPosition = FormStartPosition.Manual;
             AutoScaleMode = AutoScaleMode.Dpi;
 
             var info = new Label
@@ -143,6 +143,20 @@ namespace SwewolfMediaPlayer
             AcceptButton = _btnStart;
             CancelButton = _btnClose;
             _timer.Tick += (_, _) => UpdateStatus();
+        }
+
+        // Centered over the player window, with the final size (CenterParent alone works from the size before the layout is done).
+        protected override void OnLoad(EventArgs e)
+        {
+            base.OnLoad(e);
+            if (Owner != null)
+            {
+                Rectangle area = Screen.FromControl(Owner).WorkingArea;
+                int x = Owner.Left + (Owner.Width - Width) / 2;
+                int y = Owner.Top + (Owner.Height - Height) / 2;
+                Location = new Point(Math.Clamp(x, area.Left, Math.Max(area.Left, area.Right - Width)),
+                    Math.Clamp(y, area.Top, Math.Max(area.Top, area.Bottom - Height)));
+            }
         }
 
         protected override void OnFormClosing(FormClosingEventArgs e)
