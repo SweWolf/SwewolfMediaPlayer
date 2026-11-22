@@ -269,7 +269,7 @@ namespace SwewolfMediaPlayer
             new MediaPlayerForm(path) { Icon = Icon }.Show(this);
         }
 
-        // Media > Recent Media Files: the last nine files, newest first, numbered 1 to 9 (the digit is the shortcut key), then a separator and
+        // Media > Recent Media Files: the last nine files, newest first, numbered "1." to "9." (the digit is the shortcut key), then a separator and
         // Clear List, which asks first. The full path is the tooltip of an item. Empty list: the menu item is greyed out.
         private void RefreshRecentMenu()
         {
@@ -285,7 +285,7 @@ namespace SwewolfMediaPlayer
             {
                 string path = files[i];
                 string name = Path.GetFileName(path);
-                var item = new ToolStripMenuItem($"&{i + 1} {(name.Length > 0 ? name : path).Replace("&", "&&")}") { ToolTipText = path };
+                var item = new ToolStripMenuItem($"&{i + 1}. {(name.Length > 0 ? name : path).Replace("&", "&&")}") { ToolTipText = path };
                 item.Click += (_, _) => OpenMedia(path);
                 menuRecent.DropDownItems.Add(item);
             }

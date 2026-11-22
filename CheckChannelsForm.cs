@@ -10,6 +10,8 @@
 //
 // History:
 //   2026-11-18  First version.
+//   2026-11-22  Text no longer cut off (the labels are measured). "Hide Long-Failing Channels": hides the channels whose run of failures began 14 days
+//               or more ago (no success since), from the history.
 //   2026-11-19  The check box "Check the Hidden Channels Instead" asks only the hidden channels (of this list), and afterwards the button offers a list of
 //               the ones that answer, to bring back (UnhideForm: all are ticked, Select All / Select None).
 
@@ -21,6 +23,7 @@ namespace SwewolfMediaPlayer
     {
         private const int MaxParallel = 24;
         private static readonly TimeSpan Fresh = TimeSpan.FromHours(24);
+        private static readonly TimeSpan LongFailing = TimeSpan.FromDays(14);   // no answer for this long: the channel is counted as gone
 
         private readonly string _listUrl;
         private readonly Label _lblStatus = new();
@@ -28,7 +31,7 @@ namespace SwewolfMediaPlayer
         private readonly CheckBox _chkAgain = new(), _chkHidden = new();
         private bool _hiddenRun;   // the run that is going or was done asked the hidden channels
         private readonly ConcurrentDictionary<string, string> _workedHidden = new(StringComparer.OrdinalIgnoreCase);   // address -> name
-        private readonly Button _btnStart = new(), _btnStop = new(), _btnHide = new(), _btnClose = new();
+        private readonly Button _btnStart = new(), _btnStop = new(), _btnHide = new(), _btnLong = new(), _btnClose = new();
         private readonly System.Windows.Forms.Timer _timer = new() { Interval = 500 };
 
         private CancellationTokenSource? _stop;
@@ -57,12 +60,16 @@ namespace SwewolfMediaPlayer
                        "(point at a channel in the list to see it). It takes a while: you can stop it and continue later.\n\n" +
                        "Skipped: hidden channels, channels named [Geo-blocked], and channels checked in the last 24 hours.",
                 Dock = DockStyle.Top,
-                Height = 100,
                 Padding = new Padding(12, 12, 12, 0),
             };
+            const int width = 660;
+            // The labels are as high as their text needs (a fixed height cut the last words off).
+            int textWidth = width - 24;
+            int Measure(string text) => TextRenderer.MeasureText(text, Font, new Size(textWidth, 0), TextFormatFlags.WordBreak | TextFormatFlags.NoPadding).Height;
+            info.Height = Measure(info.Text) + 12 + 6;
             _lblStatus.AutoSize = false;
             _lblStatus.Dock = DockStyle.Top;
-            _lblStatus.Height = 60;
+            _lblStatus.Height = 4 * Font.Height + 6 + 6;   // a note, and the lines of the counts
             _lblStatus.Padding = new Padding(12, 6, 12, 0);
             _lblStatus.Text = "Ready.";
             _bar.Dock = DockStyle.Top;
@@ -94,8 +101,11 @@ namespace SwewolfMediaPlayer
             _btnStart.Text = "Start";
             _btnStop.Text = "Stop";
             _btnHide.Text = "Hide Channels That Failed";
+            _btnLong.Text = "Hide Long-Failing Channels";
+            new ToolTip().SetToolTip(_btnLong, "Hides the channels that have not answered for 14 days or more: the checks and your own clicks have not found them working since " +
+                "the day they started to fail, and that was at least 14 days ago.");
             _btnClose.Text = "Close";
-            foreach (Button b in new[] { _btnStart, _btnStop, _btnHide, _btnClose })
+            foreach (Button b in new[] { _btnStart, _btnStop, _btnHide, _btnLong, _btnClose })
             {
                 b.AutoSize = true;
                 b.AutoSizeMode = AutoSizeMode.GrowAndShrink;
@@ -105,7 +115,7 @@ namespace SwewolfMediaPlayer
             _btnStop.Enabled = false;
             _btnHide.Enabled = false;
             var buttons = new FlowLayoutPanel { Dock = DockStyle.Fill, Padding = new Padding(12, 6, 12, 6), WrapContents = false };
-            buttons.Controls.AddRange(new Control[] { _btnStart, _btnStop, _btnHide, _btnClose });
+            buttons.Controls.AddRange(new Control[] { _btnStart, _btnStop, _btnHide, _btnLong, _btnClose });
 
             // The last one added is the top one.
             Controls.Add(buttons);
@@ -113,7 +123,7 @@ namespace SwewolfMediaPlayer
             Controls.Add(barHost);
             Controls.Add(_lblStatus);
             Controls.Add(info);
-            ClientSize = new Size(520, 100 + 60 + 34 + 58 + 52);
+            ClientSize = new Size(width, info.Height + _lblStatus.Height + 34 + 58 + 52);
 
             _btnStart.Click += async (_, _) => await RunAsync();
             _btnStop.Click += (_, _) => _stop?.Cancel();
@@ -128,6 +138,7 @@ namespace SwewolfMediaPlayer
                     HideFailed();
                 }
             };
+            _btnLong.Click += async (_, _) => await HideLongFailingAsync();
             _btnClose.Click += (_, _) => Close();
             AcceptButton = _btnStart;
             CancelButton = _btnClose;
@@ -240,6 +251,7 @@ namespace SwewolfMediaPlayer
             _running = true;
             _stop = new CancellationTokenSource();
             _btnStop.Enabled = true;
+            _btnLong.Enabled = false;
             _chkAgain.Enabled = false;
             _chkHidden.Enabled = false;
             _timer.Start();
@@ -266,6 +278,7 @@ namespace SwewolfMediaPlayer
             }
             _btnStop.Enabled = false;
             _btnStart.Enabled = true;
+            _btnLong.Enabled = true;
             _chkAgain.Enabled = !_chkHidden.Checked;
             _chkHidden.Enabled = true;
             _btnHide.Enabled = _hiddenRun ? !_workedHidden.IsEmpty : !_failedUrls.IsEmpty;
@@ -350,7 +363,7 @@ namespace SwewolfMediaPlayer
             _bar.Value = Math.Min(_bar.Maximum, _done);
             string line = $"Checked {_done:N0} of {_todo:N0}: {_worked:N0} answer, {_failed:N0} do not." +
                 (_hiddenRun ? "\nOnly the hidden channels are checked."
-                    : $"\nSkipped: {_fresh:N0} checked recently, {_skipped:N0} hidden or geo-blocked, {_unknown:N0} that cannot be checked this way.");
+                    : $"\nSkipped: {_fresh:N0} checked recently, {_skipped:N0} hidden or geo-blocked, {_unknown:N0} not checkable.");
             _lblStatus.Text = _note.Length > 0 ? _note + "\n" + line : line;
             if (_running && ++_ticks % 10 == 0)
             {
@@ -439,6 +452,49 @@ namespace SwewolfMediaPlayer
                     _list.SetItemChecked(i, on);
                 }
             }
+        }
+
+        // The channels (of this list) whose run of failures began 14 days or more ago: nothing has found them working since. The history is what knows.
+        private async Task HideLongFailingAsync()
+        {
+            if (_running)
+            {
+                return;
+            }
+            _btnLong.Enabled = false;
+            string? text = await M3uPlaylist.LoadTextAsync(_listUrl);
+            if (IsDisposed)
+            {
+                return;
+            }
+            _btnLong.Enabled = true;
+            if (text == null)
+            {
+                _note = "The channel list could not be loaded.";
+                UpdateStatus();
+                return;
+            }
+
+            HashSet<string> hidden = HiddenChannels.All().ToHashSet(StringComparer.OrdinalIgnoreCase);
+            DateTime cutoff = DateTime.Now - LongFailing;
+            List<string> urls = M3uPlaylist.Parse(text)
+                .Where(e => !hidden.Contains(e.Url) && !IsGeoBlocked(e) && ChannelHistory.Get(e.Url)?.FailingSince is DateTime since && since <= cutoff)
+                .Select(e => e.Url).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+            if (urls.Count == 0)
+            {
+                _note = "No channel has been failing for 14 days or more yet. Check the channels now and then: a channel counts when it started to fail 14 days ago or earlier.";
+                UpdateStatus();
+                return;
+            }
+            if (MessageBox.Show(this, $"Hide the {urls.Count:N0} channels that have not answered for 14 days or more?\n\n" +
+                "You can find them again in the Hidden Channels group (open channel lists show the change the next time they are opened).",
+                MainForm.AppName, MessageBoxButtons.YesNo, MessageBoxIcon.Question, MessageBoxDefaultButton.Button2) != DialogResult.Yes)
+            {
+                return;
+            }
+            HiddenChannels.AddMany(urls);
+            _note = $"{urls.Count:N0} channels were hidden.";
+            UpdateStatus();
         }
 
         private void HideFailed()
