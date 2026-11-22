@@ -19,6 +19,7 @@
 //   2026-10-12  Trim asks: Replace the File (-overwrite, as before) or Save as a New File (SplitMediaFiles
 //               opens with the values filled in and the player does not wait).
 //   2026-10-26  A small X (CloseXButton.cs) in the upper right corner closes the group box; Preview and Trim moved 28 px to the left.
+//   2026-11-22  Show Trim Features is hidden when SplitMediaFiles is not found (it is not released yet); the Locate / download dialog is gone.
 
 using System.ComponentModel;
 using System.Diagnostics;
@@ -30,7 +31,6 @@ namespace SwewolfMediaPlayer
     public partial class MediaPlayerForm
     {
         private const string SplitMediaFilesExe = "SplitMediaFiles.exe";
-        private const string SplitMediaFilesDownloadUrl = "https://github.com/SweWolf/SplitMediaFiles/releases/latest";
 
         // Not remembered between runs, on purpose.
         private bool _trimVisible;
@@ -68,7 +68,8 @@ namespace SwewolfMediaPlayer
 
             // A stream has no file to trim, and neither has a file that cannot be searched (SID music).
             // An animated GIF is not trimmed: the item is hidden for it.
-            mnuShowTrim.Visible = !IsGifFile;
+            // The item is hidden when SplitMediaFiles is not installed: until it is released, trimming is an unlisted feature.
+            mnuShowTrim.Visible = !IsGifFile && FindSplitMediaFiles() != null;
             mnuShowTrim.Enabled = CanSeek && !IsDvd && !_trimming;
             mnuShowTrim.Checked = _trimVisible;
             mnuShowControlPanel.Checked = _panelVisible;
@@ -410,7 +411,10 @@ namespace SwewolfMediaPlayer
             string? exe = FindSplitMediaFiles();
             if (exe == null)
             {
-                return;   // the user did not pick the program
+                // Only if it was removed while the trim group was open.
+                MessageBox.Show(this, "SplitMediaFiles was not found, so the file cannot be trimmed.", AppName,
+                    MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
             }
 
             string summary = $"Start: {(request.HasStart ? FormatTime((long)(request.Start * 1000), true) : "the beginning")}\n"
@@ -575,8 +579,9 @@ namespace SwewolfMediaPlayer
         private static string SavedPathFile => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
             "SweWolfSoftware", "SwewolfMediaPlayer", "SplitMediaFiles.txt");
 
-        // Looks next to this program, in ..\SplitMediaFiles, and in the place saved last time. If it is
-        // nowhere, the user can point to it (the answer is saved) or open the download page.
+        // Looks next to this program, in ..\SplitMediaFiles, and in the place named in SplitMediaFiles.txt (a way to
+        // point to a copy somewhere else; nothing in the program writes that file). Null when it is nowhere: the
+        // trim feature is hidden then (see the Controls menu), because SplitMediaFiles is not released yet.
         private string? FindSplitMediaFiles()
         {
             string baseDir = AppContext.BaseDirectory;
@@ -603,58 +608,7 @@ namespace SwewolfMediaPlayer
                 return found;
             }
 
-            // Not installed, or somewhere else: let the user choose.
-            TaskDialogButton locate = new("Locate SplitMediaFiles");
-            TaskDialogButton download = new("Open the Download Page");
-            TaskDialogPage page = new()
-            {
-                Caption = AppName,
-                Heading = "SplitMediaFiles was not found.",
-                Text = "Trimming needs the program SplitMediaFiles. If it is installed, show where it is. "
-                    + "If not, download it first (the download page needs a GitHub login while the project is private).",
-                Icon = TaskDialogIcon.Warning,
-                Buttons = { locate, download, TaskDialogButton.Cancel },
-                DefaultButton = locate
-            };
-            TaskDialogButton answer = TaskDialog.ShowDialog(this, page);
-            if (answer == download)
-            {
-                try
-                {
-                    Process.Start(new ProcessStartInfo(SplitMediaFilesDownloadUrl) { UseShellExecute = true });
-                }
-                catch (Win32Exception)
-                {
-                    // No browser to open: nothing more to do.
-                }
-                return null;
-            }
-            if (answer != locate)
-            {
-                return null;
-            }
-
-            using OpenFileDialog dialog = new()
-            {
-                Title = "Locate SplitMediaFiles",
-                Filter = $"SplitMediaFiles|{SplitMediaFilesExe}",
-                FileName = SplitMediaFilesExe
-            };
-            if (dialog.ShowDialog(this) != DialogResult.OK)
-            {
-                return null;
-            }
-
-            try
-            {
-                Directory.CreateDirectory(Path.GetDirectoryName(SavedPathFile)!);
-                File.WriteAllText(SavedPathFile, dialog.FileName);
-            }
-            catch (IOException)
-            {
-                // It only means asking again next time.
-            }
-            return dialog.FileName;
+            return null;
         }
     }
 }
