@@ -8,6 +8,7 @@
 //   2026-10-16  First version.
 //   2026-10-16  The next tune starts by itself 3 seconds after a tune has played to its known length.
 //   2026-10-16  LayoutControlBar uses what the buttons were set to (_saveFrameShown, _tuneButtonsShown), not their Visible getter.
+//   2026-11-22  The bookmark button too: the seek bar no longer ends up on top of it when the layout runs before the window is shown.
 //   2026-10-21  The back button, Page Up and the previous-track key first go to the start of the file or tune when it has played 3 seconds or more.
 //   2026-10-21  The same two buttons skip to the previous / next track while the explorer runs a playlist (MediaPlayerForm.Pipe.cs: TrackSkipping,
 //               SkipTrack); they are shown for any file then, and enabled at both ends (the explorer decides what comes next).
@@ -247,8 +248,11 @@ namespace SwewolfMediaPlayer
             }
             if (btnBookmark != null)   // right of the camera button
             {
-                btnBookmark.Visible = !IsDvd;   // a bookmark cannot point into a DVD (the disc is not a file)
-                if (btnBookmark.Visible)
+                // A bookmark cannot point into a DVD (the disc is not a file). Not read back from Visible: that is false while the
+                // window is not shown yet, and the seek bar then took the place of the button and hid it.
+                bool bookmarkShown = !IsDvd;
+                btnBookmark.Visible = bookmarkShown;
+                if (bookmarkShown)
                 {
                     btnBookmark.Left = x + gap;
                     x = btnBookmark.Right;
