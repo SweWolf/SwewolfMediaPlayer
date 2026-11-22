@@ -18,6 +18,7 @@
 //
 // History:
 //   2026-11-19  First version.
+//   2026-11-22  The same lookup also checks for DRM keys (Widevine, PlayReady, FairPlay) and says so: only the sound plays, the picture is black.
 
 using System.Globalization;
 using LibVLCSharp.Shared;
@@ -59,14 +60,26 @@ namespace SwewolfMediaPlayer
         private async Task LoadVariantsAsync(string url, Uri uri, string? userAgent)
         {
             List<StreamVariant> found = new();
+            bool drm = false;
             try
             {
-                using HttpRequestMessage request = new(HttpMethod.Get, uri);
-                request.Headers.TryAddWithoutValidation("User-Agent", userAgent ?? "VLC/3.0.24 LibVLC/3.0.24");
-                using HttpResponseMessage response = await _variantClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead);
-                if (response.IsSuccessStatusCode && response.Content.Headers.ContentLength is null or < 1_000_000)
+                string? text = await GetPlaylistTextAsync(uri, userAgent);
+                if (text != null)
                 {
-                    found = ParseVariants(await response.Content.ReadAsStringAsync());
+                    found = ParseVariants(text);
+                    drm = HasDrmKey(text);
+                    if (!drm && text.Contains("#EXT-X-STREAM-INF", StringComparison.OrdinalIgnoreCase))
+                    {
+                        // The keys are usually in the playlist of a quality, not in the master playlist: look at the first one.
+                        string? variantLine = text.Split('\n').Select(l => l.Trim())
+                            .SkipWhile(l => !l.StartsWith("#EXT-X-STREAM-INF:", StringComparison.OrdinalIgnoreCase))
+                            .Skip(1).FirstOrDefault(l => l.Length > 0 && !l.StartsWith('#'));
+                        if (variantLine != null && Uri.TryCreate(uri, variantLine, out Uri? variantUri))
+                        {
+                            string? variantText = await GetPlaylistTextAsync(variantUri, userAgent);
+                            drm = variantText != null && HasDrmKey(variantText);
+                        }
+                    }
                 }
             }
             catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or InvalidOperationException)
@@ -77,7 +90,40 @@ namespace SwewolfMediaPlayer
             if (!IsDisposed && string.Equals(_variantsFor, url, StringComparison.Ordinal))
             {
                 _variants = found;
+                if (drm)
+                {
+                    BeginInvoke(() => MessageBox.Show(this,
+                        "This stream is protected by DRM (copy protection). The player can play its sound, but not decode its picture, so the screen stays black.\n\n"
+                        + "To watch it, use the website or app of the service that offers it.", AppName, MessageBoxButtons.OK, MessageBoxIcon.Information));
+                }
             }
+        }
+
+        private static async Task<string?> GetPlaylistTextAsync(Uri uri, string? userAgent)
+        {
+            using HttpRequestMessage request = new(HttpMethod.Get, uri);
+            request.Headers.TryAddWithoutValidation("User-Agent", userAgent ?? "VLC/3.0.24 LibVLC/3.0.24");
+            using HttpResponseMessage response = await _variantClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead);
+            return response.IsSuccessStatusCode && response.Content.Headers.ContentLength is null or < 1_000_000
+                ? await response.Content.ReadAsStringAsync()
+                : null;
+        }
+
+        // True when a playlist has an EXT-X-KEY for a DRM system (Widevine, PlayReady, FairPlay). A plain AES-128 key is not DRM: LibVLC can use it.
+        private static bool HasDrmKey(string playlist)
+        {
+            foreach (string raw in playlist.Split('\n'))
+            {
+                string line = raw.Trim();
+                if (line.StartsWith("#EXT-X-KEY:", StringComparison.OrdinalIgnoreCase)
+                    && (line.Contains("edef8ba9-79d6-4ace-a3c8-27dcd51d21ed", StringComparison.OrdinalIgnoreCase)   // Widevine
+                        || line.Contains("com.microsoft.playready", StringComparison.OrdinalIgnoreCase)
+                        || line.Contains("com.apple.streamingkeydelivery", StringComparison.OrdinalIgnoreCase)))   // FairPlay
+                {
+                    return true;
+                }
+            }
+            return false;
         }
 
         // The qualities of a master playlist, one per height (the highest bandwidth of a height), the highest first. Fewer than two = no choice.
