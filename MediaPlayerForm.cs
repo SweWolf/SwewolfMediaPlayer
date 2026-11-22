@@ -395,7 +395,15 @@ namespace SwewolfMediaPlayer
             // The window may be made much smaller than the designer size, but not so small
             // that the control bar no longer fits.
             UpdateMinimumSize();
+
+            // A trackbar draws its channel and thumb a little above the middle of its own area, so the two sliders looked too
+            // high next to the buttons. Moving them down lines the middle of the channel up with the middle of the buttons.
+            int sliderDrop = LogicalToDeviceUnits(SliderDropPixels);
+            trkSeek.Top += sliderDrop;
+            trkVolume.Top += sliderDrop;
         }
+
+        private const int SliderDropPixels = 6;
 
         protected override async void OnShown(EventArgs e)
         {
