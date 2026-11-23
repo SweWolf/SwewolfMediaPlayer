@@ -664,6 +664,7 @@ namespace SwewolfMediaPlayer
                 return;
             }
 
+            _liveBaseMs = -1;   // a live stream counts its time from here (see UpdateTime)
             OpenTimingLog.Write($"StartMedia: {OpenTimingLog.Describe(_filePath, _isStream)}{(restart ? " (restart)" : "")}");
             var stepWatch = System.Diagnostics.Stopwatch.StartNew();
             _audioStateApplied = 0;
@@ -1623,8 +1624,20 @@ namespace SwewolfMediaPlayer
             UpdateTime(0);
         }
 
+        // The first time LibVLC reported for the live stream that plays now. Some channels carry timestamps that start at a huge
+        // number (hours since 1970, ...), so "LIVE 498720:52:26" showed: the time shown is what has passed since the stream began here.
+        private long _liveBaseMs = -1;
+
         private void UpdateTime(long timeMs)
         {
+            if (_isStream && !(_recorder is { InPlayer: true }) && !IsRecordingPlayback)
+            {
+                if (timeMs > 0 && (_liveBaseMs < 0 || timeMs < _liveBaseMs))
+                {
+                    _liveBaseMs = timeMs;
+                }
+                timeMs = _liveBaseMs < 0 ? 0 : Math.Max(timeMs - _liveBaseMs, 0);
+            }
             // A stream has no real length (a live stream reports a fixed window): show only the time.
             long length = _lengthMs > 0 ? _lengthMs : _knownLengthMs;
             if (IsRecordingPlayback && timeMs > 0)

@@ -7,6 +7,7 @@
 //   2026-10-23  Cover picture size, Medium (75 percent) or Maximum (ApplyCoverSize; AppSettings.CoverPictureSize).
 //   2026-11-13  UseMnemonic off: an "&" in a title or album name (Heaven & Hell) was swallowed.
 //   2026-10-23  SID files show author, title and the name of the tune (MediaPlayerForm.TuneList.cs).
+//   2026-11-22  With a list on the left, the texts start right of it (PositionTrackInfo) instead of covering its first rows.
 
 namespace SwewolfMediaPlayer
 {
@@ -89,11 +90,37 @@ namespace SwewolfMediaPlayer
                     Visible = false,
                 };
                 Controls.Add(_lblTrackInfo);
+                Layout += (_, _) => PositionTrackInfo();   // a list shown or hidden on the left moves the corner
             }
 
             _lblTrackInfo.Text = text;
+            PositionTrackInfo();
             _lblTrackInfo.Visible = true;
             _lblTrackInfo.BringToFront();
+        }
+
+        // The top left corner of the video area: with the tune list or the playlist on the left (Settings: Side of the Tune and
+        // Channel Lists) the texts start right of it, not on top of its first rows.
+        private void PositionTrackInfo()
+        {
+            if (_lblTrackInfo == null)
+            {
+                return;
+            }
+
+            int left = 0;
+            foreach (Panel? list in new[] { _pnlTuneList, _pnlChannels })
+            {
+                if (list is { Visible: true, Dock: DockStyle.Left })
+                {
+                    left += list.Width;
+                }
+            }
+            Point location = new(left + LogicalToDeviceUnits(10), LogicalToDeviceUnits(6));
+            if (_lblTrackInfo.Location != location)
+            {
+                _lblTrackInfo.Location = location;
+            }
         }
 
         private void HideTrackInfo()

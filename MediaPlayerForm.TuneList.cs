@@ -7,6 +7,7 @@
 // History:
 //   2026-10-23  First version.
 //   2026-11-14  The top left texts: title, author and released (file order), without empty or "???" ones, each with its label.
+//   2026-11-22  A double click on a tune plays it, also when the player is stopped or paused.
 
 namespace SwewolfMediaPlayer
 {
@@ -145,6 +146,20 @@ namespace SwewolfMediaPlayer
                 if (index >= 0)
                 {
                     ChangeTune(index);
+                }
+            };
+
+            // A double click means play: it plays that tune also when the player is stopped (the last tune has ended) or paused.
+            _lstTunes.MouseDoubleClick += (s, e) =>
+            {
+                int index = _lstTunes.IndexFromPoint(e.Location);
+                if (index >= 0 && e.Button == MouseButtons.Left && _player != null)
+                {
+                    ChangeTune(index);
+                    if (!_player.IsPlaying)
+                    {
+                        TogglePlayPause();
+                    }
                 }
             };
 
