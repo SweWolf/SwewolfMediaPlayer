@@ -74,6 +74,10 @@ namespace SwewolfMediaPlayer
                     path = args[i].Trim().Trim('"');
                 }
             }
+            if (!string.IsNullOrEmpty(path) && InternetShortcut.TryResolve(path, out string shortcutUrl))
+            {
+                path = shortcutUrl;   // a .url file (e.g. a bookmark of a stream) plays the address in it
+            }
             if (!string.IsNullOrEmpty(path) && DvdSupport.TryResolve(path, out string dvdInfo))
             {
                 path = dvdInfo;   // a DVD drive or folder (E:\) opens as a DVD

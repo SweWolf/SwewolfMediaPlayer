@@ -4,6 +4,10 @@ A Windows media player for video, music, DVDs, audio CDs, playlists and live TV 
 
 It is built on the VLC engine (LibVLC), so it plays nearly every format. It works on its own and together with its sibling application, SweWolf File Explorer.
 
+![The player with a video, the control bar at the bottom and the seek bar](Assets/Screenshot.png)
+
+![The player with a live TV channel and the channel list on the right](Assets/Screenshot2.png)
+
 ---
 
 ## Features

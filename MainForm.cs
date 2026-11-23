@@ -259,6 +259,11 @@ namespace SwewolfMediaPlayer
         // Opens a file or web address in a player window. Used by Open and by the IPTV menu (which leaves the box alone).
         private void OpenMedia(string path)
         {
+            // An Internet shortcut (a .url file, e.g. a bookmark of a stream) opens like the web address in it.
+            if (InternetShortcut.TryResolve(path, out string shortcutUrl))
+            {
+                path = shortcutUrl;
+            }
             // A DVD drive or folder (E: or E:\) is opened like Media > Open DVD.
             if (DvdSupport.TryResolve(path, out string dvdInfo))
             {
