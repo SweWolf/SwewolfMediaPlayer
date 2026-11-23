@@ -184,6 +184,7 @@ namespace SwewolfMediaPlayer
             };
             _pnlTuneList.Controls.Add(_lstTunes);   // the filling control first, then the one docked to the top
             _pnlTuneList.Controls.Add(header);
+            _pnlTuneList.Controls.Add(NewContinuousBox());   // Continuous Play, at the bottom (MediaPlayerForm.Continuous.cs)
 
             // Docked after the control bar and the group boxes (so they keep the full width), before the video.
             Controls.Add(_pnlTuneList);

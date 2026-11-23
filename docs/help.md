@@ -218,6 +218,11 @@ tune has played to its known length, the next one starts by itself after 3 secon
 **Tools > Settings**, **Side of the Tune and Channel Lists** puts the list on the left or on the
 right, and **Look of the Previous and Next Buttons** chooses a modern or a classic look.
 
+At the bottom of the tune list (and of a playlist, see [Playlists](#playlists)) is the check box
+**Continuous Play**. It is on whenever a player window opens (it is not a setting). Turn it off if
+you only want to hear the tune you chose: when it has ended, the player stops instead of going on
+to the next one.
+
 **SID music needs VLC media player.** The first time you open a SID file, the player copies the
 SID plugin from your own VLC installation. If VLC is not installed, the player tells you so.
 Install [VLC](https://www.videolan.org/vlc/) and open the file again.
@@ -232,6 +237,10 @@ If an item cannot be played because it is missing or damaged, a message in the v
 which file and why, counts down, and then the next item starts. **Skip Now** and the **Next**
 button do not wait. In **Tools > Settings**, **Seconds to Show a Playlist Error** sets the
 countdown (10 seconds by default). If every item in the list fails, the list is not repeated.
+
+The check box **Continuous Play** at the bottom of the list is on whenever a player window opens
+(it is not a setting). Turn it off to play only the item you chose: when it has ended, the player
+does not go on to the next one. It is not shown for a list of live channels.
 
 At the end of the list, **When the Playlist Ends** decides what happens (see
 [When the Media File Ends](#when-the-media-file-ends)).

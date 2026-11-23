@@ -24,6 +24,7 @@ namespace SwewolfMediaPlayer
     public partial class MediaPlayerForm
     {
         private Panel? _pnlChannels;
+        private CheckBox? _continuousBoxChannels;
         private ListBox? _lstChannels;
         private TextBox? _txtChannelFilter;
         private ComboBox? _cboChannelGroup;
@@ -478,6 +479,9 @@ namespace SwewolfMediaPlayer
             _pnlChannels.Controls.Add(_lstChannels);   // the filling control first, then the ones docked to the top (the last added is the top one)
             _pnlChannels.Controls.Add(filterRow);
             _pnlChannels.Controls.Add(_lblChannelsHeader);
+            _continuousBoxChannels = NewContinuousBox();   // Continuous Play, at the bottom: only for a playlist, not for a list of channels
+            _continuousBoxChannels.Visible = _playlistMode;
+            _pnlChannels.Controls.Add(_continuousBoxChannels);
 
             Controls.Add(_pnlChannels);
             Controls.SetChildIndex(_pnlChannels, Controls.GetChildIndex(grpControlPanel));

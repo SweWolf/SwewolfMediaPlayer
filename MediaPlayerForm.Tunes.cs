@@ -311,6 +311,11 @@ namespace SwewolfMediaPlayer
 
             if (_tuneAdvanceAtTicks != 0)
             {
+                if (!_continuousPlay)
+                {
+                    _tuneAdvanceAtTicks = 0;   // Continuous Play was turned off during the 3 seconds
+                    return;
+                }
                 if (Environment.TickCount64 >= _tuneAdvanceAtTicks)
                 {
                     _tuneAdvanceAtTicks = 0;
@@ -326,6 +331,10 @@ namespace SwewolfMediaPlayer
 
             _tuneEndHandled = true;
             player.SetPause(true);
+            if (!_continuousPlay)
+            {
+                return;   // Continuous Play is off: the tune stays paused at its end
+            }
             _tuneAdvanceAtTicks = Environment.TickCount64 + 3000;
         }
 

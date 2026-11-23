@@ -125,6 +125,10 @@ namespace SwewolfMediaPlayer
         private void UpdateEndLabel()
         {
             lblWhenEnds.Text = _playlistMode ? "When the Playlist Ends" : "When the Media File Ends";
+            if (_continuousBoxChannels != null)
+            {
+                _continuousBoxChannels.Visible = _playlistMode;
+            }
         }
 
         private async Task PlayPlaylistItemAsync(int index)
@@ -203,6 +207,10 @@ namespace SwewolfMediaPlayer
             {
                 OnPlaylistItemFailed(_channelIndex, "The file could not be played. It may be damaged or in a format the player does not support.");
                 return true;
+            }
+            if (!_continuousPlay)
+            {
+                return false;   // Continuous Play is off: this item was all that was wanted, it ends like a single file
             }
             return PlaylistGoNext(_channelIndex);
         }
