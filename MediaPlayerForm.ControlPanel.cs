@@ -13,8 +13,9 @@
 //   2026-11-18  A player started with a file argument uses "Close Player" without saving it (UseCloseWhenEnds).
 //   2026-11-18  A file handed over to a running player through the pipe does the same (PlayFromPipeAsync).
 //   2026-10-26  A "Show Subtitles" check box was added and removed again the next day: the default is in Tools > Settings, the choice per file is
-//   2026-11-19  The label reads "When the Media File Ends", or "When the Playlist Ends" while a playlist is open (UpdateEndLabel).
 //               remembered in the library (MediaPlayerForm.Tracks.cs).
+//   2026-11-19  The label reads "When the Media File Ends", or "When the Playlist Ends" while a playlist is open (UpdateEndLabel).
+//   2026-11-22  The drop-down follows the right edge of its label (PositionEndCombo): it overlapped the longer label.
 
 namespace SwewolfMediaPlayer
 {
@@ -36,8 +37,17 @@ namespace SwewolfMediaPlayer
         // it stays on the last frame, so the user can go on trimming. The chosen option is kept as it was.
         private EndAction EffectiveEndAction => _trimVisible ? EndAction.LastFrame : _whenEnds;
 
+        // The drop-down sits a little right of its label, whatever the label says ("When the Media File Ends" / "When the Playlist Ends")
+        // and however wide that is on this screen: the label is as wide as its text, so the drop-down follows its right edge.
+        private void PositionEndCombo()
+        {
+            cboWhenEnds.Left = lblWhenEnds.Right + LogicalToDeviceUnits(8);
+        }
+
         private void InitControlPanel()
         {
+            lblWhenEnds.SizeChanged += (_, _) => PositionEndCombo();
+            PositionEndCombo();
             cboWhenEnds.Items.AddRange(new object[] { "Show the Last Frame", "Show a Black Screen", "Repeat", "Close Player" });
             _whenEnds = Enum.IsDefined((EndAction)_settings.WhenVideoEnds) ? (EndAction)_settings.WhenVideoEnds : EndAction.LastFrame;
             cboWhenEnds.SelectedIndex = (int)_whenEnds;
