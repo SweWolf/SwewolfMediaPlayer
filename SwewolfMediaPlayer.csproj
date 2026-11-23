@@ -42,6 +42,13 @@
     <PackageReference Include="VideoLAN.LibVLC.Windows" Version="3.0.24" />
   </ItemGroup>
 
+  <!-- License and notices: next to the EXE in every download (the GPL text and the source pointer for the VLC DVD plugins are required) -->
+  <ItemGroup>
+    <Content Include="LICENSE" Link="LICENSE" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="THIRD-PARTY-NOTICES.txt" Link="THIRD-PARTY-NOTICES.txt" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="licenses\*.txt" Link="licenses\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
   <!-- Plugins of VLC 3.0.24 (GPL) that the LibVLC package leaves out (DVD reader, AC-3 packetizer): they go into LibVLC's own plugin folders (access, packetizer) (see Resources\VlcDvd\README.txt). -->
   <ItemGroup>
     <None Include="Resources\VlcDvd\**\*.dll" Link="libvlc\win-x64\plugins\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />

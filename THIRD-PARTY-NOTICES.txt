@@ -1,0 +1,64 @@
+SweWolf Media Player: third-party notices
+==========================================
+
+SweWolf Media Player itself is released under the MIT License (see the file LICENSE).
+
+It uses and ships the following software. The full license texts are in the "licenses" folder next to this file.
+
+
+VLC plugins for DVD playback (shipped in libvlc\win-x64\plugins)
+-----------------------------------------------------------------
+  access\libdvdnav_plugin.dll
+  access\libdvdread_plugin.dll
+  packetizer\libpacketizer_a52_plugin.dll
+License:  GNU General Public License, version 2 or later (licenses\GPL-2.0.txt)
+Origin:   VLC media player 3.0.24, copied unchanged from a VLC installation. https://www.videolan.org/vlc/
+Source:   https://code.videolan.org/videolan/vlc (tag 3.0.24); the DVD reading libraries are libdvdread and libdvdnav,
+          https://code.videolan.org/videolan
+          The source of these three files, exactly as in VLC 3.0.24, can also be had on request: open an issue at
+          https://github.com/SweWolf/SwewolfMediaPlayer
+These plugins are separate files that LibVLC loads when a DVD is played. They are not part of the program's own code.
+Decryption of copy-protected discs (libdvdcss) is not included.
+
+
+LibVLC (libvlc\win-x64\libvlc.dll, libvlccore.dll and the other plugins)
+--------------------------------------------------------------------------
+License:  GNU Lesser General Public License, version 2.1 or later (licenses\LGPL-2.1.txt)
+Origin:   the NuGet package VideoLAN.LibVLC.Windows 3.0.24, built from VLC 3.0.24. https://www.videolan.org/vlc/libvlc.html
+Source:   https://code.videolan.org/videolan/vlc (tag 3.0.24)
+LibVLC is used as separate DLL files: they can be replaced by another build of the same version.
+
+
+LibVLCSharp and LibVLCSharp.WinForms
+-------------------------------------
+License:  GNU Lesser General Public License, version 2.1 or later (licenses\LGPL-2.1.txt)
+Source:   https://github.com/videolan/libvlcsharp
+Like TagLibSharp below, these are separate DLLs in the small download and inside the EXE in the standalone download.
+
+
+TagLibSharp (tags and cover pictures of music files)
+------------------------------------------------------
+License:  GNU Lesser General Public License, version 2.1 only (licenses\LGPL-2.1.txt)
+Source:   https://github.com/mono/taglib-sharp
+In the small download it is a separate DLL (TagLibSharp.dll) that can be replaced. The standalone download has it inside
+SwewolfMediaPlayer.exe; use the small download if you want to replace it.
+
+
+Microsoft.Data.Sqlite and the .NET runtime
+-------------------------------------------
+License:  MIT License. Copyright (c) .NET Foundation and Contributors / Microsoft Corporation.
+Source:   https://github.com/dotnet/efcore and https://github.com/dotnet/runtime
+The .NET runtime is only included in the standalone download.
+
+
+SQLitePCLRaw (SQLitePCLRaw.*.dll) and SQLite (e_sqlite3.dll)
+--------------------------------------------------------------
+License:  SQLitePCLRaw: Apache License 2.0 (licenses\Apache-2.0.txt). SQLite itself is in the public domain.
+Source:   https://github.com/ericsink/SQLitePCL.raw and https://www.sqlite.org/
+
+
+Not shipped, but used
+----------------------
+  FFmpeg    Started as a separate program (ffmpeg.exe) when it is installed on the computer. https://ffmpeg.org/
+  VLC       The SID plugin is copied from the user's own VLC installation, when a SID file is opened. Nothing is shipped.
+  iptv-org  The public list of TV channels is downloaded when the user asks for it. https://github.com/iptv-org/iptv

@@ -101,3 +101,11 @@ The player opens at once, plays the file and closes when it has ended. If a play
 - [FFmpeg](https://ffmpeg.org/): thumbnails, the last frame and stream recording
 - [TagLibSharp](https://github.com/mono/taglib-sharp): music tags and cover pictures
 - [Microsoft.Data.Sqlite](https://learn.microsoft.com/dotnet/standard/data/sqlite/): the library of opened files
+
+---
+
+## License
+
+SweWolf Media Player is released under the [MIT License](LICENSE).
+
+The downloads also contain software from other projects under their own licenses, among them LibVLC and the VLC plugins for DVD playback (LGPL and GPL). They are listed with their licenses and source links in [THIRD-PARTY-NOTICES.txt](THIRD-PARTY-NOTICES.txt), and the full license texts are in the [licenses](licenses) folder.
