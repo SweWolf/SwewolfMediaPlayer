@@ -9,6 +9,7 @@
 //   2026-10-21  First version. A question first (the file, a checkbox "Start Point 0:00:53", unchecked, as TeraTool had it).
 //   2026-10-23  SID files: no Start Point checkbox (a SID file cannot be jumped in), the question is shorter.
 //   2026-11-11  Streams can be bookmarked too: an Internet shortcut (.url) in the same folder, no start point.
+//   2026-11-22  Without SweWolf File Explorer, the first bookmark is followed by a one-time message about where it is and what the explorer adds.
 
 using System.Runtime.InteropServices;
 
@@ -115,6 +116,7 @@ namespace SwewolfMediaPlayer
                 Marshal.FinalReleaseComObject(shell);
 
                 ShowTitleMessage(useStart ? $"Bookmark added at {clock}" : "Bookmark added");
+                ExplainBookmarksOnce();
             }
             catch (Exception ex)
             {
@@ -169,11 +171,47 @@ namespace SwewolfMediaPlayer
                 File.WriteAllBytes(temp, ansi.GetBytes("[InternetShortcut]\r\nURL=" + url + "\r\n"));
                 File.Move(temp, path);
                 ShowTitleMessage("Bookmark added");
+                ExplainBookmarksOnce();
             }
             catch (Exception ex)
             {
                 try { File.Delete(temp); } catch { }
                 MessageBox.Show(this, $"The bookmark could not be made. {ex.Message}", AppName, MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            }
+        }
+
+        // The bookmarks are seen and opened (at their start point) in SweWolf File Explorer. Without it the player has nowhere to show them, so
+        // the first time a bookmark is made on a computer where it cannot be found, the user is told where the bookmark is and what the
+        // explorer adds, with the link to its page (the same message, and the Yes / No, as for the other features that need a sibling).
+        // Only once (AppSettings.BookmarkExplorerNoticeShown); a bookmark is made all the same.
+        private void ExplainBookmarksOnce()
+        {
+            try
+            {
+                AppSettings settings = AppSettings.Load();
+                if (settings.BookmarkExplorerNoticeShown || FindFileExplorer() != null)
+                {
+                    return;
+                }
+                settings.BookmarkExplorerNoticeShown = true;
+                settings.Save();
+
+                string folder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+                    "SweWolfSoftware", "SwewolfFileExplorer", "Bookmarks");
+                DialogResult answer = MessageBox.Show(this,
+                    $"The bookmark was saved in this folder:\n{folder}\n\n"
+                    + "SweWolf File Explorer shows your bookmarks and opens a video at the point you saved. It was not found on this computer. "
+                    + "In another file explorer, a bookmark of a video opens the video from the beginning.\n\n"
+                    + "This message is shown only once. Do you want to open the SweWolf File Explorer page on GitHub now?",
+                    AppName, MessageBoxButtons.YesNo, MessageBoxIcon.Information, MessageBoxDefaultButton.Button2);
+                if (answer == DialogResult.Yes)
+                {
+                    System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("https://github.com/SweWolf/SwewolfFileExplorer/releases") { UseShellExecute = true });
+                }
+            }
+            catch (Exception)
+            {
+                // A notice is never worth an error.
             }
         }
 

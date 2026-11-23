@@ -323,6 +323,11 @@ watch it as it is, or **Discard** (asks first; the file goes to the Recycle Bin)
 folder of SweWolf File Explorer. It shows at the top of the explorer's folder tree, and opens the
 video at that point.
 
+The player itself has no list of bookmarks: you see and open them in SweWolf File Explorer. If it is
+not installed, the first bookmark you make is followed by a message that says where the bookmark was
+saved, with an offer to open the page of SweWolf File Explorer on GitHub. In another file explorer a
+bookmark of a video opens the video from the beginning.
+
 ## Settings
 
 **Tools > Settings** has these groups.

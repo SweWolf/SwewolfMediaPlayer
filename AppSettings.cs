@@ -24,6 +24,7 @@
 //   2026-11-12  ListSide (right by default): the side of the tune list and the channel list.
 //   2026-11-19  PlaylistNoticeSeconds (10 by default): how long the message about a playlist item that cannot be played stays.
 //   2026-11-22  FfmpegNoticeShown (false by default): the one-time message that FFmpeg is not installed has been shown.
+//   2026-11-22  BookmarkExplorerNoticeShown (false by default): the one-time message about bookmarks and SweWolf File Explorer has been shown.
 
 using System.Text.Json;
 
@@ -95,6 +96,9 @@ namespace SwewolfMediaPlayer
 
         // Whether the one-time message that FFmpeg is not installed has been shown (see FfmpegNotice.cs).
         public bool FfmpegNoticeShown { get; set; }
+
+        // Whether the one-time message that bookmarks need SweWolf File Explorer to be seen has been shown (see MediaPlayerForm.Bookmark.cs).
+        public bool BookmarkExplorerNoticeShown { get; set; }
 
         // The folder of the last recording of a stream (the Record button): the Save As dialog starts there, and the .ts file is written there while
         // it records. The Windows Videos folder until the first recording.
