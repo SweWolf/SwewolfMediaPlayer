@@ -25,6 +25,7 @@ namespace SwewolfMediaPlayer
             lnkGitHub = new LinkLabel();
             lblBuiltWithHeader = new Label();
             lblBuiltWith = new Label();
+            lblLicense = new Label();
             btnClose = new Button();
             pnlHeader.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)picIcon).BeginInit();
@@ -85,15 +86,15 @@ namespace SwewolfMediaPlayer
             //
             lblDescription.Location = new Point(20, 106);
             lblDescription.Name = "lblDescription";
-            lblDescription.Size = new Size(400, 36);
+            lblDescription.Size = new Size(400, 52);
             lblDescription.TabIndex = 1;
-            lblDescription.Text = "Plays video and audio files, steps through them frame by frame, saves frames and trims files.";
+            lblDescription.Text = "Plays video, music, DVDs, audio CDs, playlists and live TV channels. Steps through video frame by frame and saves frames.";
             //
             // lblCopyright
             //
             lblCopyright.AutoSize = true;
             lblCopyright.ForeColor = SystemColors.GrayText;
-            lblCopyright.Location = new Point(20, 150);
+            lblCopyright.Location = new Point(20, 166);
             lblCopyright.Name = "lblCopyright";
             lblCopyright.TabIndex = 2;
             lblCopyright.Text = "SweWolf Software";
@@ -102,7 +103,7 @@ namespace SwewolfMediaPlayer
             //
             lnkGitHub.AutoSize = true;
             lnkGitHub.LinkColor = Color.FromArgb(120, 170, 255);
-            lnkGitHub.Location = new Point(20, 172);
+            lnkGitHub.Location = new Point(20, 188);
             lnkGitHub.Name = "lnkGitHub";
             lnkGitHub.TabIndex = 3;
             lnkGitHub.TabStop = true;
@@ -113,23 +114,32 @@ namespace SwewolfMediaPlayer
             //
             lblBuiltWithHeader.AutoSize = true;
             lblBuiltWithHeader.Font = new Font("Segoe UI", 9F, FontStyle.Bold);
-            lblBuiltWithHeader.Location = new Point(20, 204);
+            lblBuiltWithHeader.Location = new Point(20, 220);
             lblBuiltWithHeader.Name = "lblBuiltWithHeader";
             lblBuiltWithHeader.TabIndex = 4;
             lblBuiltWithHeader.Text = "Built With";
             //
             // lblBuiltWith
             //
-            lblBuiltWith.Location = new Point(20, 224);
+            lblBuiltWith.Location = new Point(20, 240);
             lblBuiltWith.Name = "lblBuiltWith";
-            lblBuiltWith.Size = new Size(400, 52);
+            lblBuiltWith.Size = new Size(400, 88);
             lblBuiltWith.TabIndex = 5;
-            lblBuiltWith.Text = "• .NET 10 / Windows Forms\r\n• LibVLC / LibVLCSharp (playback)\r\n• TagLibSharp (cover art)";
+            lblBuiltWith.Text = "• .NET 10 / Windows Forms\r\n• LibVLC / LibVLCSharp (playback)\r\n• TagLibSharp (cover art)\r\n• FFmpeg (thumbnails, last frame, recording; optional)\r\n• SQLite (library of opened files)";
+            //
+            // lblLicense
+            //
+            lblLicense.ForeColor = SystemColors.GrayText;
+            lblLicense.Location = new Point(20, 336);
+            lblLicense.Name = "lblLicense";
+            lblLicense.Size = new Size(400, 34);
+            lblLicense.TabIndex = 7;
+            lblLicense.Text = "Released under the MIT License. The components used and their licenses are listed in THIRD-PARTY-NOTICES.txt, next to the program.";
             //
             // btnClose
             //
             btnClose.DialogResult = DialogResult.Cancel;
-            btnClose.Location = new Point(340, 292);
+            btnClose.Location = new Point(340, 380);
             btnClose.Name = "btnClose";
             btnClose.Size = new Size(80, 28);
             btnClose.TabIndex = 6;
@@ -142,8 +152,9 @@ namespace SwewolfMediaPlayer
             AutoScaleDimensions = new SizeF(7F, 15F);
             AutoScaleMode = AutoScaleMode.Font;
             CancelButton = btnClose;
-            ClientSize = new Size(440, 336);
+            ClientSize = new Size(440, 426);
             Controls.Add(btnClose);
+            Controls.Add(lblLicense);
             Controls.Add(lblBuiltWith);
             Controls.Add(lblBuiltWithHeader);
             Controls.Add(lnkGitHub);
@@ -170,6 +181,7 @@ namespace SwewolfMediaPlayer
         private Label lblUpdateStatus;
         private Label lblDescription;
         private Label lblCopyright;
+        private Label lblLicense;
         private LinkLabel lnkGitHub;
         private Label lblBuiltWithHeader;
         private Label lblBuiltWith;
