@@ -26,7 +26,7 @@ It is built on the VLC engine (LibVLC), so it plays nearly every format. It work
 - **DVD and audio CD**: **Media > Open DVD/CD** plays the disc in the drive. For an audio CD, the artist, title, album and cover come from MusicBrainz
 - **Music with several tunes**: Commodore 64 music (SID files) with tune buttons, the tune lengths, and a list of tunes
 - **Visualizations**: moving graphics while music plays (right-click menu)
-- **Cover pictures** for music files, taken from the tags or from a picture in the folder
+- **Cover pictures** for music files, taken from the tags or from a picture in the folder (a WebP picture needs FFmpeg)
 - **Full screen** (**F** or **Alt+Enter**): a control bar and a title bar appear when you move the mouse
 - **Bookmarks**: **Ctrl+D** adds a bookmark at the current spot, to be found again in SweWolf File Explorer
 - **Recent Media Files**: the last nine files, in the **Media** menu

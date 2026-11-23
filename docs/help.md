@@ -212,6 +212,9 @@ Music files show their cover picture, taken from the file's tags or from a pictu
 folder. In **Tools > Settings > Player**, **Cover Picture Size for Music Files** chooses
 **Medium** or **Maximum**.
 
+A picture in the folder can be a JPEG, PNG, GIF, BMP, TIFF or WebP picture. WebP pictures are read
+with FFmpeg: if FFmpeg is not installed, they are not shown.
+
 Files with several tunes (SID music, Commodore 64) get **Previous** and **Next** buttons
 (Page Up and Page Down), the **Tune** menu, and a list of the tunes beside the picture. When a
 tune has played to its known length, the next one starts by itself after 3 seconds. In

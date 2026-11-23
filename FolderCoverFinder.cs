@@ -17,6 +17,8 @@
 // When the explorer's rules change, change them here too.
 //
 // History:
+//   2026-11-23  WebP pictures count too (the explorer's list has .webp): decoded by FFmpeg, since System.Drawing can't read
+//               WebP; without FFmpeg such a picture is silently skipped.
 //   2026-10-25  The icon of the folder's desktop.ini as the last fallback, except for the standard Windows folders.
 //   2026-10-25  No more cover from other music files of the folder (step 2 removed; Find has no musicExtensions).
 //   2026-10-23  First version.
@@ -27,8 +29,11 @@ namespace SwewolfMediaPlayer
     {
         private static readonly string[] CoverNames = { "folder", "cover", "front", "poster", "albumart", "album", "thumb", "thumbnail" };
 
-        // The picture types System.Drawing can read.
-        private static readonly string[] ImageExtensions = { ".jpg", ".jpeg", ".jfif", ".png", ".gif", ".bmp", ".tif", ".tiff" };
+        // The picture types System.Drawing can read, and WebP (read by FFmpeg, see LoadWebp).
+        private static readonly string[] ImageExtensions = { ".jpg", ".jpeg", ".jfif", ".png", ".gif", ".bmp", ".tif", ".tiff", ".webp" };
+
+        // FFmpeg is optional in the player: without it a WebP picture is simply not used (no message).
+        private static readonly Lazy<string?> Ffmpeg = new(MediaPlayerForm.FindFfmpeg);
 
         private static readonly System.Text.RegularExpressions.Regex WmpArt =
             new(@"^AlbumArt_(\{[0-9A-Fa-f-]+\})_(Large|Small)$", System.Text.RegularExpressions.RegexOptions.Compiled);
@@ -256,6 +261,78 @@ namespace SwewolfMediaPlayer
             {
                 using Image loaded = Image.FromFile(file);
                 return new Bitmap(loaded);   // a copy: the file is not kept open
+            }
+            catch (Exception)
+            {
+                // System.Drawing can't read WebP (whatever the extension: a web browser may save one as .jpg).
+                return IsWebp(file) ? LoadWebp(file) : null;
+            }
+        }
+
+        // RIFF....WEBP at the start of the file.
+        private static bool IsWebp(string file)
+        {
+            try
+            {
+                byte[] head = new byte[12];
+                using FileStream stream = new(file, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+                return stream.Read(head, 0, 12) == 12
+                    && head[0] == 'R' && head[1] == 'I' && head[2] == 'F' && head[3] == 'F'
+                    && head[8] == 'W' && head[9] == 'E' && head[10] == 'B' && head[11] == 'P';
+            }
+            catch (Exception)
+            {
+                return false;
+            }
+        }
+
+        // FFmpeg turns the first picture of the WebP file (an animated one too) into a PNG that goes straight into memory.
+        // No FFmpeg, a damaged file or a timeout gives null.
+        private static Bitmap? LoadWebp(string file)
+        {
+            string? ffmpeg = Ffmpeg.Value;
+            if (ffmpeg == null)
+            {
+                return null;
+            }
+
+            try
+            {
+                var info = new System.Diagnostics.ProcessStartInfo(ffmpeg)
+                {
+                    UseShellExecute = false,
+                    CreateNoWindow = true,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                };
+                foreach (string argument in new[] { "-nostdin", "-loglevel", "quiet", "-i", file, "-frames:v", "1", "-f", "image2pipe", "-c:v", "png", "pipe:1" })
+                {
+                    info.ArgumentList.Add(argument);
+                }
+
+                using System.Diagnostics.Process? process = System.Diagnostics.Process.Start(info);
+                if (process == null)
+                {
+                    return null;
+                }
+
+                using var output = new MemoryStream();
+                Task copy = process.StandardOutput.BaseStream.CopyToAsync(output);
+                _ = process.StandardError.ReadToEndAsync();
+                if (!process.WaitForExit(15000))
+                {
+                    try { process.Kill(); } catch (Exception) { }
+                    return null;
+                }
+                copy.Wait();
+                if (process.ExitCode != 0 || output.Length == 0)
+                {
+                    return null;
+                }
+
+                output.Position = 0;
+                using Bitmap decoded = new(output);
+                return new Bitmap(decoded);   // a copy: it does not depend on the stream
             }
             catch (Exception)
             {
