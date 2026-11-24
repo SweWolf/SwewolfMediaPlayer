@@ -29,7 +29,9 @@
 //   2026-11-22  Show Trim Features is hidden when SplitMediaFiles is not found (it is not released yet); the Locate / download dialog is gone.
 //   2026-11-23  Trim/Remove/Split: a mode list, Remove (-remove) and Split (-split, Split Now = -run), the button is called Start,
 //               Quick Preview (QuickPreviewSeconds around each edit, plus the fade), pauses at the cuts when splitting,
-//               previous / next time stamp buttons. The group box has two rows.
+//               previous / next time stamp buttons.
+//   2026-11-23  The group box has one row when the window is wide enough, else two; Quick Preview, Preview and Start have the same
+//               width and Start is bold.
 
 using System.ComponentModel;
 using System.Diagnostics;
@@ -91,8 +93,22 @@ namespace SwewolfMediaPlayer
 
         private void InitTrimControls()
         {
+            // Start is the main button: bold. The three buttons have the same width (the widest text, Quick Preview, plus room).
+            btnTrim.Font = new Font(btnTrim.Font, FontStyle.Bold);
+            int textWidth = Math.Max(TextRenderer.MeasureText(btnQuickPreview.Text, btnQuickPreview.Font).Width,
+                Math.Max(TextRenderer.MeasureText(btnPreview.Text, btnPreview.Font).Width,
+                    TextRenderer.MeasureText(btnTrim.Text, btnTrim.Font).Width));
+            btnQuickPreview.Width = btnPreview.Width = btnTrim.Width = textWidth + LogicalToDeviceUnits(28);
+
             cboTrimMode.SelectedIndex = 0;
             ApplyTrimMode();
+            ClientSizeChanged += (s, e) =>
+            {
+                if (_trimVisible)
+                {
+                    LayoutTrimRow();   // one row or two, as the window allows
+                }
+            };
         }
 
         private void cboTrimMode_SelectedIndexChanged(object? sender, EventArgs e)
@@ -144,33 +160,66 @@ namespace SwewolfMediaPlayer
             LayoutTrimRow();
         }
 
-        // The first row: the mode list, the two time boxes and the fades. The labels differ in width from mode to mode,
-        // so everything after them follows. In Remove mode the fade out comes first, as in time.
+        // The group box has one row when the window is wide enough for everything, otherwise two (the buttons below).
+        // Whether it is wide enough is decided for the widest mode, so changing the mode never changes the height.
+        // Called when the mode changes, when the window is resized and when the box is shown.
         private void LayoutTrimRow()
         {
             int gap = LogicalToDeviceUnits(16);
             int space = LogicalToDeviceUnits(6);
+            int nowGap = LogicalToDeviceUnits(4);
+
+            // The first row: the mode list, the two time boxes and the fades. The labels differ in width from mode to mode,
+            // so everything after them follows. In Remove mode the fade out comes first, as in time.
             int x = cboTrimMode.Right + gap;
             x = PlaceTimeBox(lblStartAt, txtStartAt, btnStartNow, x, space) + gap;
             x = PlaceTimeBox(lblEndAt, txtEndAt, btnEndNow, x, space) + gap;
 
-            if (Mode == TrimMode.Split)
+            if (Mode != TrimMode.Split)
             {
-                return;
-            }
-            bool remove = Mode == TrimMode.Remove;
-            Label firstLabel = remove ? lblFadeOut : lblFadeIn;
-            TextBox firstBox = remove ? txtFadeOut : txtFadeIn;
-            Label secondLabel = remove ? lblFadeIn : lblFadeOut;
-            TextBox secondBox = remove ? txtFadeIn : txtFadeOut;
-            x = PlaceFadeBox(firstLabel, firstBox, x, space) + gap;
-            PlaceFadeBox(secondLabel, secondBox, x, space);
+                bool remove = Mode == TrimMode.Remove;
+                Label firstLabel = remove ? lblFadeOut : lblFadeIn;
+                TextBox firstBox = remove ? txtFadeOut : txtFadeIn;
+                Label secondLabel = remove ? lblFadeIn : lblFadeOut;
+                TextBox secondBox = remove ? txtFadeIn : txtFadeOut;
+                x = PlaceFadeBox(firstLabel, firstBox, x, space) + gap;
+                PlaceFadeBox(secondLabel, secondBox, x, space);
 
-            // Tab goes in the order the boxes are shown.
-            firstLabel.TabIndex = 7;
-            firstBox.TabIndex = 8;
-            secondLabel.TabIndex = 9;
-            secondBox.TabIndex = 10;
+                // Tab goes in the order the boxes are shown.
+                firstLabel.TabIndex = 7;
+                firstBox.TabIndex = 8;
+                secondLabel.TabIndex = 9;
+                secondBox.TabIndex = 10;
+            }
+
+            // How wide the first row is in its widest mode.
+            int MeasureLabel(string text) => TextRenderer.MeasureText(text, lblStartAt.Font, Size.Empty, TextFormatFlags.NoPadding).Width + 2;
+            int startLabel = Math.Max(MeasureLabel("Remove From"), Math.Max(MeasureLabel("Start at"), MeasureLabel("Split at")));
+            int endLabel = Math.Max(MeasureLabel("Remove To"), Math.Max(MeasureLabel("End at"), MeasureLabel("and at")));
+            int timeFixed = space + txtStartAt.Width + nowGap + btnStartNow.Width;
+            int fadesWidth = lblFadeIn.PreferredSize.Width + space + txtFadeIn.Width + gap + lblFadeOut.PreferredSize.Width + space + txtFadeOut.Width;
+            int widestRow = cboTrimMode.Right + gap + startLabel + timeFixed + gap + endLabel + timeFixed + gap + fadesWidth;
+
+            // The buttons: two time stamp buttons, then Quick Preview, Preview and Start (the same width).
+            int buttonsWidth = btnPrevMark.Width + space + btnNextMark.Width + gap + 3 * btnTrim.Width + 2 * space;
+            bool oneRow = ClientSize.Width >= widestRow + gap + buttonsWidth + LogicalToDeviceUnits(40);   // (room for the X)
+            int left = oneRow ? widestRow + gap : LogicalToDeviceUnits(12);
+            int top = oneRow ? btnStartNow.Top : LogicalToDeviceUnits(60);
+            btnPrevMark.SetBounds(left, top, btnPrevMark.Width, btnPrevMark.Height);
+            btnNextMark.SetBounds(btnPrevMark.Right + space, top, btnNextMark.Width, btnNextMark.Height);
+            btnQuickPreview.SetBounds(btnNextMark.Right + gap, top, btnQuickPreview.Width, btnQuickPreview.Height);
+            btnPreview.SetBounds(btnQuickPreview.Right + space, top, btnPreview.Width, btnPreview.Height);
+            btnTrim.SetBounds(btnPreview.Right + space, top, btnTrim.Width, btnTrim.Height);
+
+            int height = LogicalToDeviceUnits(oneRow ? 62 : 96);
+            if (grpTrim.Height != height)
+            {
+                grpTrim.Height = height;
+                if (_trimVisible)
+                {
+                    UpdateMinimumSize();
+                }
+            }
         }
 
         private int PlaceTimeBox(Label label, TextBox box, Button now, int x, int space)
@@ -245,6 +294,10 @@ namespace SwewolfMediaPlayer
             }
             _trimVisible = visible;
             grpTrim.Visible = visible && !_fullScreen;
+            if (visible)
+            {
+                LayoutTrimRow();   // one row or two, for the width of the window now
+            }
             UpdateMinimumSize();
 
             // Keep the video as large as it was: the window grows and shrinks with the group box.
