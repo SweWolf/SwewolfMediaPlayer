@@ -12,7 +12,7 @@ It is built on the VLC engine (LibVLC), so it plays nearly every format. It work
 
 ## Features
 
-- **Plays almost anything**: video, music, animated GIFs, DVDs (with their menus), audio CDs, and web streams
+- **Plays almost anything**: video, music, animated GIFs and WebP pictures (WebP needs FFmpeg), DVDs (with their menus), audio CDs, and web streams
 - **Frame stepping**: while a video is paused, **Left** and **Right** move one frame back or forward
 - **Save Frame**: **S** (or the camera button) saves the picture on screen as an image file, also the very last frame of a video. Choose a default folder in the settings, or save without being asked
 - **Seek bar thumbnails**: point at the seek bar and a small picture of that moment pops up (needs FFmpeg)

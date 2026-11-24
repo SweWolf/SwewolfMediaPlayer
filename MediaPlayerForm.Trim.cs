@@ -267,7 +267,7 @@ namespace SwewolfMediaPlayer
             // A stream has no file to trim, and neither has a file that cannot be searched (SID music).
             // An animated GIF is not trimmed: the item is hidden for it.
             // The item is hidden when SplitMediaFiles is not installed: until it is released, trimming is an unlisted feature.
-            mnuShowTrim.Visible = !IsGifFile && FindSplitMediaFiles() != null;
+            mnuShowTrim.Visible = !IsGifFile && !IsWebpFile && FindSplitMediaFiles() != null;
             mnuShowTrim.Enabled = CanSeek && !IsDvd && !_trimming;
             mnuShowTrim.Checked = _trimVisible;
             mnuShowControlPanel.Checked = _panelVisible;

@@ -199,6 +199,16 @@ namespace SwewolfMediaPlayer
         public MediaPlayerForm(string filePath, string? libraryPath = null)
         {
             InitializeComponent();
+            // While paused, one notch of the wheel over the seek bar steps one frame, as it does elsewhere in the window (PreFilterMessage).
+            // The TrackBar's own wheel handling moves it by a few slider units, which is far less than a frame in a short clip.
+            trkSeek.MouseWheel += (_, e) =>
+            {
+                if (_paused && CanSeek && !_trimming && e.Delta != 0)
+                {
+                    QueueWheelStep(e.Delta > 0 ? 1 : -1);
+                    ((HandledMouseEventArgs)e).Handled = true;
+                }
+            };
             InitControlPanel();
             InitStreamInfo();
             InitTuneControls();
@@ -690,7 +700,7 @@ namespace SwewolfMediaPlayer
             // Includes the time the resume prompt waits for the user, if it is shown.
             OpenTimingLog.Write($"StartMedia: library/resume, {stepWatch.ElapsedMilliseconds} ms");
             stepWatch.Restart();
-            if ((IsGifFile || IsDvd) && _trimVisible)
+            if ((IsGifFile || IsWebpFile || IsDvd) && _trimVisible)
             {
                 SetTrimVisible(false);   // a GIF or a DVD is not trimmed
             }
@@ -1101,7 +1111,7 @@ namespace SwewolfMediaPlayer
             int delta = (short)((long)m.WParam >> 16);
             if (delta != 0)
             {
-                StepFrame(delta > 0 ? 1 : -1);
+                QueueWheelStep(delta > 0 ? 1 : -1);
             }
             return true;
         }
@@ -1109,6 +1119,36 @@ namespace SwewolfMediaPlayer
         private static bool IsOver(Control control, Point screenPoint)
         {
             return control.Visible && control.RectangleToScreen(control.ClientRectangle).Contains(screenPoint);
+        }
+
+        // A fast wheel sends many notches in a moment. Seeking for each of them flooded LibVLC, which then stopped answering (the picture
+        // froze until Play), so the notches are added up and applied as one seek at most every 80 ms. One slow notch still moves one frame.
+        private int _wheelSteps;
+        private System.Windows.Forms.Timer? _wheelTimer;
+
+        private void QueueWheelStep(int direction)
+        {
+            _wheelSteps += direction;
+            if (_wheelTimer == null)
+            {
+                _wheelTimer = new System.Windows.Forms.Timer { Interval = 80 };
+                _wheelTimer.Tick += (_, _) =>
+                {
+                    _wheelTimer!.Stop();
+                    int steps = _wheelSteps;
+                    _wheelSteps = 0;
+                    if (steps != 0 && _paused)
+                    {
+                        StepFrame(steps);
+                    }
+                };
+            }
+            if (!_wheelTimer.Enabled)
+            {
+                StepFrame(_wheelSteps);   // the first notch is applied at once
+                _wheelSteps = 0;
+                _wheelTimer.Start();
+            }
         }
 
         // Steps one frame by seeking one frame length from the tracked time. LibVLC can only
@@ -1127,13 +1167,18 @@ namespace SwewolfMediaPlayer
 
             double frameMs = GetFrameMs();
             // A seek into the last frames of a GIF ends playback in LibVLC, and a stopped player ignores every further seek
-            // (the wheel then seemed dead until Stop and Play). So stepping a GIF forward stops two frames before the end.
+            // (the wheel then seemed dead until Stop and Play). So stepping a GIF forward stops three frames before the end.
             long lastMs = Math.Max(_lengthMs - 1, 0);
-            if (IsGifFile)
+            if (IsGifFile || IsWebpFile)
             {
-                lastMs = Math.Max(_lengthMs - (long)(frameMs * 2) - 1, 0);
+                lastMs = Math.Max(_lengthMs - (long)(frameMs * 3) - 1, 0);
             }
-            _stepTimeMs = (long)Math.Clamp(_stepTimeMs + direction * frameMs, 0, lastMs);
+            long newStep = (long)Math.Clamp(_stepTimeMs + direction * frameMs, 0, lastMs);
+            if (newStep == _stepTimeMs && (IsGifFile || IsWebpFile))
+            {
+                return;   // already at the first or last picture: a fast wheel kept seeking to the same spot, and LibVLC then ended the playback
+            }
+            _stepTimeMs = newStep;
             _player.Time = _stepTimeMs;
             UpdateTime(_stepTimeMs);
         }
@@ -1480,6 +1525,8 @@ namespace SwewolfMediaPlayer
         // to read it with the FFmpeg demuxer, so every Media made for the file goes through here.
         private bool IsGifFile => !_isStream && string.Equals(Path.GetExtension(_filePath), ".gif", StringComparison.OrdinalIgnoreCase);
 
+        private bool IsWebpFile => !_isStream && string.Equals(Path.GetExtension(_filePath), ".webp", StringComparison.OrdinalIgnoreCase);
+
         private Media CreateMedia(LibVLC lib, string path, bool isStream)
         {
             if (!isStream && TryGetCdTrack(path, out string? cdLocation, out int cdTrack))
@@ -1494,7 +1541,9 @@ namespace SwewolfMediaPlayer
                 // A video DVD: LibVLC reads the disc (or folder, or image) itself and shows its menus.
                 return new Media(lib, DvdSupport.Location(path), FromType.FromLocation);
             }
-            Media media = new(lib, path, isStream ? FromType.FromLocation : FromType.FromPath);
+            // An animated WebP is played as a video made by FFmpeg (WebpAnimation.cs); a still WebP or no FFmpeg: as before.
+            string? webpVideo = !isStream && Path.GetExtension(path).Equals(".webp", StringComparison.OrdinalIgnoreCase) ? WebpAnimation.GetVideo(path) : null;
+            Media media = new(lib, webpVideo ?? path, isStream ? FromType.FromLocation : FromType.FromPath);
             if (_nextStartSeconds is { } startAt && !isStream && IsRecordingPlayback)
             {
                 _nextStartSeconds = null;
@@ -1516,7 +1565,7 @@ namespace SwewolfMediaPlayer
                 StartVariantsLookup(path);   // the qualities for the Quality menu (MediaPlayerForm.Quality.cs)
                 AddQualityOptions(media);
             }
-            if (!isStream && (string.Equals(Path.GetExtension(path), ".gif", StringComparison.OrdinalIgnoreCase) || IsGrowingTransportStream(path)))
+            if (!isStream && (webpVideo != null || string.Equals(Path.GetExtension(path), ".gif", StringComparison.OrdinalIgnoreCase) || IsGrowingTransportStream(path)))
             {
                 media.AddOption(":demux=avformat");
             }
@@ -1654,6 +1703,19 @@ namespace SwewolfMediaPlayer
                 // Rounded, not cut off (the thumb was up to a pixel left of the true position), and the bar has far more
                 // steps than pixels (Maximum 100000), so a position lands on the right pixel.
                 trkSeek.Value = (int)Math.Clamp(Math.Round((double)timeMs * trkSeek.Maximum / length), 0, trkSeek.Maximum);
+            }
+            if (!_isStream && length > 0 && length < 20000)
+            {
+                // A step of the arrow keys or the wheel on the seek bar is 0.1% of the length: less than a frame for a very short
+                // clip (an animated WebP or GIF), so the picture did not move. It is never less than one frame.
+                double frameMs = GetFrameMs();
+                int small = frameMs > 0 ? Math.Max(100, (int)Math.Ceiling(frameMs * trkSeek.Maximum / length)) : 100;
+                small = Math.Min(small, trkSeek.Maximum / 2);
+                if (trkSeek.SmallChange != small)
+                {
+                    trkSeek.SmallChange = small;
+                    trkSeek.LargeChange = Math.Max(500, small * 5);
+                }
             }
         }
 
@@ -2599,6 +2661,9 @@ namespace SwewolfMediaPlayer
             }
         }
 
+        private long _dragSeekMs = -1;
+        private System.Windows.Forms.Timer? _dragSeekTimer;
+
         private void SeekTo(long timeMs)
         {
             if (_player == null || _lengthMs <= 0)
@@ -2611,6 +2676,40 @@ namespace SwewolfMediaPlayer
             {
                 // A stopped player ignores seeks: remember the position for Play.
                 _pendingSeekMs = timeMs;
+                UpdateTime(timeMs);
+                return;
+            }
+            if (_paused && (IsGifFile || IsWebpFile))
+            {
+                // Dragging the seek bar to the far right seeks to the very end, and LibVLC then ends the playback and ignores every seek
+                // (the picture froze until Play). So a paused animated image stops three frames before the end, as stepping does.
+                timeMs = Math.Clamp(timeMs, 0, Math.Max(_lengthMs - (long)(GetFrameMs() * 3) - 1, 0));
+            }
+            if (_paused && (IsGifFile || IsWebpFile))
+            {
+                // Seeks come in faster than LibVLC answers when the seek bar is dragged (as with a fast wheel): only the latest position is
+                // applied, at most every 80 ms, and the last one always is.
+                _stepTimeMs = timeMs;
+                _dragSeekMs = timeMs;
+                if (_dragSeekTimer == null)
+                {
+                    _dragSeekTimer = new System.Windows.Forms.Timer { Interval = 80 };
+                    _dragSeekTimer.Tick += (_, _) =>
+                    {
+                        _dragSeekTimer!.Stop();
+                        if (_dragSeekMs >= 0 && _player != null && _paused)
+                        {
+                            _player.Time = _dragSeekMs;
+                        }
+                        _dragSeekMs = -1;
+                    };
+                }
+                if (!_dragSeekTimer.Enabled)
+                {
+                    _player.Time = timeMs;
+                    _dragSeekMs = -1;
+                    _dragSeekTimer.Start();
+                }
                 UpdateTime(timeMs);
                 return;
             }
