@@ -102,6 +102,8 @@ namespace SwewolfMediaPlayer
 
             cboTrimMode.SelectedIndex = 0;
             ApplyTrimMode();
+            txtStartAt.TextChanged += (s, e) => RefreshSeekMarks();
+            txtEndAt.TextChanged += (s, e) => RefreshSeekMarks();
             ClientSizeChanged += (s, e) =>
             {
                 if (_trimVisible)
@@ -158,6 +160,7 @@ namespace SwewolfMediaPlayer
             bool fades = mode != TrimMode.Split;
             lblFadeIn.Visible = txtFadeIn.Visible = lblFadeOut.Visible = txtFadeOut.Visible = fades;
             LayoutTrimRow();
+            RefreshSeekMarks();
         }
 
         // The group box has one row when the window is wide enough for everything, otherwise two (the buttons below).
@@ -299,6 +302,7 @@ namespace SwewolfMediaPlayer
                 LayoutTrimRow();   // one row or two, for the width of the window now
             }
             UpdateMinimumSize();
+            RefreshSeekMarks();
 
             // Keep the video as large as it was: the window grows and shrinks with the group box.
             if (!_fullScreen && WindowState == FormWindowState.Normal)
@@ -393,6 +397,64 @@ namespace SwewolfMediaPlayer
             {
                 SeekTo(target.Value);
             }
+        }
+
+        // ---- Marks on the seek bar ----
+
+        // Chapters (small triangles, when the setting is on) and, while the group box is open, what the boxes say:
+        // Trim shades the part that is kept (green), Remove the part that is removed (red), Split puts a triangle
+        // at every cut. Called by the timer and when the boxes or the mode change; the bar only repaints on a change.
+        private void RefreshSeekMarks()
+        {
+            if (_lengthMs <= 0 || _isStream)
+            {
+                trkSeek.SetMarks([], [], null, Color.Transparent);
+                return;
+            }
+
+            double length = _lengthMs;
+            double[] chapters = _settings.ShowChapterMarks && _chapters != null
+                ? _chapters.Where(c => c.TimeOffset > 0 && c.TimeOffset < _lengthMs).Select(c => c.TimeOffset / length).ToArray()
+                : [];
+
+            double[] cuts = [];
+            (double From, double To)? band = null;
+            Color bandColor = Color.Transparent;
+            if (_trimVisible)
+            {
+                double lengthSeconds = length / 1000;
+                bool hasA = TryParseTime(txtStartAt.Text, out double a);
+                bool hasB = TryParseTime(txtEndAt.Text, out double b);
+                a = Math.Clamp(a, 0, lengthSeconds);
+                b = Math.Clamp(b, 0, lengthSeconds);
+                switch (Mode)
+                {
+                    case TrimMode.Trim:
+                        if (hasA || hasB)
+                        {
+                            double from = hasA ? a : 0;
+                            double to = hasB ? b : lengthSeconds;
+                            if (to > from)
+                            {
+                                band = (from / lengthSeconds, to / lengthSeconds);
+                                bandColor = Color.FromArgb(210, 70, 190, 90);
+                            }
+                        }
+                        break;
+                    case TrimMode.Remove:
+                        if (hasA && hasB && b > a)
+                        {
+                            band = (a / lengthSeconds, b / lengthSeconds);
+                            bandColor = Color.FromArgb(210, 225, 70, 70);
+                        }
+                        break;
+                    default:
+                        cuts = new[] { hasA ? a : 0, hasB ? b : 0 }
+                            .Where(t => t > 0 && t < lengthSeconds).Distinct().Select(t => t / lengthSeconds).ToArray();
+                        break;
+                }
+            }
+            trkSeek.SetMarks(chapters, cuts, band, bandColor);
         }
 
         // ---- Reading and checking the fields ----

@@ -104,6 +104,7 @@ namespace SwewolfMediaPlayer
             AppSettings settings = AppSettings.Load();
             chkStartFullScreen.Checked = settings.StartFullScreenForVideo;
             chkSeekThumbnails.Checked = settings.ShowSeekBarThumbnails;
+            chkChapterMarks.Checked = settings.ShowChapterMarks;
             chkShowSubtitles.Checked = settings.ShowSubtitles;
             chkTrackMenus.Checked = settings.TrackMenusOnlyWithChoice;
             cboNewVersionCheck.SelectedItem = settings.CheckForUpdatesOnStartup ? "Yes" : "No";
@@ -137,6 +138,7 @@ namespace SwewolfMediaPlayer
             AppSettings settings = AppSettings.Load();
             settings.StartFullScreenForVideo = chkStartFullScreen.Checked;
             settings.ShowSeekBarThumbnails = chkSeekThumbnails.Checked;
+            settings.ShowChapterMarks = chkChapterMarks.Checked;
             settings.ShowSubtitles = chkShowSubtitles.Checked;
             settings.TrackMenusOnlyWithChoice = chkTrackMenus.Checked;
             settings.CheckForUpdatesOnStartup = cboNewVersionCheck.SelectedItem?.ToString() != "No";

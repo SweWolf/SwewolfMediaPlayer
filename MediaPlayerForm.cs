@@ -2350,6 +2350,7 @@ namespace SwewolfMediaPlayer
 
             CheckTunes();
             CheckChapters();
+            RefreshSeekMarks();
             CheckSpeed();
             CheckTracks();
             TrackLibrary();
@@ -2751,6 +2752,64 @@ namespace SwewolfMediaPlayer
     internal sealed class JumpTrackBar : TrackBar
     {
         private const int WM_LBUTTONDOWN = 0x0201;
+        private const int WM_PAINT = 0x000F;
+
+        // Marks drawn along the lower edge, over what Windows paints: little triangles (chapters, the cuts of a split)
+        // and a thin shaded band (the part that is kept or removed). Positions are 0 to 1 along the bar. They are
+        // drawn at the bottom so they never cover the thumb, which sits in the middle.
+        private double[] _chapterMarks = [];
+        private double[] _cutMarks = [];
+        private (double From, double To)? _band;
+        private Color _bandColor = Color.Transparent;
+        private static readonly Color ChapterMarkColor = Color.FromArgb(200, 200, 200);
+        private static readonly Color CutMarkColor = Color.FromArgb(255, 170, 40);
+
+        public void SetMarks(double[] chapterMarks, double[] cutMarks, (double From, double To)? band, Color bandColor)
+        {
+            if (chapterMarks.SequenceEqual(_chapterMarks) && cutMarks.SequenceEqual(_cutMarks) && band == _band && bandColor == _bandColor)
+            {
+                return;
+            }
+            _chapterMarks = chapterMarks;
+            _cutMarks = cutMarks;
+            _band = band;
+            _bandColor = bandColor;
+            Invalidate();
+        }
+
+        private void PaintMarks()
+        {
+            if (_chapterMarks.Length == 0 && _cutMarks.Length == 0 && _band == null)
+            {
+                return;
+            }
+
+            int pad = LogicalToDeviceUnits(8);
+            int channel = Math.Max(Width - 2 * pad, 1);
+            int bottom = Height - 1;
+            using Graphics g = Graphics.FromHwnd(Handle);
+            g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+
+            if (_band is { } band)
+            {
+                int x1 = pad + (int)(band.From * channel);
+                int x2 = pad + (int)(band.To * channel);
+                using SolidBrush brush = new(_bandColor);
+                g.FillRectangle(brush, x1, bottom - LogicalToDeviceUnits(4), Math.Max(x2 - x1, 1), LogicalToDeviceUnits(4));
+            }
+
+            int half = LogicalToDeviceUnits(4);
+            int rise = LogicalToDeviceUnits(7);
+            foreach ((double[] marks, Color color) in new[] { (_chapterMarks, ChapterMarkColor), (_cutMarks, CutMarkColor) })
+            {
+                using SolidBrush brush = new(color);
+                foreach (double mark in marks)
+                {
+                    float x = pad + (float)(mark * channel);
+                    g.FillPolygon(brush, new[] { new PointF(x - half, bottom), new PointF(x + half, bottom), new PointF(x, bottom - rise) });
+                }
+            }
+        }
 
         // The position (0 to 1) of the bar under a pointer at x (in the control's pixels).
         public double RatioAt(int x)
@@ -2777,6 +2836,10 @@ namespace SwewolfMediaPlayer
                 }
             }
             base.WndProc(ref m);
+            if (m.Msg == WM_PAINT && Orientation == Orientation.Horizontal)
+            {
+                PaintMarks();
+            }
         }
     }
 

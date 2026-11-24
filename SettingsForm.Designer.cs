@@ -18,6 +18,7 @@ namespace SwewolfMediaPlayer
             grpPlayer = new GroupBox();
             chkStartFullScreen = new CheckBox();
             chkSeekThumbnails = new CheckBox();
+            chkChapterMarks = new CheckBox();
             chkShowSubtitles = new CheckBox();
             chkTrackMenus = new CheckBox();
             lblCoverSize = new Label();
@@ -75,6 +76,7 @@ namespace SwewolfMediaPlayer
             //
             grpPlayer.Controls.Add(chkStartFullScreen);
             grpPlayer.Controls.Add(chkSeekThumbnails);
+            grpPlayer.Controls.Add(chkChapterMarks);
             grpPlayer.Controls.Add(chkShowSubtitles);
             grpPlayer.Controls.Add(chkTrackMenus);
             grpPlayer.Controls.Add(lblCoverSize);
@@ -87,7 +89,7 @@ namespace SwewolfMediaPlayer
             grpPlayer.Controls.Add(nudNoticeSeconds);
             grpPlayer.Location = new Point(12, 12);
             grpPlayer.Name = "grpPlayer";
-            grpPlayer.Size = new Size(360, 346);
+            grpPlayer.Size = new Size(360, 372);
             grpPlayer.TabIndex = 0;
             grpPlayer.TabStop = false;
             grpPlayer.Text = "Player";
@@ -114,13 +116,24 @@ namespace SwewolfMediaPlayer
             toolTip.SetToolTip(chkSeekThumbnails, "Show a small picture of the video at the pointer\r\nwhile you point at the seek bar. Video files only.\r\nIt needs FFmpeg (ffmpeg.exe in the program folder or in the PATH);\r\nwithout it nothing is shown.");
             chkSeekThumbnails.UseVisualStyleBackColor = true;
             //
+            // chkChapterMarks
+            //
+            chkChapterMarks.AutoSize = true;
+            chkChapterMarks.Location = new Point(10, 76);
+            chkChapterMarks.Name = "chkChapterMarks";
+            chkChapterMarks.Size = new Size(240, 19);
+            chkChapterMarks.TabIndex = 2;
+            chkChapterMarks.Text = "Show Chapter &Marks on the Seek Bar";
+            toolTip.SetToolTip(chkChapterMarks, "Show a small triangle under the seek bar where each chapter\r\nof a file starts (files that have chapters, such as MKV, MP4 and DVD).");
+            chkChapterMarks.UseVisualStyleBackColor = true;
+            //
             // chkShowSubtitles
             //
             chkShowSubtitles.AutoSize = true;
-            chkShowSubtitles.Location = new Point(10, 76);
+            chkShowSubtitles.Location = new Point(10, 102);
             chkShowSubtitles.Name = "chkShowSubtitles";
             chkShowSubtitles.Size = new Size(240, 19);
-            chkShowSubtitles.TabIndex = 2;
+            chkShowSubtitles.TabIndex = 3;
             chkShowSubtitles.Text = "Turn On Subtitles When a &Video Opens";
             toolTip.SetToolTip(chkShowSubtitles, "Show the subtitles of a video the first time you open it.\r\nA choice you make in the right-click menu (or with the C key)\r\nis remembered for that video and used instead.");
             chkShowSubtitles.UseVisualStyleBackColor = true;
@@ -128,10 +141,10 @@ namespace SwewolfMediaPlayer
             // chkTrackMenus
             //
             chkTrackMenus.AutoSize = true;
-            chkTrackMenus.Location = new Point(10, 102);
+            chkTrackMenus.Location = new Point(10, 128);
             chkTrackMenus.Name = "chkTrackMenus";
             chkTrackMenus.Size = new Size(300, 19);
-            chkTrackMenus.TabIndex = 3;
+            chkTrackMenus.TabIndex = 4;
             chkTrackMenus.Text = "Show Track Menus Only When There Is a &Choice";
             toolTip.SetToolTip(chkTrackMenus, "In the right-click menu, show Audio Track and Video Track\r\nonly for a file that has more than one of them, and\r\nSubtitle Track only for a file that has at least one\r\n(subtitles can also be turned off there).\r\nWhen this is off, the three menus are always shown,\r\nand greyed out when the file has none.");
             chkTrackMenus.UseVisualStyleBackColor = true;
@@ -139,9 +152,9 @@ namespace SwewolfMediaPlayer
             // lblCoverSize
             //
             lblCoverSize.AutoSize = true;
-            lblCoverSize.Location = new Point(10, 132);
+            lblCoverSize.Location = new Point(10, 158);
             lblCoverSize.Name = "lblCoverSize";
-            lblCoverSize.TabIndex = 4;
+            lblCoverSize.TabIndex = 5;
             lblCoverSize.Text = "Cover Picture Si&ze for Music Files";
             //
             // cboCoverSize
@@ -149,18 +162,18 @@ namespace SwewolfMediaPlayer
             cboCoverSize.DropDownStyle = ComboBoxStyle.DropDownList;
             cboCoverSize.FormattingEnabled = true;
             cboCoverSize.Items.AddRange(new object[] { "Medium", "Maximum" });
-            cboCoverSize.Location = new Point(10, 150);
+            cboCoverSize.Location = new Point(10, 176);
             cboCoverSize.Name = "cboCoverSize";
             cboCoverSize.Size = new Size(218, 23);
-            cboCoverSize.TabIndex = 5;
+            cboCoverSize.TabIndex = 6;
             toolTip.SetToolTip(cboCoverSize, "How large the cover picture of a music file is shown.\r\nMedium is 75 percent of the largest size that fits the window.\r\nMaximum fills the video area.");
             //
             // lblButtonLook
             //
             lblButtonLook.AutoSize = true;
-            lblButtonLook.Location = new Point(10, 186);
+            lblButtonLook.Location = new Point(10, 212);
             lblButtonLook.Name = "lblButtonLook";
-            lblButtonLook.TabIndex = 6;
+            lblButtonLook.TabIndex = 7;
             lblButtonLook.Text = "&Look of the Previous and Next Buttons";
             //
             // cboButtonLook
@@ -168,18 +181,18 @@ namespace SwewolfMediaPlayer
             cboButtonLook.DropDownStyle = ComboBoxStyle.DropDownList;
             cboButtonLook.FormattingEnabled = true;
             cboButtonLook.Items.AddRange(new object[] { "Modern", "Classic" });
-            cboButtonLook.Location = new Point(10, 204);
+            cboButtonLook.Location = new Point(10, 230);
             cboButtonLook.Name = "cboButtonLook";
             cboButtonLook.Size = new Size(218, 23);
-            cboButtonLook.TabIndex = 7;
+            cboButtonLook.TabIndex = 8;
             toolTip.SetToolTip(cboButtonLook, "How the buttons for the previous and next tune or track look.\r\nModern has one triangle and a bar.\r\nClassic has two triangles and a bar.\r\nA player that is already open keeps its look until it is opened again.");
             //
             // lblListSide
             //
             lblListSide.AutoSize = true;
-            lblListSide.Location = new Point(10, 240);
+            lblListSide.Location = new Point(10, 266);
             lblListSide.Name = "lblListSide";
-            lblListSide.TabIndex = 8;
+            lblListSide.TabIndex = 9;
             lblListSide.Text = "S&ide of the Tune and Channel Lists";
             //
             // cboListSide
@@ -187,28 +200,28 @@ namespace SwewolfMediaPlayer
             cboListSide.DropDownStyle = ComboBoxStyle.DropDownList;
             cboListSide.FormattingEnabled = true;
             cboListSide.Items.AddRange(new object[] { "Right", "Left" });
-            cboListSide.Location = new Point(10, 258);
+            cboListSide.Location = new Point(10, 284);
             cboListSide.Name = "cboListSide";
             cboListSide.Size = new Size(218, 23);
-            cboListSide.TabIndex = 9;
+            cboListSide.TabIndex = 10;
             toolTip.SetToolTip(cboListSide, "Which side of the window the list of tunes (SID music)\r\nand the list of channels (an M3U list) are shown on.\r\nA player that is already open keeps its side until it is opened again.");
             //
             // lblNoticeSeconds
             //
             lblNoticeSeconds.AutoSize = true;
-            lblNoticeSeconds.Location = new Point(10, 292);
+            lblNoticeSeconds.Location = new Point(10, 318);
             lblNoticeSeconds.Name = "lblNoticeSeconds";
-            lblNoticeSeconds.TabIndex = 10;
+            lblNoticeSeconds.TabIndex = 11;
             lblNoticeSeconds.Text = "Seconds to Show a Playlist Error";
             //
             // nudNoticeSeconds
             //
-            nudNoticeSeconds.Location = new Point(10, 310);
+            nudNoticeSeconds.Location = new Point(10, 336);
             nudNoticeSeconds.Maximum = new decimal(new int[] { 60, 0, 0, 0 });
             nudNoticeSeconds.Minimum = new decimal(new int[] { 1, 0, 0, 0 });
             nudNoticeSeconds.Name = "nudNoticeSeconds";
             nudNoticeSeconds.Size = new Size(60, 23);
-            nudNoticeSeconds.TabIndex = 11;
+            nudNoticeSeconds.TabIndex = 12;
             nudNoticeSeconds.Value = new decimal(new int[] { 10, 0, 0, 0 });
             toolTip.SetToolTip(nudNoticeSeconds, "When an item of a playlist cannot be played (missing or damaged), a message tells why.\r\nThis many seconds later the next item starts by itself. Next or Skip Now does not wait.");
             //
@@ -526,6 +539,7 @@ namespace SwewolfMediaPlayer
         private GroupBox grpPlayer;
         private CheckBox chkStartFullScreen;
         private CheckBox chkSeekThumbnails;
+        private CheckBox chkChapterMarks;
         private CheckBox chkShowSubtitles;
         private CheckBox chkTrackMenus;
         private Label lblCoverSize;

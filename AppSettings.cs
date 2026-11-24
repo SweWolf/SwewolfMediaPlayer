@@ -25,6 +25,7 @@
 //   2026-11-19  PlaylistNoticeSeconds (10 by default): how long the message about a playlist item that cannot be played stays.
 //   2026-11-22  FfmpegNoticeShown (false by default): the one-time message that FFmpeg is not installed has been shown.
 //   2026-11-22  BookmarkExplorerNoticeShown (false by default): the one-time message about bookmarks and SweWolf File Explorer has been shown.
+//   2026-11-23  ShowChapterMarks (on by default).
 
 using System.Text.Json;
 
@@ -40,6 +41,9 @@ namespace SwewolfMediaPlayer
 
         // Whether the player opens video files in full screen mode (audio files never do).
         public bool StartFullScreenForVideo { get; set; } = true;
+
+        // Whether a small triangle shows where each chapter starts, under the seek bar.
+        public bool ShowChapterMarks { get; set; } = true;
 
         // Whether a small picture of the video pops up while the pointer is on the seek bar.
         public bool ShowSeekBarThumbnails { get; set; } = true;
