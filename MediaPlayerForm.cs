@@ -209,6 +209,7 @@ namespace SwewolfMediaPlayer
                 TextBoxStyle.Apply(box);   // a little space before the text; Tab into a box selects all of its text
             }
             InitChapterControls();
+            InitTrimControls();
             InitSpeedBox();
             StyleMenu(menuVideo);
             _filePath = filePath;
