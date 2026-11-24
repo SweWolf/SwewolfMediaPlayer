@@ -55,7 +55,7 @@ namespace SwewolfMediaPlayer
 
             if (_chapters != null)
             {
-                UpdateChapterButtons(player.Time);
+                UpdateChapterButtons(CurrentTimeMs());
                 return;
             }
 
@@ -78,7 +78,7 @@ namespace SwewolfMediaPlayer
                 {
                     _chapters = chapters;
                     ShowChapterControls(true);
-                    UpdateChapterButtons(player.Time);
+                    UpdateChapterButtons(CurrentTimeMs());
                 }
             }
             else if (player.Time > 5000)
@@ -133,7 +133,9 @@ namespace SwewolfMediaPlayer
                 return;
             }
 
-            long now = Math.Max(_player.Time, 0);
+            // CurrentTimeMs, not _player.Time: while paused LibVLC keeps reporting the old time after a jump, so
+            // Next would find the same chapter every time.
+            long now = Math.Max(CurrentTimeMs(), 0);
             int current = ChapterAt(now);
             int target = current + direction;
             if (direction < 0 && now - _chapters![current].TimeOffset > 3000)

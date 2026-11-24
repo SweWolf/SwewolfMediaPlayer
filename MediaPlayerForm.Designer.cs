@@ -46,6 +46,7 @@ namespace SwewolfMediaPlayer
             btnTrim = new Button();
             cboTrimMode = new ComboBox();
             btnQuickPreview = new Button();
+            btnFineTune = new Button();
             btnPrevMark = new IconButton();
             btnNextMark = new IconButton();
             btnCloseTrim = new CloseXButton();
@@ -234,7 +235,7 @@ namespace SwewolfMediaPlayer
             txtFadeIn.Location = new Point(484, 25);
             txtFadeIn.Name = "txtFadeIn";
             txtFadeIn.Size = new Size(44, 23);
-            txtFadeIn.TabIndex = 8;
+            txtFadeIn.TabIndex = 9;
             txtFadeIn.Text = "0";
             toolTip.SetToolTip(txtFadeIn, "Length of the fade in at the start, in seconds. 0 means no fade.");
             // 
@@ -246,7 +247,7 @@ namespace SwewolfMediaPlayer
             txtFadeOut.Location = new Point(620, 25);
             txtFadeOut.Name = "txtFadeOut";
             txtFadeOut.Size = new Size(44, 23);
-            txtFadeOut.TabIndex = 10;
+            txtFadeOut.TabIndex = 11;
             txtFadeOut.Text = "0";
             toolTip.SetToolTip(txtFadeOut, "Length of the fade out at the end, in seconds. 0 means no fade.");
             // 
@@ -259,11 +260,27 @@ namespace SwewolfMediaPlayer
             btnPreview.Location = new Point(210, 60);
             btnPreview.Name = "btnPreview";
             btnPreview.Size = new Size(80, 25);
-            btnPreview.TabIndex = 14;
+            btnPreview.TabIndex = 15;
             btnPreview.Text = "Preview";
             toolTip.SetToolTip(btnPreview, "Play the result with the fades. The file is not changed.");
             btnPreview.UseVisualStyleBackColor = false;
             btnPreview.Click += btnPreview_Click;
+            //
+            // btnFineTune
+            //
+            btnFineTune.BackColor = Color.FromArgb(48, 48, 48);
+            btnFineTune.FlatAppearance.BorderColor = Color.FromArgb(96, 96, 96);
+            btnFineTune.FlatStyle = FlatStyle.Flat;
+            btnFineTune.ForeColor = Color.FromArgb(230, 230, 230);
+            btnFineTune.Location = new Point(420, 24);
+            btnFineTune.Name = "btnFineTune";
+            btnFineTune.Size = new Size(84, 25);
+            btnFineTune.TabIndex = 7;
+            btnFineTune.Text = "Fine Tune";
+            toolTip.SetToolTip(btnFineTune, "Move the time in the boxes that is nearest to the seek bar to the closest scene change within 3 seconds of it. Needs FFmpeg.");
+            btnFineTune.UseVisualStyleBackColor = false;
+            btnFineTune.Visible = false;
+            btnFineTune.Click += btnFineTune_Click;
             //
             // btnQuickPreview
             //
@@ -274,7 +291,7 @@ namespace SwewolfMediaPlayer
             btnQuickPreview.Location = new Point(96, 60);
             btnQuickPreview.Name = "btnQuickPreview";
             btnQuickPreview.Size = new Size(108, 25);
-            btnQuickPreview.TabIndex = 13;
+            btnQuickPreview.TabIndex = 14;
             btnQuickPreview.Text = "Quick Preview";
             toolTip.SetToolTip(btnQuickPreview, "Play only the places where something happens, a few seconds each. The file is not changed.");
             btnQuickPreview.UseVisualStyleBackColor = false;
@@ -289,7 +306,7 @@ namespace SwewolfMediaPlayer
             btnPrevMark.Location = new Point(12, 60);
             btnPrevMark.Name = "btnPrevMark";
             btnPrevMark.Size = new Size(36, 25);
-            btnPrevMark.TabIndex = 11;
+            btnPrevMark.TabIndex = 12;
             toolTip.SetToolTip(btnPrevMark, "Go to the previous time stamp in the boxes above");
             btnPrevMark.UseVisualStyleBackColor = false;
             btnPrevMark.Click += btnPrevMark_Click;
@@ -303,7 +320,7 @@ namespace SwewolfMediaPlayer
             btnNextMark.Location = new Point(54, 60);
             btnNextMark.Name = "btnNextMark";
             btnNextMark.Size = new Size(36, 25);
-            btnNextMark.TabIndex = 12;
+            btnNextMark.TabIndex = 13;
             toolTip.SetToolTip(btnNextMark, "Go to the next time stamp in the boxes above");
             btnNextMark.UseVisualStyleBackColor = false;
             btnNextMark.Click += btnNextMark_Click;
@@ -331,7 +348,7 @@ namespace SwewolfMediaPlayer
             btnTrim.Location = new Point(312, 60);
             btnTrim.Name = "btnTrim";
             btnTrim.Size = new Size(74, 25);
-            btnTrim.TabIndex = 15;
+            btnTrim.TabIndex = 16;
             btnTrim.Text = "Start";
             toolTip.SetToolTip(btnTrim, "Trim the file with SplitMediaFiles. The original file is kept.");
             btnTrim.UseVisualStyleBackColor = false;
@@ -343,7 +360,7 @@ namespace SwewolfMediaPlayer
             btnCloseTrim.Location = new Point(1154, 9);
             btnCloseTrim.Name = "btnCloseTrim";
             btnCloseTrim.Size = new Size(22, 20);
-            btnCloseTrim.TabIndex = 16;
+            btnCloseTrim.TabIndex = 17;
             toolTip.SetToolTip(btnCloseTrim, "Close Trim");
             btnCloseTrim.UseVisualStyleBackColor = false;
             btnCloseTrim.Click += btnCloseTrim_Click;
@@ -411,7 +428,9 @@ namespace SwewolfMediaPlayer
             trkSeek.AutoSize = false;
             trkSeek.BackColor = Color.FromArgb(32, 32, 32);
             trkSeek.Location = new Point(152, 12);
-            trkSeek.Maximum = 1000;
+            trkSeek.LargeChange = 500;
+            trkSeek.Maximum = 100000;
+            trkSeek.SmallChange = 100;
             trkSeek.Name = "trkSeek";
             trkSeek.Size = new Size(608, 32);
             trkSeek.TabIndex = 3;
@@ -540,6 +559,7 @@ namespace SwewolfMediaPlayer
             grpTrim.Controls.Add(lblEndAt);
             grpTrim.Controls.Add(txtEndAt);
             grpTrim.Controls.Add(btnEndNow);
+            grpTrim.Controls.Add(btnFineTune);
             grpTrim.Controls.Add(lblFadeIn);
             grpTrim.Controls.Add(txtFadeIn);
             grpTrim.Controls.Add(lblFadeOut);
@@ -583,7 +603,7 @@ namespace SwewolfMediaPlayer
             lblFadeIn.Location = new Point(416, 28);
             lblFadeIn.Name = "lblFadeIn";
             lblFadeIn.Size = new Size(61, 15);
-            lblFadeIn.TabIndex = 7;
+            lblFadeIn.TabIndex = 8;
             lblFadeIn.Text = "Fade in (s)";
             // 
             // lblFadeOut
@@ -592,7 +612,7 @@ namespace SwewolfMediaPlayer
             lblFadeOut.Location = new Point(544, 28);
             lblFadeOut.Name = "lblFadeOut";
             lblFadeOut.Size = new Size(69, 15);
-            lblFadeOut.TabIndex = 9;
+            lblFadeOut.TabIndex = 10;
             lblFadeOut.Text = "Fade out (s)";
             // 
             // MediaPlayerForm
@@ -658,6 +678,7 @@ namespace SwewolfMediaPlayer
         private Button btnTrim;   // the Start button (named when it only trimmed)
         private ComboBox cboTrimMode;
         private Button btnQuickPreview;
+        private Button btnFineTune;
         private IconButton btnPrevMark;
         private IconButton btnNextMark;
         private CloseXButton btnCloseTrim;

@@ -1651,7 +1651,9 @@ namespace SwewolfMediaPlayer
                 : $"{FormatTime(timeMs, _paused)} / {FormatTime(length, false)}";
             if (!_seeking && !_isStream && length > 0)
             {
-                trkSeek.Value = (int)Math.Clamp(timeMs * trkSeek.Maximum / length, 0, trkSeek.Maximum);
+                // Rounded, not cut off (the thumb was up to a pixel left of the true position), and the bar has far more
+                // steps than pixels (Maximum 100000), so a position lands on the right pixel.
+                trkSeek.Value = (int)Math.Clamp(Math.Round((double)timeMs * trkSeek.Maximum / length), 0, trkSeek.Maximum);
             }
         }
 
@@ -2753,6 +2755,49 @@ namespace SwewolfMediaPlayer
     {
         private const int WM_LBUTTONDOWN = 0x0201;
         private const int WM_PAINT = 0x000F;
+        private const int TBM_GETTHUMBRECT = 0x0419;
+        private const int TBM_GETCHANNELRECT = 0x041A;
+
+        [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential)]
+        private struct NativeRect
+        {
+            public int Left, Top, Right, Bottom;
+        }
+
+        [System.Runtime.InteropServices.DllImport("user32.dll")]
+        private static extern IntPtr SendMessage(IntPtr hWnd, int msg, IntPtr wParam, ref NativeRect lParam);
+
+        // Where the middle of the thumb is when the value is at its minimum (Start), how far the middle travels to the
+        // maximum (Span), and the thumb itself (in the control's pixels), as Windows has it. The thumb is about 11 px
+        // wide and its edges, not its middle, are what reaches the ends of the channel, so the middle starts about
+        // 5 px inside the channel. (Measured with a test program at 96 DPI; the sizes come from Windows, so other DPIs follow.)
+        private (double Start, double Span, int ThumbLeft, int ThumbRight) Travel()
+        {
+            if (IsHandleCreated)
+            {
+                NativeRect channel = default;
+                NativeRect thumb = default;
+                SendMessage(Handle, TBM_GETCHANNELRECT, IntPtr.Zero, ref channel);
+                SendMessage(Handle, TBM_GETTHUMBRECT, IntPtr.Zero, ref thumb);
+                int thumbWidth = thumb.Right - thumb.Left;
+                if (thumbWidth > 0 && channel.Right - channel.Left > thumbWidth)
+                {
+                    return (channel.Left + thumbWidth / 2.0, channel.Right - channel.Left - thumbWidth, thumb.Left, thumb.Right);
+                }
+            }
+            int pad = LogicalToDeviceUnits(8);   // (not created yet: the old estimate)
+            return (pad, Math.Max(Width - 2 * pad, 1), -1, -1);
+        }
+
+        // Where the middle of the thumb is on screen when the value is at this position (0 to 1). Windows puts the thumb's left edge on
+        // a whole pixel (the channel start plus the position, rounded), so the same rounding is done here and a mark is at the
+        // middle of the thumb, not up to a pixel beside it.
+        private double XAt(double ratio)
+        {
+            (double start, double span, int thumbLeft, int thumbRight) = Travel();
+            double half = thumbLeft >= 0 ? (thumbRight - thumbLeft) / 2.0 : 0;
+            return Math.Round(start - half + ratio * span) + half;
+        }
 
         // Marks drawn along the lower edge, over what Windows paints: little triangles (chapters, the cuts of a split)
         // and a thin shaded band (the part that is kept or removed). Positions are 0 to 1 along the bar. They are
@@ -2784,16 +2829,14 @@ namespace SwewolfMediaPlayer
                 return;
             }
 
-            int pad = LogicalToDeviceUnits(8);
-            int channel = Math.Max(Width - 2 * pad, 1);
             int bottom = Height - 1;
             using Graphics g = Graphics.FromHwnd(Handle);
             g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
 
             if (_band is { } band)
             {
-                int x1 = pad + (int)(band.From * channel);
-                int x2 = pad + (int)(band.To * channel);
+                int x1 = (int)Math.Round(XAt(band.From));
+                int x2 = (int)Math.Round(XAt(band.To));
                 using SolidBrush brush = new(_bandColor);
                 g.FillRectangle(brush, x1, bottom - LogicalToDeviceUnits(4), Math.Max(x2 - x1, 1), LogicalToDeviceUnits(4));
             }
@@ -2805,7 +2848,7 @@ namespace SwewolfMediaPlayer
                 using SolidBrush brush = new(color);
                 foreach (double mark in marks)
                 {
-                    float x = pad + (float)(mark * channel);
+                    float x = (float)XAt(mark);
                     g.FillPolygon(brush, new[] { new PointF(x - half, bottom), new PointF(x + half, bottom), new PointF(x, bottom - rise) });
                 }
             }
@@ -2814,9 +2857,8 @@ namespace SwewolfMediaPlayer
         // The position (0 to 1) of the bar under a pointer at x (in the control's pixels).
         public double RatioAt(int x)
         {
-            int pad = LogicalToDeviceUnits(8);
-            int channel = Math.Max(Width - 2 * pad, 1);
-            return Math.Clamp((x - pad) / (double)channel, 0, 1);
+            (double start, double span, _, _) = Travel();
+            return Math.Clamp((x - start) / span, 0, 1);
         }
 
         protected override void WndProc(ref Message m)
@@ -2824,12 +2866,12 @@ namespace SwewolfMediaPlayer
             if (m.Msg == WM_LBUTTONDOWN && Orientation == Orientation.Horizontal)
             {
                 int x = (short)((long)m.LParam & 0xFFFF);
-                int pad = LogicalToDeviceUnits(8);   // about half the width of the thumb
-                int channel = Math.Max(Width - 2 * pad, 1);
-                double thumbX = pad + (double)(Value - Minimum) / Math.Max(Maximum - Minimum, 1) * channel;
+                (double start, double span, int thumbLeft, int thumbRight) = Travel();
+                double thumbX = start + (double)(Value - Minimum) / Math.Max(Maximum - Minimum, 1) * span;
 
                 // A click on the thumb itself starts a normal drag.
-                if (Math.Abs(x - thumbX) > pad)
+                bool onThumb = thumbLeft >= 0 ? x >= thumbLeft && x < thumbRight : Math.Abs(x - thumbX) <= LogicalToDeviceUnits(8);
+                if (!onThumb)
                 {
                     Value = Minimum + (int)Math.Round(RatioAt(x) * (Maximum - Minimum));
                     OnScroll(EventArgs.Empty);

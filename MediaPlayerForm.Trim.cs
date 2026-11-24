@@ -99,6 +99,7 @@ namespace SwewolfMediaPlayer
                 Math.Max(TextRenderer.MeasureText(btnPreview.Text, btnPreview.Font).Width,
                     TextRenderer.MeasureText(btnTrim.Text, btnTrim.Font).Width));
             btnQuickPreview.Width = btnPreview.Width = btnTrim.Width = textWidth + LogicalToDeviceUnits(28);
+            btnFineTune.Width = TextRenderer.MeasureText(btnFineTune.Text, btnFineTune.Font).Width + LogicalToDeviceUnits(28);
 
             cboTrimMode.SelectedIndex = 0;
             ApplyTrimMode();
@@ -177,6 +178,11 @@ namespace SwewolfMediaPlayer
             int x = cboTrimMode.Right + gap;
             x = PlaceTimeBox(lblStartAt, txtStartAt, btnStartNow, x, space) + gap;
             x = PlaceTimeBox(lblEndAt, txtEndAt, btnEndNow, x, space) + gap;
+            if (_fineTuneShown)
+            {
+                btnFineTune.Left = x;
+                x = btnFineTune.Right + gap;
+            }
 
             if (Mode != TrimMode.Split)
             {
@@ -189,10 +195,10 @@ namespace SwewolfMediaPlayer
                 PlaceFadeBox(secondLabel, secondBox, x, space);
 
                 // Tab goes in the order the boxes are shown.
-                firstLabel.TabIndex = 7;
-                firstBox.TabIndex = 8;
-                secondLabel.TabIndex = 9;
-                secondBox.TabIndex = 10;
+                firstLabel.TabIndex = 8;
+                firstBox.TabIndex = 9;
+                secondLabel.TabIndex = 10;
+                secondBox.TabIndex = 11;
             }
 
             // How wide the first row is in its widest mode.
@@ -201,7 +207,8 @@ namespace SwewolfMediaPlayer
             int endLabel = Math.Max(MeasureLabel("Remove To"), Math.Max(MeasureLabel("End at"), MeasureLabel("and at")));
             int timeFixed = space + txtStartAt.Width + nowGap + btnStartNow.Width;
             int fadesWidth = lblFadeIn.PreferredSize.Width + space + txtFadeIn.Width + gap + lblFadeOut.PreferredSize.Width + space + txtFadeOut.Width;
-            int widestRow = cboTrimMode.Right + gap + startLabel + timeFixed + gap + endLabel + timeFixed + gap + fadesWidth;
+            int fineTuneWidth = _fineTuneShown ? btnFineTune.Width + gap : 0;
+            int widestRow = cboTrimMode.Right + gap + startLabel + timeFixed + gap + endLabel + timeFixed + gap + fineTuneWidth + fadesWidth;
 
             // The buttons: two time stamp buttons, then Quick Preview, Preview and Start (the same width).
             int buttonsWidth = btnPrevMark.Width + space + btnNextMark.Width + gap + 3 * btnTrim.Width + 2 * space;
@@ -399,6 +406,146 @@ namespace SwewolfMediaPlayer
             }
         }
 
+        // ---- Fine Tune: snap a time to the nearest scene change ----
+
+        private const double FineTuneSeconds = 3;   // how far from the time in the box to look, each way
+        private const string SceneThreshold = "0.3";   // FFmpeg's scene score (0 to 1) that counts as a scene change
+
+        private bool _fineTuneShown;
+        private bool _fineTuning;
+
+        // The button is hidden when there is nothing to detect with (no FFmpeg) or nothing to detect in (audio, a stream), and
+        // greyed out while no time is filled in or while it is working.
+        private void RefreshFineTuneButton()
+        {
+            bool show = _trimVisible && FfmpegPath.Value != null && !_isStream && !IsAudioFile(_filePath) && _lengthMs > 0;
+            if (show != _fineTuneShown)
+            {
+                _fineTuneShown = show;
+                btnFineTune.Visible = show;
+                LayoutTrimRow();
+            }
+            btnFineTune.Enabled = !_fineTuning && !_trimming
+                && (TryParseTime(txtStartAt.Text, out _) || TryParseTime(txtEndAt.Text, out _));
+        }
+
+        // Takes the time in the boxes that is nearest to the position of the seek bar, looks for the scene change nearest to it
+        // within FineTuneSeconds each way (FFmpeg's scene detection), writes it into the box and moves the player there.
+        // Nothing found: a beep, and the box is left as it is.
+        private async void btnFineTune_Click(object? sender, EventArgs e)
+        {
+            string? ffmpeg = FfmpegPath.Value;
+            if (ffmpeg == null || _fineTuning || _trimming || _lengthMs <= 0 || !File.Exists(_filePath))
+            {
+                return;
+            }
+
+            long now = CurrentTimeMs();
+            TextBox? target = null;
+            double around = 0;
+            foreach (TextBox box in new[] { txtStartAt, txtEndAt })
+            {
+                if (TryParseTime(box.Text, out double seconds) && (target == null || Math.Abs(seconds * 1000 - now) < Math.Abs(around * 1000 - now)))
+                {
+                    target = box;
+                    around = seconds;
+                }
+            }
+            if (target == null)
+            {
+                return;
+            }
+
+            double length = _lengthMs / 1000.0;
+            around = Math.Min(around, length);
+            double from = Math.Max(0, around - FineTuneSeconds);
+            double to = Math.Min(length, around + FineTuneSeconds);
+            string file = _filePath;
+
+            _fineTuning = true;
+            UseWaitCursor = true;
+            RefreshFineTuneButton();
+            double? cut;
+            try
+            {
+                cut = await Task.Run(() => FindSceneChange(ffmpeg, file, from, to, around));
+            }
+            catch (Exception)
+            {
+                cut = null;
+            }
+            _fineTuning = false;
+            if (IsDisposed)
+            {
+                return;
+            }
+            UseWaitCursor = false;
+            RefreshFineTuneButton();
+
+            if (file != _filePath)
+            {
+                return;   // another file was opened meanwhile
+            }
+            if (cut == null)
+            {
+                System.Media.SystemSounds.Beep.Play();
+                return;
+            }
+
+            long cutMs = (long)Math.Round(cut.Value * 1000);
+            target.Text = FormatTime(cutMs, true);
+            SeekTo(cutMs);
+        }
+
+        // Runs FFmpeg over [from, to] seconds and returns the scene change nearest to "around" (seconds), or null.
+        // The picture frames are only decoded and thrown away; "showinfo" lists the time of every frame that passed the
+        // scene test. Times are counted from "from". The first frame of the window never counts (it has nothing to compare with).
+        private static double? FindSceneChange(string ffmpeg, string file, double from, double to, double around)
+        {
+            ProcessStartInfo info = new(ffmpeg)
+            {
+                UseShellExecute = false,
+                CreateNoWindow = true,
+                RedirectStandardError = true
+            };
+            foreach (string argument in new[] { "-hide_banner", "-nostats", "-ss", FormatSeconds(from), "-t", FormatSeconds(to - from),
+                "-i", file, "-an", "-sn", "-vf", $"select='gt(scene,{SceneThreshold})',showinfo", "-f", "null", "-" })
+            {
+                info.ArgumentList.Add(argument);
+            }
+
+            using Process? process = Process.Start(info);
+            if (process == null)
+            {
+                return null;
+            }
+            Task<string> output = process.StandardError.ReadToEndAsync();
+            if (!process.WaitForExit(30000))
+            {
+                try
+                {
+                    process.Kill(true);
+                }
+                catch (InvalidOperationException)
+                {
+                    // It ended just now.
+                }
+                return null;
+            }
+
+            double? best = null;
+            foreach (System.Text.RegularExpressions.Match match in System.Text.RegularExpressions.Regex.Matches(
+                output.Result, @"showinfo.*?pts_time:(?<t>\d+(\.\d+)?)"))
+            {
+                double time = from + double.Parse(match.Groups["t"].Value, CultureInfo.InvariantCulture);
+                if (time >= from + 0.04 && (best == null || Math.Abs(time - around) < Math.Abs(best.Value - around)))
+                {
+                    best = time;
+                }
+            }
+            return best;
+        }
+
         // ---- Marks on the seek bar ----
 
         // Chapters (small triangles, when the setting is on) and, while the group box is open, what the boxes say:
@@ -406,6 +553,7 @@ namespace SwewolfMediaPlayer
         // at every cut. Called by the timer and when the boxes or the mode change; the bar only repaints on a change.
         private void RefreshSeekMarks()
         {
+            RefreshFineTuneButton();
             if (_lengthMs <= 0 || _isStream)
             {
                 trkSeek.SetMarks([], [], null, Color.Transparent);
