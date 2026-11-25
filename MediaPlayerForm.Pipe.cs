@@ -21,6 +21,8 @@ namespace SwewolfMediaPlayer
     {
         private PlayerPipe? _pipe;
         private bool _controlled;                         // a playlist of the explorer is running
+        private bool _quickSettingsOnce;                  // the next StartMedia follows the quick settings (see UseQuickSettingsOnce)
+        private bool _startPausedPending;                 // the file stops on its first picture as soon as it plays
         private bool _noResumeOnce;                       // the next StartLibrary does not offer or use a saved position
         private long _startAtOnceMs;                      // the next StartLibrary starts the file at this time (the explorer's Demo Play)
         private PipeCommand? _pendingPlay;                // a play command that came before the video engine was ready
@@ -30,6 +32,14 @@ namespace SwewolfMediaPlayer
         {
             _startAtOnceMs = startMs;
             _noResumeOnce = noResume;
+        }
+
+        // The two quick settings of the main window's Media menu (Play Media Files Automatically, Always Play from Start) apply to the next file
+        // that is opened by hand: from that menu, or dropped on this window. A file that arrives with arguments or through the pipe (the explorer)
+        // never uses them: it always plays and always asks about a saved position.
+        internal void UseQuickSettingsOnce()
+        {
+            _quickSettingsOnce = true;
         }
 
         internal void AttachPipe(PlayerPipe? pipe)

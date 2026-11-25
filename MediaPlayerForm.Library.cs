@@ -73,7 +73,7 @@ namespace SwewolfMediaPlayer
 
         // A new file (or the same one again) starts: forget what was counted, and offer to continue where the user stopped.
         // Called by StartMedia before the file plays.
-        private void StartLibrary()
+        private void StartLibrary(bool alwaysFromStart = false)
         {
             _playedMs = 0;
             _lastTrackTicks = 0;
@@ -98,6 +98,12 @@ namespace SwewolfMediaPlayer
             if (_noResumeOnce)
             {
                 _noResumeOnce = false;
+                return;
+            }
+
+            // The quick setting "Always Play from Start" (Media menu of the main window): no offer, but the position is saved as usual.
+            if (alwaysFromStart)
+            {
                 return;
             }
 

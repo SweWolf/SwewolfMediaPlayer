@@ -117,7 +117,8 @@ namespace SwewolfMediaPlayer
 
             UpdateFloatingTitle(position, moved, buttonDown, now);
             bool over = BarScreenArea().Contains(position);
-            bool holding = menuVideo.Visible || (buttonDown && pnlControls.ContainsFocus && _barShown);
+            // The "Press Play" message (a file that was opened without playing) shows the bar too, so the Play button can be seen.
+            bool holding = menuVideo.Visible || _pressPlayVisible || (buttonDown && pnlControls.ContainsFocus && _barShown);
             if (over && (moved || buttonDown))
             {
                 _barActiveTicks = now;

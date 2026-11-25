@@ -26,6 +26,7 @@
 //   2026-11-22  FfmpegNoticeShown (false by default): the one-time message that FFmpeg is not installed has been shown.
 //   2026-11-22  BookmarkExplorerNoticeShown (false by default): the one-time message about bookmarks and SweWolf File Explorer has been shown.
 //   2026-11-23  ShowChapterMarks (on by default).
+//   2026-11-24  PlayAutomatically (on by default) and AlwaysPlayFromStart (off by default): the two check items at the bottom of the Media menu.
 
 using System.Text.Json;
 
@@ -41,6 +42,12 @@ namespace SwewolfMediaPlayer
 
         // Whether the player opens video files in full screen mode (audio files never do).
         public bool StartFullScreenForVideo { get; set; } = true;
+
+        // Media menu of the main window: whether a file opened there (Open, Recent, a drop on the player) starts to play by itself (on by default;
+        // off: it stops on its first picture, for trimming) and whether such a file always starts from the beginning without the question about
+        // a saved resume point (off by default; the position is still saved). A file started with arguments (explorer, "Open with") ignores both.
+        public bool PlayAutomatically { get; set; } = true;
+        public bool AlwaysPlayFromStart { get; set; }
 
         // Whether a small triangle shows where each chapter starts, under the seek bar.
         public bool ShowChapterMarks { get; set; } = true;

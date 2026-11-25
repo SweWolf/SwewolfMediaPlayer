@@ -240,7 +240,7 @@ namespace SwewolfMediaPlayer
         // for it: change this value to go back.
         private static readonly bool MessageAsBox = true;
 
-        private void ShowLoading(string text)
+        private void ShowLoading(string text, bool slowHint = true)
         {
             if (_loadingLabel == null)
             {
@@ -262,7 +262,7 @@ namespace SwewolfMediaPlayer
             _loadingLabel.BringToFront();
 
             // Still waiting after a few seconds: say why (Windows checks the new files the first time).
-            if (_slowLoadTimer == null && !_slowLoadHint)
+            if (slowHint && _slowLoadTimer == null && !_slowLoadHint)
             {
                 _slowLoadTimer = new System.Windows.Forms.Timer { Interval = SlowLoadHintDelayMs };
                 _slowLoadTimer.Tick += (s, a) =>
@@ -325,6 +325,7 @@ namespace SwewolfMediaPlayer
             _slowLoadTimer?.Dispose();
             _slowLoadTimer = null;
             _slowLoadHint = false;
+            EndPressPlayHint();
             if (_loadingLabel != null)
             {
                 _loadingLabel.Visible = false;
@@ -346,6 +347,7 @@ namespace SwewolfMediaPlayer
                 return;
             }
 
+            _quickSettingsOnce = true;   // dropped by hand: follows the quick settings of the Media menu
             await OpenAnotherAsync(files[0], files[0]);
         }
 
@@ -588,6 +590,11 @@ namespace SwewolfMediaPlayer
                 _stepTimeMs = -1;
                 ShowPlayPause(true);
                 ApplyAudioState();
+                if (_startPausedPending)
+                {
+                    _startPausedPending = false;
+                    _ = PauseOnFirstPictureAsync(mine);
+                }
             });
             _player.Paused += (s, a) => Post(() =>
             {
@@ -666,6 +673,75 @@ namespace SwewolfMediaPlayer
             videoView.MediaPlayer = _player;
         }
 
+        // "Play Media Files Automatically" is off: stop the file on its first picture. Pausing right when it starts shows no picture at all
+        // (measured with LibVLC: the player is paused with nothing on the screen), but a single step forward from there draws the first
+        // frame. The user may have pressed Play already; then nothing is done.
+        private async Task PauseOnFirstPictureAsync(MediaPlayer started)
+        {
+            started.SetPause(true);
+            await Task.Delay(300);
+            if (ReferenceEquals(started, _player) && !IsDisposed && !started.IsPlaying && _paused)
+            {
+                started.NextFrame();
+                ShowPressPlayHint();
+            }
+        }
+
+        // The message in the middle of the picture (the same black box as "Opening the file...") that says what to do. It goes away when the file
+        // plays, when the user presses a key or a mouse button anywhere in the program, or after 5 seconds. In full screen the control bar is
+        // shown meanwhile, as if the pointer were at the bottom edge (see UpdateFloatingBar).
+        private bool _pressPlayVisible;
+        private System.Windows.Forms.Timer? _pressPlayTimer;
+        private PressPlayFilter? _pressPlayFilter;
+
+        private void ShowPressPlayHint()
+        {
+            ShowLoading("Press Play to start the media file", slowHint: false);
+            _pressPlayVisible = true;
+            if (_fullScreen)
+            {
+                _barActiveTicks = Environment.TickCount64;
+                SetBarShown(true);
+            }
+            if (_pressPlayTimer == null)
+            {
+                _pressPlayTimer = new System.Windows.Forms.Timer { Interval = 5000 };
+                _pressPlayTimer.Tick += (s, a) => HideLoading();
+            }
+            _pressPlayTimer.Stop();
+            _pressPlayTimer.Start();
+            if (_pressPlayFilter == null)
+            {
+                _pressPlayFilter = new PressPlayFilter(() => Post(HideLoading));
+                Application.AddMessageFilter(_pressPlayFilter);
+            }
+        }
+
+        private void EndPressPlayHint()
+        {
+            _pressPlayVisible = false;
+            _pressPlayTimer?.Stop();
+            if (_pressPlayFilter != null)
+            {
+                Application.RemoveMessageFilter(_pressPlayFilter);
+                _pressPlayFilter = null;
+            }
+        }
+
+        // Calls "dismiss" for a key or a mouse button pressed anywhere in the program.
+        private sealed class PressPlayFilter(Action dismiss) : IMessageFilter
+        {
+            public bool PreFilterMessage(ref Message m)
+            {
+                const int WM_KEYDOWN = 0x0100, WM_SYSKEYDOWN = 0x0104, WM_LBUTTONDOWN = 0x0201, WM_RBUTTONDOWN = 0x0204;
+                if (m.Msg is WM_KEYDOWN or WM_SYSKEYDOWN or WM_LBUTTONDOWN or WM_RBUTTONDOWN)
+                {
+                    dismiss();
+                }
+                return false;
+            }
+        }
+
         // Opens the file (or stream) and plays it. Also used to open a file again after a trim.
         // restart: the same file starts again (for a new visualization): the library and the resume offer are left alone.
         private void StartMedia(bool restart = false)
@@ -693,9 +769,17 @@ namespace SwewolfMediaPlayer
             UpdateSaveFrameButton();
             OpenTimingLog.Write($"StartMedia: cover art and save-frame button, {stepWatch.ElapsedMilliseconds} ms");
             stepWatch.Restart();
+            // The quick settings (main window, Media menu) are read now, so a change made there counts for a window that is open already.
+            bool quickSettings = !restart && _quickSettingsOnce;
             if (!restart)
             {
-                StartLibrary();   // forget what was counted for the last file; offer to resume
+                _quickSettingsOnce = false;
+            }
+            AppSettings? quick = quickSettings ? AppSettings.Load() : null;
+            _startPausedPending = false;
+            if (!restart)
+            {
+                StartLibrary(quick is { AlwaysPlayFromStart: true });   // forget what was counted for the last file; offer to resume
             }
             // Includes the time the resume prompt waits for the user, if it is shown.
             OpenTimingLog.Write($"StartMedia: library/resume, {stepWatch.ElapsedMilliseconds} ms");
@@ -709,6 +793,8 @@ namespace SwewolfMediaPlayer
             _media = CreateMedia(_activeLib, _filePath, _isStream);
             _mediaStartsAtEnd = false;
             _openWatch = System.Diagnostics.Stopwatch.StartNew();
+            // Not playing automatically: it stops on its first picture (see the Playing handler). Not for a stream or a disc.
+            _startPausedPending = quick is { PlayAutomatically: false } && !_isStream && !IsDvd;
             _player.Play(_media);
             OpenTimingLog.Write($"StartMedia: Media created and Play called, {stepWatch.ElapsedMilliseconds} ms");
 

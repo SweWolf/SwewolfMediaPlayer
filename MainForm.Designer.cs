@@ -34,6 +34,9 @@
             menuMedia = new ToolStripMenuItem();
             menuOpenDvd = new ToolStripMenuItem();
             menuRecent = new ToolStripMenuItem();
+            menuSepQuick = new ToolStripSeparator();
+            menuPlayAutomatically = new ToolStripMenuItem();
+            menuAlwaysFromStart = new ToolStripMenuItem();
             menuTools = new ToolStripMenuItem();
             menuCreateShortcut = new ToolStripMenuItem();
             menuSettings = new ToolStripMenuItem();
@@ -65,7 +68,7 @@
             //
             // menuMedia
             //
-            menuMedia.DropDownItems.AddRange(new ToolStripItem[] { menuOpenDvd, menuRecent });
+            menuMedia.DropDownItems.AddRange(new ToolStripItem[] { menuOpenDvd, menuRecent, menuSepQuick, menuPlayAutomatically, menuAlwaysFromStart });
             menuMedia.Name = "menuMedia";
             menuMedia.Size = new Size(52, 20);
             menuMedia.Text = "Media";
@@ -84,6 +87,29 @@
             menuRecent.Size = new Size(180, 22);
             menuRecent.Text = "Recent Media Files";
             menuRecent.ToolTipText = "The media files you opened most recently.";
+            //
+            // menuSepQuick
+            //
+            menuSepQuick.Name = "menuSepQuick";
+            menuSepQuick.Size = new Size(177, 6);
+            //
+            // menuPlayAutomatically
+            //
+            menuPlayAutomatically.CheckOnClick = true;
+            menuPlayAutomatically.Name = "menuPlayAutomatically";
+            menuPlayAutomatically.Size = new Size(180, 22);
+            menuPlayAutomatically.Text = "Play Media Files Automatically";
+            menuPlayAutomatically.ToolTipText = "A file you open here starts to play by itself. Without the check mark it stops on its first picture until you press Play (handy for trimming). A file started from another program, or with arguments, always plays.";
+            menuPlayAutomatically.Click += menuPlayAutomatically_Click;
+            //
+            // menuAlwaysFromStart
+            //
+            menuAlwaysFromStart.CheckOnClick = true;
+            menuAlwaysFromStart.Name = "menuAlwaysFromStart";
+            menuAlwaysFromStart.Size = new Size(180, 22);
+            menuAlwaysFromStart.Text = "Always Play from Start";
+            menuAlwaysFromStart.ToolTipText = "A file you open here always starts from the beginning, without the question about continuing where you stopped. Where you stop is still remembered. A file started from another program, or with arguments, still asks.";
+            menuAlwaysFromStart.Click += menuAlwaysFromStart_Click;
             //
             // menuTools
             //
@@ -270,6 +296,9 @@
         private MenuStrip menuStrip;
         private ToolStripMenuItem menuMedia;
         private ToolStripMenuItem menuRecent;
+        private ToolStripSeparator menuSepQuick;
+        private ToolStripMenuItem menuPlayAutomatically;
+        private ToolStripMenuItem menuAlwaysFromStart;
         private ToolStripMenuItem menuOpenDvd;
         private ToolStripMenuItem menuTools;
         private ToolStripMenuItem menuCreateShortcut;

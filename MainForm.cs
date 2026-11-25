@@ -16,6 +16,9 @@ namespace SwewolfMediaPlayer
             MediaPlayerForm.StyleMenu(menuStrip);   // the same dark menus as the player (clearer lines between groups)
             RefreshRecordingsMenu();   // there only when a recording has been made
             RefreshRecentMenu();
+            AppSettings quick = AppSettings.Load();
+            menuPlayAutomatically.Checked = quick.PlayAutomatically;
+            menuAlwaysFromStart.Checked = quick.AlwaysPlayFromStart;
             if (!string.IsNullOrEmpty(initialPath))
             {
                 txtFile.Text = initialPath;
@@ -24,6 +27,22 @@ namespace SwewolfMediaPlayer
 
             // Start loading the video engine now, so the first video opens without a wait.
             _ = MediaPlayerForm.PreloadAsync();
+        }
+
+        // The two quick settings at the bottom of the Media menu. They are saved at once (the file is read again first, so nothing else
+        // in it is overwritten) and read by every player window when it opens a file (see MediaPlayerForm.StartMedia).
+        private void menuPlayAutomatically_Click(object? sender, EventArgs e)
+        {
+            AppSettings settings = AppSettings.Load();
+            settings.PlayAutomatically = menuPlayAutomatically.Checked;
+            settings.Save();
+        }
+
+        private void menuAlwaysFromStart_Click(object? sender, EventArgs e)
+        {
+            AppSettings settings = AppSettings.Load();
+            settings.AlwaysPlayFromStart = menuAlwaysFromStart.Checked;
+            settings.Save();
         }
 
         // Media > Open DVD/CD: the one video DVD or audio CD in the drives is played at once (a CD from its first track to its last, as a playlist);
@@ -284,7 +303,9 @@ namespace SwewolfMediaPlayer
 
             RecentFiles.Add(path);   // (only real files qualify: not addresses, the playlist of a CD, or a disc)
             RefreshRecentMenu();
-            new MediaPlayerForm(path) { Icon = Icon }.Show(this);
+            var player = new MediaPlayerForm(path) { Icon = Icon };
+            player.UseQuickSettingsOnce();   // a file opened here follows the two check items of the Media menu
+            player.Show(this);
         }
 
         // Media > Recent Media Files: the last nine files, newest first, numbered "1." to "9." (the digit is the shortcut key), then a separator and
