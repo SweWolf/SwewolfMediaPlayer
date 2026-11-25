@@ -32,6 +32,7 @@
 //               previous / next time stamp buttons.
 //   2026-11-23  The group box has one row when the window is wide enough, else two; Quick Preview, Preview and Start have the same
 //               width and Start is bold.
+//   2026-11-24  Start stands half a button apart from the preview buttons (it looked like it belonged to them).
 //   2026-11-24  The mode list keeps its choice while the window is open (it used to go back to Trim every time the box was shown).
 
 using System.ComponentModel;
@@ -219,7 +220,8 @@ namespace SwewolfMediaPlayer
             int widestRow = cboTrimMode.Right + gap + startLabel + timeFixed + gap + endLabel + timeFixed + gap + fineTuneWidth + fadesWidth;
 
             // The buttons: two time stamp buttons, then Quick Preview, Preview and Start (the same width).
-            int buttonsWidth = btnPrevMark.Width + space + btnNextMark.Width + gap + 3 * btnTrim.Width + 2 * space;
+            int startGap = space + btnTrim.Width / 2;   // Start stands apart from the two preview buttons (one of them says Stop while it plays)
+            int buttonsWidth = btnPrevMark.Width + space + btnNextMark.Width + gap + 3 * btnTrim.Width + space + startGap;
             bool oneRow = ClientSize.Width >= widestRow + gap + buttonsWidth + LogicalToDeviceUnits(40);   // (room for the X)
             int left = oneRow ? widestRow + gap : LogicalToDeviceUnits(12);
             int top = oneRow ? btnStartNow.Top : LogicalToDeviceUnits(60);
@@ -227,7 +229,7 @@ namespace SwewolfMediaPlayer
             btnNextMark.SetBounds(btnPrevMark.Right + space, top, btnNextMark.Width, btnNextMark.Height);
             btnQuickPreview.SetBounds(btnNextMark.Right + gap, top, btnQuickPreview.Width, btnQuickPreview.Height);
             btnPreview.SetBounds(btnQuickPreview.Right + space, top, btnPreview.Width, btnPreview.Height);
-            btnTrim.SetBounds(btnPreview.Right + space, top, btnTrim.Width, btnTrim.Height);
+            btnTrim.SetBounds(btnPreview.Right + startGap, top, btnTrim.Width, btnTrim.Height);
 
             int height = LogicalToDeviceUnits(oneRow ? 62 : 96);
             if (grpTrim.Height != height)
