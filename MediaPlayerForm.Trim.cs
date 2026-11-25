@@ -32,6 +32,7 @@
 //               previous / next time stamp buttons.
 //   2026-11-23  The group box has one row when the window is wide enough, else two; Quick Preview, Preview and Start have the same
 //               width and Start is bold.
+//   2026-11-24  The mode list keeps its choice while the window is open (it used to go back to Trim every time the box was shown).
 
 using System.ComponentModel;
 using System.Diagnostics;
@@ -305,11 +306,7 @@ namespace SwewolfMediaPlayer
             {
                 EndPreview(false);
             }
-            else if (cboTrimMode.SelectedIndex != 0)
-            {
-                cboTrimMode.SelectedIndex = 0;   // the box always opens on Trim
-            }
-            _trimVisible = visible;
+            _trimVisible = visible;   // (the mode list keeps its choice while this window is open; a new window starts on Trim)
             grpTrim.Visible = visible && !_fullScreen;
             if (visible)
             {
