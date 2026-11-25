@@ -48,6 +48,9 @@ namespace SwewolfMediaPlayer
         // A constant for now; meant to become a setting.
         private const double QuickPreviewSeconds = 5;
 
+        // How long before a cut of a split the preview pauses (see PreviewTick).
+        private const long PausePointLeadMs = 100;
+
         private enum TrimMode { Trim, Remove, Split }
 
         // How SplitMediaFiles is started: its window opens with the values filled in; it replaces the file by itself
@@ -78,6 +81,10 @@ namespace SwewolfMediaPlayer
         private double _previewFadeOut;
         private long _previewStartedTicks;
         private long _previewSettleMs;   // the time to assume right after a jump, before the player reports it
+        private long _previewLastTime = -1;   // the last time the player reported, and when (to run the clock between reports)
+        private long _previewLastTicks;
+        private long _previewPauseMark;   // the cut the preview paused at, and whether the time shown has been corrected yet
+        private bool _previewPauseShown;
         private System.Windows.Forms.Timer? _previewTimer;
 
         // What the user typed, checked and converted. Times are in seconds; the "has" flags say whether the user
@@ -409,7 +416,11 @@ namespace SwewolfMediaPlayer
         // ---- Fine Tune: snap a time to the nearest scene change ----
 
         private const double FineTuneSeconds = 3;   // how far from the time in the box to look, each way
-        private const string SceneThreshold = "0.3";   // FFmpeg's scene score (0 to 1) that counts as a scene change
+        // FFmpeg's scene score (0 to 1) is how much a frame differs from the one before it. A cut in a dark film such as
+        // Krampus scores only 0.09 to 0.2 (measured), a cut in a bright film 0.4 or more, and a continuous shot with camera movement
+        // stays below about 0.05. So a frame counts as a cut from this score up. (The first version used 0.3 and found nothing.)
+        private const double MinSceneScore = 0.06;
+        private const double ClusterSeconds = 0.25;   // frames this close together are one transition; its first frame is the cut
 
         private bool _fineTuneShown;
         private bool _fineTuning;
@@ -497,19 +508,21 @@ namespace SwewolfMediaPlayer
             SeekTo(cutMs);
         }
 
-        // Runs FFmpeg over [from, to] seconds and returns the scene change nearest to "around" (seconds), or null.
-        // The picture frames are only decoded and thrown away; "showinfo" lists the time of every frame that passed the
-        // scene test. Times are counted from "from". The first frame of the window never counts (it has nothing to compare with).
+        // Runs FFmpeg over [from, to] seconds and returns the cut nearest to "around" (seconds), or null. The frames are only
+        // decoded and thrown away; FFmpeg prints the scene score of every frame ("metadata=print"). A cut is a frame whose score
+        // is at least MinSceneScore; frames close together (a quick fade or flash) are one cut, and its first frame is the time,
+        // which is the first picture of the new shot. Times are counted from "from". The first frame of the window never counts.
         private static double? FindSceneChange(string ffmpeg, string file, double from, double to, double around)
         {
             ProcessStartInfo info = new(ffmpeg)
             {
                 UseShellExecute = false,
                 CreateNoWindow = true,
+                RedirectStandardOutput = true,
                 RedirectStandardError = true
             };
             foreach (string argument in new[] { "-hide_banner", "-nostats", "-ss", FormatSeconds(from), "-t", FormatSeconds(to - from),
-                "-i", file, "-an", "-sn", "-vf", $"select='gt(scene,{SceneThreshold})',showinfo", "-f", "null", "-" })
+                "-i", file, "-an", "-sn", "-vf", "select='gte(scene,0)',metadata=print:key=lavfi.scene_score:file=-", "-f", "null", "-" })
             {
                 info.ArgumentList.Add(argument);
             }
@@ -519,7 +532,8 @@ namespace SwewolfMediaPlayer
             {
                 return null;
             }
-            Task<string> output = process.StandardError.ReadToEndAsync();
+            Task<string> output = process.StandardOutput.ReadToEndAsync();
+            _ = process.StandardError.ReadToEndAsync();   // (read so FFmpeg never waits for a full pipe)
             if (!process.WaitForExit(30000))
             {
                 try
@@ -534,11 +548,23 @@ namespace SwewolfMediaPlayer
             }
 
             double? best = null;
+            double lastCandidate = double.NegativeInfinity;
             foreach (System.Text.RegularExpressions.Match match in System.Text.RegularExpressions.Regex.Matches(
-                output.Result, @"showinfo.*?pts_time:(?<t>\d+(\.\d+)?)"))
+                output.Result, @"pts_time:(?<t>\d+(\.\d+)?)\s+lavfi\.scene_score=(?<s>\d+(\.\d+)?)"))
             {
                 double time = from + double.Parse(match.Groups["t"].Value, CultureInfo.InvariantCulture);
-                if (time >= from + 0.04 && (best == null || Math.Abs(time - around) < Math.Abs(best.Value - around)))
+                double score = double.Parse(match.Groups["s"].Value, CultureInfo.InvariantCulture);
+                if (time < from + 0.04 || score < MinSceneScore)
+                {
+                    continue;
+                }
+                bool sameTransition = time - lastCandidate <= ClusterSeconds;
+                lastCandidate = time;
+                if (sameTransition)
+                {
+                    continue;   // only the first frame of a transition is the cut
+                }
+                if (best == null || Math.Abs(time - around) < Math.Abs(best.Value - around))
                 {
                     best = time;
                 }
@@ -975,6 +1001,22 @@ namespace SwewolfMediaPlayer
             _stepTimeMs = -1;
             _previewSettleMs = timeMs;
             _previewStartedTicks = Environment.TickCount64;
+            _previewLastTime = -1;
+        }
+
+        // The player reports its time only every few frames, so a mark was passed by up to a tenth of a second before the preview
+        // noticed. Between two reports the clock is run on from the last one (the preview plays at normal speed).
+        private long PreviewTimeMs(MediaPlayer player)
+        {
+            long reported = player.Time;
+            long now = Environment.TickCount64;
+            if (reported != _previewLastTime || _previewLastTime < 0)
+            {
+                _previewLastTime = reported;
+                _previewLastTicks = now;
+                return reported;
+            }
+            return reported + (now - _previewLastTicks);
         }
 
         // Follows the fades with the volume of the player, goes from one segment to the next, pauses at the marks
@@ -991,16 +1033,26 @@ namespace SwewolfMediaPlayer
             // Paused at a mark: the preview goes on when the user plays.
             if (_previewWaiting)
             {
+                // The player's own time is only updated every quarter of a second, so while paused it shows a time up to a third
+                // of a second before the picture (the seek bar thumb sat well left of the marker). Show the time of the last
+                // frame before the cut instead: the picture is that frame or one or two before it.
+                if (!_previewPauseShown && Environment.TickCount64 - _previewWaitingTicks >= 150 && !player.IsPlaying)
+                {
+                    _previewPauseShown = true;
+                    _stepTimeMs = Math.Max(0, (long)Math.Round(_previewPauseMark - GetFrameMs()));
+                    UpdateTime(_stepTimeMs);
+                }
                 if (Environment.TickCount64 - _previewWaitingTicks < 400 || !player.IsPlaying)
                 {
                     return;
                 }
                 _previewWaiting = false;
+                _previewLastTime = -1;
             }
 
             // Right after a jump the player still reports the old time for a moment.
             bool settling = Environment.TickCount64 - _previewStartedTicks < 600;
-            long timeMs = settling ? _previewSettleMs : player.Time;
+            long timeMs = settling ? _previewSettleMs : PreviewTimeMs(player);
             if (!settling && !player.IsPlaying)
             {
                 EndPreview(false);
@@ -1022,8 +1074,16 @@ namespace SwewolfMediaPlayer
                     return;
                 }
 
-                if (_previewPauseIndex < _previewPauses.Length && timeMs >= _previewPauses[_previewPauseIndex] - 30)
+                // Pause early. The pause takes effect a tenth of a second or more after the player's time says so, and that
+                // varies by up to about 70 ms from one run to the next (measured with LibVLC on a 24 fps video: pausing 60 ms
+                // before the cut showed the new shot in two runs of three, 90 ms in one of three, 120 ms and 150 ms never), so
+                // the preview stops on a picture of the first part a few frames before the cut, never on the second part.
+                // (A seek afterwards cannot put it on an exact frame: LibVLC showed the first frame of the second part for
+                // every time from a frame before the cut to a frame after it.)
+                if (_previewPauseIndex < _previewPauses.Length && timeMs >= _previewPauses[_previewPauseIndex] - PausePointLeadMs)
                 {
+                    _previewPauseMark = _previewPauses[_previewPauseIndex];
+                    _previewPauseShown = false;
                     _previewPauseIndex++;
                     _previewWaiting = true;
                     _previewWaitingTicks = Environment.TickCount64;
