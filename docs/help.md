@@ -386,6 +386,12 @@ The player opens at once, skips the main window, plays the file and closes when 
 player window is already open, the file is handed to that one. A file that does not exist is
 reported.
 
+Add `--start-paused` (the same switch as in VLC) to stop on the first picture until you press Play:
+
+```
+SwewolfMediaPlayer.exe --start-paused "C:\Videos\My Video.mp4"
+```
+
 ## Keyboard Shortcuts
 
 | Key | What it does |

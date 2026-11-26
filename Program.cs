@@ -52,11 +52,17 @@ namespace SwewolfMediaPlayer
             string? libraryPath = null;
             long startAtMs = 0;       // --start-at <ms> / --no-resume: from the explorer's Demo Play and Intro Play
             bool noResume = false;
+            bool startPaused = false; // --start-paused (as in VLC): stop on the first picture
             for (int i = 0; i < args.Length; i++)
             {
                 if (args[i].Equals("--no-resume", StringComparison.OrdinalIgnoreCase))
                 {
                     noResume = true;
+                    continue;
+                }
+                if (args[i].Equals("--start-paused", StringComparison.OrdinalIgnoreCase))
+                {
+                    startPaused = true;   // the same switch as VLC
                     continue;
                 }
                 if (args[i].Equals("--start-at", StringComparison.OrdinalIgnoreCase) && i + 1 < args.Length)
@@ -92,7 +98,7 @@ namespace SwewolfMediaPlayer
                     // PlayerPipe.cs) and ends. If no player answers, this one goes on as a player of its own.
                     using var oneWindow = new Mutex(true, PlayerPipe.MutexName, out bool first);
                     if (!first && PlayerPipe.TrySend(new PipeCommand("play", fullPath,
-                            string.IsNullOrEmpty(libraryPath) ? null : libraryPath, StartMs: startAtMs, NoResume: noResume, Front: true)))
+                            string.IsNullOrEmpty(libraryPath) ? null : libraryPath, StartMs: startAtMs, NoResume: noResume, Front: true, StartPaused: startPaused)))
                     {
                         OpenTimingLog.Write("Main: the file was handed to the player that is running");
                         return;
@@ -103,7 +109,7 @@ namespace SwewolfMediaPlayer
                     // Load the video engine while the window is being made (the main window does the same).
                     _ = MediaPlayerForm.PreloadAsync();
                     var window = new MediaPlayerForm(fullPath, string.IsNullOrEmpty(libraryPath) ? null : libraryPath) { Icon = LoadIcon() };
-                    window.SetFirstFileOptions(startAtMs, noResume);
+                    window.SetFirstFileOptions(startAtMs, noResume, startPaused);
                     window.UseCloseWhenEnds();   // started with a file (e.g. from the explorer): close at the end, not saved
                     PlayerPipe? pipe = first ? new PlayerPipe() : null;
                     window.AttachPipe(pipe);

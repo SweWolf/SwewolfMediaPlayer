@@ -84,6 +84,12 @@ SwewolfMediaPlayer.exe "C:\Videos\My Video.mp4"
 
 The player opens at once, plays the file and closes when it has ended. If a player is already running, the file is handed to that one instead.
 
+Add `--start-paused` (the same switch as in VLC) to stop on the first picture until you press Play:
+
+```
+SwewolfMediaPlayer.exe --start-paused "C:\Videos\My Video.mp4"
+```
+
 ---
 
 ## Where the Program Keeps Its Files

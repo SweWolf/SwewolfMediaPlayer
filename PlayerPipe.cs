@@ -21,7 +21,7 @@ namespace SwewolfMediaPlayer
 {
     /// <summary>A command from the explorer. Names are in camelCase in the JSON ("cmd", "path", "libraryPath", ...).</summary>
     internal sealed record PipeCommand(string Cmd, string? Path = null, string? LibraryPath = null, long StartMs = 0,
-                                       bool NoResume = false, bool Front = false, bool Playlist = false);
+                                       bool NoResume = false, bool Front = false, bool Playlist = false, bool StartPaused = false);
 
     internal sealed class PlayerPipe : IDisposable
     {

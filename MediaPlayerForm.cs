@@ -794,7 +794,10 @@ namespace SwewolfMediaPlayer
             _mediaStartsAtEnd = false;
             _openWatch = System.Diagnostics.Stopwatch.StartNew();
             // Not playing automatically: it stops on its first picture (see the Playing handler). Not for a stream or a disc.
-            _startPausedPending = quick is { PlayAutomatically: false } && !_isStream && !IsDvd;
+            // --start-paused (command line or pipe) asks for the same, for the first file only.
+            bool paused = quick is { PlayAutomatically: false } || (!restart && _startPausedOnce);
+            if (!restart) _startPausedOnce = false;
+            _startPausedPending = paused && !_isStream && !IsDvd;
             _player.Play(_media);
             OpenTimingLog.Write($"StartMedia: Media created and Play called, {stepWatch.ElapsedMilliseconds} ms");
 

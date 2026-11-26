@@ -24,14 +24,16 @@ namespace SwewolfMediaPlayer
         private bool _quickSettingsOnce;                  // the next StartMedia follows the quick settings (see UseQuickSettingsOnce)
         private bool _startPausedPending;                 // the file stops on its first picture as soon as it plays
         private bool _noResumeOnce;                       // the next StartLibrary does not offer or use a saved position
-        private long _startAtOnceMs;                      // the next StartLibrary starts the file at this time (the explorer's Demo Play)
+        private bool _startPausedOnce;                    // the next StartMedia stops on the first picture (--start-paused)
+        private long _startAtOnceMs;                     // the next StartLibrary starts the file at this time (the explorer's Demo Play)
         private PipeCommand? _pendingPlay;                // a play command that came before the video engine was ready
 
         /// <summary>The first file of a player the explorer started (command line --start-at / --no-resume).</summary>
-        internal void SetFirstFileOptions(long startMs, bool noResume)
+        internal void SetFirstFileOptions(long startMs, bool noResume, bool startPaused = false)
         {
             _startAtOnceMs = startMs;
             _noResumeOnce = noResume;
+            _startPausedOnce = startPaused;
         }
 
         // The two quick settings of the main window's Media menu (Play Media Files Automatically, Always Play from Start) apply to the next file
@@ -146,6 +148,7 @@ namespace SwewolfMediaPlayer
             SetControlled(command.Playlist);
             _noResumeOnce = command.NoResume;   // the explorer says: a file that follows another one in a playlist starts from the beginning
             _startAtOnceMs = command.StartMs;   // Demo Play
+            _startPausedOnce = command.StartPaused;
             await OpenAnotherAsync(path, command.LibraryPath ?? path);
             if (command.Front) BringToFrontNow();
         }
