@@ -69,6 +69,8 @@ namespace SwewolfMediaPlayer
             grpControlPanel = new GroupBox();
             lblWhenEnds = new Label();
             cboWhenEnds = new ComboBox();
+            lblFrameStepping = new Label();
+            cboFrameStepping = new ComboBox();
             grpTrim = new GroupBox();
             lblStartAt = new Label();
             lblEndAt = new Label();
@@ -517,6 +519,8 @@ namespace SwewolfMediaPlayer
             grpControlPanel.ContextMenuStrip = menuControls;
             grpControlPanel.Controls.Add(lblWhenEnds);
             grpControlPanel.Controls.Add(cboWhenEnds);
+            grpControlPanel.Controls.Add(lblFrameStepping);
+            grpControlPanel.Controls.Add(cboFrameStepping);
             grpControlPanel.Controls.Add(btnCloseControlPanel);
             grpControlPanel.Dock = DockStyle.Bottom;
             grpControlPanel.Location = new Point(0, 518);
@@ -548,6 +552,28 @@ namespace SwewolfMediaPlayer
             cboWhenEnds.TabIndex = 1;
             toolTip.SetToolTip(cboWhenEnds, "What the player does when a media file has played to its end.\r\nFor a playlist: what happens after the last item.");
             cboWhenEnds.SelectedIndexChanged += cboWhenEnds_SelectedIndexChanged;
+            //
+            // lblFrameStepping
+            //
+            lblFrameStepping.AutoSize = true;
+            lblFrameStepping.Location = new Point(360, 28);
+            lblFrameStepping.Name = "lblFrameStepping";
+            lblFrameStepping.Size = new Size(130, 15);
+            lblFrameStepping.TabIndex = 2;
+            lblFrameStepping.Text = "Frame Stepping when Paused";
+            //
+            // cboFrameStepping
+            //
+            cboFrameStepping.BackColor = Color.FromArgb(48, 48, 48);
+            cboFrameStepping.DropDownStyle = ComboBoxStyle.DropDownList;
+            cboFrameStepping.FlatStyle = FlatStyle.Flat;
+            cboFrameStepping.ForeColor = Color.FromArgb(230, 230, 230);
+            cboFrameStepping.Location = new Point(520, 25);
+            cboFrameStepping.Name = "cboFrameStepping";
+            cboFrameStepping.Size = new Size(130, 23);
+            cboFrameStepping.TabIndex = 3;
+            toolTip.SetToolTip(cboFrameStepping, "How the mouse wheel and the Left and Right keys step through the frames while paused. Normal (VLC) is what the player has always done: the frame can be a frame or two away from the expected one, and the time shown is an estimate. Exact (FFmpeg) shows the frames FFmpeg decodes, so every frame is the one whose time is shown, the same time that is used when cutting. It needs FFmpeg.");
+            cboFrameStepping.SelectedIndexChanged += cboFrameStepping_SelectedIndexChanged;
             // 
             // grpTrim
             // 
@@ -695,5 +721,7 @@ namespace SwewolfMediaPlayer
         private GroupBox grpControlPanel;
         private Label lblWhenEnds;
         private ComboBox cboWhenEnds;
+        private Label lblFrameStepping;
+        private ComboBox cboFrameStepping;
     }
 }

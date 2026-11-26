@@ -502,7 +502,8 @@ namespace SwewolfMediaPlayer
                 return;
             }
 
-            long cutMs = (long)Math.Round(cut.Value * 1000);
+            // Cut off, not rounded: a time even half a millisecond after the first frame of the new shot would leave that frame in the first part.
+            long cutMs = (long)Math.Floor(cut.Value * 1000);
             target.Text = FormatTime(cutMs, true);
             SeekTo(cutMs);
         }
@@ -945,6 +946,7 @@ namespace SwewolfMediaPlayer
                 return;
             }
 
+            HideExact();   // the preview plays in LibVLC
             (PreviewSegment[] segments, long[] pauses) = BuildPreviewPlan(request, quick, CurrentTimeMs());
             _previewMode = request.Mode;
             _previewQuick = quick;

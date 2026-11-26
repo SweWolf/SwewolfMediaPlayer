@@ -120,7 +120,9 @@ namespace SwewolfMediaPlayer
                 OpenTimingLog.Write($"LibVLC load: Core.Initialize done after {watch.ElapsedMilliseconds} ms");
                 // For finding problems: with the environment variable SWEWOLF_VLC_LOG set, LibVLC's own messages go to the timing log.
                 bool vlcLog = !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("SWEWOLF_VLC_LOG"));
-                _libVlc = new LibVLC(vlcLog);
+                // No on-screen messages from LibVLC: a snapshot (taken to find out which frame is shown, MediaPlayerForm.ExactSteps.cs) wrote its file
+                // path across the picture and showed a small copy of the frame in the corner.
+                _libVlc = new LibVLC(vlcLog, "--no-osd", "--no-snapshot-preview");
                 if (vlcLog)
                 {
                     _libVlc.Log += (s, e) => OpenTimingLog.Write($"VLC {e.Level} [{e.Module}] {e.Message}");
@@ -210,6 +212,7 @@ namespace SwewolfMediaPlayer
                 }
             };
             InitControlPanel();
+            InitFrameStepping();
             InitStreamInfo();
             InitTuneControls();
             InitBookmarkButton();
@@ -588,6 +591,7 @@ namespace SwewolfMediaPlayer
                 _playlistFailsInRow = 0;   // an item plays: the "nothing plays" check of a repeating playlist starts again
                 _paused = false;
                 _stepTimeMs = -1;
+                HideExact();
                 ShowPlayPause(true);
                 ApplyAudioState();
                 if (_startPausedPending)
@@ -761,6 +765,7 @@ namespace SwewolfMediaPlayer
                 return;
             }
 
+            HideExact();
             _liveBaseMs = -1;   // a live stream counts its time from here (see UpdateTime)
             OpenTimingLog.Write($"StartMedia: {OpenTimingLog.Describe(_filePath, _isStream)}{(restart ? " (restart)" : "")}");
             var stepWatch = System.Diagnostics.Stopwatch.StartNew();
@@ -1253,6 +1258,21 @@ namespace SwewolfMediaPlayer
         // Steps one frame by seeking one frame length from the tracked time. LibVLC can only
         // step forward natively, and this way both directions behave the same.
         private void StepFrame(int direction)
+        {
+            if (_player == null || !CanSeek)
+            {
+                return;
+            }
+
+            if (ExactMode)
+            {
+                ExactStepAsync(direction);   // the frames come from FFmpeg (MediaPlayerForm.ExactSteps.cs)
+                return;
+            }
+            StepFrameNormal(direction);
+        }
+
+        private void StepFrameNormal(int direction)
         {
             if (_player == null || !CanSeek)
             {
@@ -1762,6 +1782,7 @@ namespace SwewolfMediaPlayer
 
         private void ShowStopped()
         {
+            HideExact();
             _paused = false;
             _stepTimeMs = -1;
             _pendingSeekMs = -1;
@@ -1852,11 +1873,16 @@ namespace SwewolfMediaPlayer
             else if (!_player.IsPlaying && (IsAtEnd() || _lengthMs > 0 && _player.Time >= _lengthMs - 200))
             {
                 // Paused on the last frame: play again from the beginning.
+                HideExact();
                 _player.Time = 0;
                 _player.SetPause(false);
             }
             else
             {
+                if (!_player.IsPlaying)
+                {
+                    LeaveExact(true);   // after exact stepping LibVLC goes on from the frame that is shown
+                }
                 _player.SetPause(_player.IsPlaying);
             }
         }
@@ -2771,6 +2797,7 @@ namespace SwewolfMediaPlayer
             }
 
             EndPreview(false);
+            HideExact();
             if (IsStopped(_player))
             {
                 // A stopped player ignores seeks: remember the position for Play.

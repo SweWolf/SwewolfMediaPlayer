@@ -16,6 +16,7 @@
 //               remembered in the library (MediaPlayerForm.Tracks.cs).
 //   2026-11-19  The label reads "When the Media File Ends", or "When the Playlist Ends" while a playlist is open (UpdateEndLabel).
 //   2026-11-22  The drop-down follows the right edge of its label (PositionEndCombo): it overlapped the longer label.
+//   2026-11-26  "Frame Stepping when Paused" (Normal (VLC) / Exact (FFmpeg)), not remembered: MediaPlayerForm.ExactSteps.cs.
 
 namespace SwewolfMediaPlayer
 {
@@ -42,6 +43,7 @@ namespace SwewolfMediaPlayer
         private void PositionEndCombo()
         {
             cboWhenEnds.Left = lblWhenEnds.Right + LogicalToDeviceUnits(8);
+            PositionFrameStepping();
         }
 
         private void InitControlPanel()
