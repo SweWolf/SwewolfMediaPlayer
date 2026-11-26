@@ -1505,7 +1505,7 @@ namespace SwewolfMediaPlayer
             }
 
             // A playlist of this player: the next item starts (after the last one the end action decides; see MediaPlayerForm.Playlist.cs).
-            if (PlaylistItemEnded())
+            if (PlaylistItemEnded() || UserListItemEnded())
             {
                 return;
             }
