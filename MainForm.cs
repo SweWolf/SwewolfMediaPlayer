@@ -16,6 +16,7 @@ namespace SwewolfMediaPlayer
             MediaPlayerForm.StyleMenu(menuStrip);   // the same dark menus as the player (clearer lines between groups)
             RefreshRecordingsMenu();   // there only when a recording has been made
             RefreshRecentMenu();
+            RefreshLocalPlaylistsMenu();   // IPTV > Local Playlists
             AppSettings quick = AppSettings.Load();
             menuPlayAutomatically.Checked = quick.PlayAutomatically;
             menuAlwaysFromStart.Checked = quick.AlwaysPlayFromStart;
@@ -95,7 +96,10 @@ namespace SwewolfMediaPlayer
         private void menuCreateShortcut_Click(object? sender, EventArgs e)
         {
             using var form = new CreateShortcutForm(Application.ExecutablePath);
-            form.ShowDialog(this);
+            if (form.ShowDialog(this) == DialogResult.OK)
+            {
+                RefreshLocalPlaylistsMenu();   // the folder may have been changed
+            }
         }
 
         private void menuSettings_Click(object? sender, EventArgs e)
