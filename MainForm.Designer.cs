@@ -99,7 +99,7 @@
             menuPlayAutomatically.Name = "menuPlayAutomatically";
             menuPlayAutomatically.Size = new Size(180, 22);
             menuPlayAutomatically.Text = "Play Media Files Automatically";
-            menuPlayAutomatically.ToolTipText = "A file you open here starts to play by itself. Without the check mark it stops on its first picture until you press Play (handy for trimming). A file started from another program, or with arguments, always plays.";
+            menuPlayAutomatically.ToolTipText = "A file you open here starts to play by itself. Without the check mark it stops on its first picture until you press Play (handy for trimming).\r\nThis setting does not apply when a file is started from another program or with command-line arguments. Such a file always plays, unless you add --start-paused.";
             menuPlayAutomatically.Click += menuPlayAutomatically_Click;
             //
             // menuAlwaysFromStart
