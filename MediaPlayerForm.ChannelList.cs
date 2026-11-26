@@ -44,6 +44,9 @@ namespace SwewolfMediaPlayer
         private const string HiddenGroupName = "Hidden Channels";   // the last item of the group drop-down, there only while a channel is hidden
         private const string FavoritesGroupName = "Favorites";   // first item after "All Groups": the channels the user marked
         private const string RecentGroupName = "Recently Watched";   // second item of the group drop-down: the last 10 channels that played
+        private bool _userListMode;                    // the channels come from a file of the user's (shown as a playlist, see ShowChannelList)
+        private string _channelListName = "";          // the file name of that list, for the panel header
+        private Panel? _channelGroupGap;
         private string? _channelListSource;            // the web address of the list the channels came from (null for a file); kept with a recording
 
         // Dock side of the lists: right by default, left when the user chose so.
@@ -98,8 +101,9 @@ namespace SwewolfMediaPlayer
                 return true;
             }
 
-            _channelListSource = Uri.TryCreate(pathOrUrl.Trim(), UriKind.Absolute, out Uri? listUri) && (listUri.Scheme == "http" || listUri.Scheme == "https") ? pathOrUrl.Trim() : null;
-            ShowChannelList(entries);
+            bool fromWeb = Uri.TryCreate(pathOrUrl.Trim(), UriKind.Absolute, out Uri? listUri) && (listUri.Scheme == "http" || listUri.Scheme == "https");
+            _channelListSource = fromWeb ? pathOrUrl.Trim() : null;
+            ShowChannelList(entries, userList: !fromWeb, name: Path.GetFileNameWithoutExtension(pathOrUrl));   // a list of streams in a file of the user's: a playlist, not the IPTV list
             Text = Uri.TryCreate(pathOrUrl, UriKind.Absolute, out Uri? uri) && uri.Scheme.StartsWith("http") ? uri.Host : Path.GetFileName(pathOrUrl);
             ShowVideoMessage("Choose a channel in the list.");
             return true;
@@ -115,15 +119,22 @@ namespace SwewolfMediaPlayer
             _slowLoadHint = false;
         }
 
-        private void ShowChannelList(List<M3uEntry> entries)
+        // userList: the streams come from a file on the user's disk. The panel then says "Playlist", has no group drop-down and no
+        // favorites, and Hide Channel only hides the row until the file is opened again (nothing is saved).
+        private void ShowChannelList(List<M3uEntry> entries, bool userList = false, string name = "")
         {
             LeavePlaylistMode();
+            _userListMode = userList;
+            _channelListName = name;
             _channels = entries;
-            _favoriteUrls = FavoriteChannels.All().ToHashSet(StringComparer.OrdinalIgnoreCase);
-            _hiddenUrls = HiddenChannels.All().ToHashSet(StringComparer.OrdinalIgnoreCase);
+            _favoriteUrls = userList ? new(StringComparer.OrdinalIgnoreCase) : FavoriteChannels.All().ToHashSet(StringComparer.OrdinalIgnoreCase);
+            _hiddenUrls = userList ? new(StringComparer.OrdinalIgnoreCase) : HiddenChannels.All().ToHashSet(StringComparer.OrdinalIgnoreCase);
             _channelIndex = -1;
             _channelListShown = true;
             EnsureChannelList();
+            _cboChannelGroup!.Visible = !userList;
+            _channelGroupGap!.Visible = !userList;
+            UpdateListToggleTexts();
 
             _channelGroups = entries.SelectMany(c => GroupsOf(c)).Distinct(StringComparer.OrdinalIgnoreCase)
                 .OrderBy(g => g, StringComparer.CurrentCultureIgnoreCase).ToList();
@@ -156,7 +167,7 @@ namespace SwewolfMediaPlayer
         // "Hidden Channels" is shown only while this list has a hidden channel. When the last one is unhidden while the group is open, the list goes back to All Groups.
         private void UpdateHiddenGroupItem()
         {
-            if (_cboChannelGroup == null || _channels == null)
+            if (_cboChannelGroup == null || _channels == null || _userListMode)
             {
                 return;
             }
@@ -187,6 +198,7 @@ namespace SwewolfMediaPlayer
         private void HideChannelList()
         {
             LeavePlaylistMode();
+            _userListMode = false;
             _channels = null;
             _channelListSource = null;
             _channelIndex = -1;
@@ -305,7 +317,9 @@ namespace SwewolfMediaPlayer
             _lstChannels.Items.AddRange(rows.ToArray());
             _lstChannels.EndUpdate();
             int total = hiddenView ? _channels.Count(IsHidden) : _channels.Count(c => !IsHidden(c));   // the hidden ones are not counted in the other views
-            _lblChannelsHeader!.Text = rows.Count == total ? $"Channels ({rows.Count:N0})" : $"Channels ({rows.Count:N0} of {total:N0})";
+            string title = _userListMode ? "Playlist" : "Channels";
+            string count = rows.Count == total ? $"{rows.Count:N0}" : $"{rows.Count:N0} of {total:N0}";
+            _lblChannelsHeader!.Text = $"{title} ({count})" + (_userListMode && _channelListName.Length > 0 ? " - " + _channelListName : "");
 
             // Keep the channel that plays in view when it is in the list (not in the recent list: the newest is on top).
             int at = _channelIndex >= 0 && !recent ? rows.IndexOf(_channelIndex) : -1;
@@ -440,6 +454,7 @@ namespace SwewolfMediaPlayer
             _channelFilterRow = filterRow;
             filterRow.Controls.Add(_txtChannelFilter);   // the filling control first, then the one docked to the right
             var gap = new Panel { Dock = DockStyle.Right, Width = LogicalToDeviceUnits(6), BackColor = dark };
+            _channelGroupGap = gap;
             filterRow.Controls.Add(gap);
             filterRow.Controls.Add(_cboChannelGroup);
 
@@ -551,7 +566,7 @@ namespace SwewolfMediaPlayer
             int left = box.Right + pad;
             int half = e.Bounds.Height / 2;
             int textRight = e.Bounds.Right - pad;
-            if (ShowFavoriteStars && !_playlistMode && _favoriteUrls.Contains(channel.Url))
+            if (ShowFavoriteStars && !_playlistMode && !_userListMode && _favoriteUrls.Contains(channel.Url))
             {
                 int starSize = LogicalToDeviceUnits(14);
                 var starBox = new Rectangle(e.Bounds.Right - pad - starSize, e.Bounds.Top + (e.Bounds.Height - starSize) / 2, starSize, starSize);
@@ -616,6 +631,13 @@ namespace SwewolfMediaPlayer
                 {
                     return;
                 }
+                if (_userListMode)
+                {
+                    // Only for this window: the row goes until the file is opened again; nothing is saved.
+                    _hiddenUrls.Add(url);
+                    ApplyChannelFilter();
+                    return;
+                }
                 SetChannelHidden(url, !HiddenChannels.Contains(url));
             };
             menu.Items.Add(favorite);
@@ -635,9 +657,9 @@ namespace SwewolfMediaPlayer
                 url = _channels[index].Url;
                 copy.ToolTipText = url;
                 favorite.Text = FavoriteChannels.Contains(url) ? "Remove from Favorites" : "Add to Favorites";
-                bool hidden = HiddenChannels.Contains(url);
+                bool hidden = !_userListMode && HiddenChannels.Contains(url);
                 hide.Text = hidden ? "Unhide Channel" : "Hide Channel";
-                favorite.Visible = !hidden && !_playlistMode;   // a hidden channel is not shown in Favorites
+                favorite.Visible = !hidden && !_playlistMode && !_userListMode;   // a hidden channel is not shown in Favorites; a playlist has none (yet)
                 hide.Visible = !_playlistMode;
                 copy.Text = _playlistMode ? "Copy File Path" : "Copy Stream Address";
             };
@@ -731,7 +753,10 @@ namespace SwewolfMediaPlayer
             }
             if (playing >= 2)
             {
-                RecentChannels.Add(channel.Url);
+                if (!_userListMode)
+                {
+                    RecentChannels.Add(channel.Url);   // a playlist of the user's is not part of the IPTV lists' recent list
+                }
                 ChannelHistory.RecordWorked(channel.Url);
                 if (_cboChannelGroup?.SelectedIndex == 2)
                 {
@@ -760,7 +785,7 @@ namespace SwewolfMediaPlayer
                 _lstChannels?.Invalidate();
 
                 // A channel that keeps failing (three times in a row, the first at least a day ago) can be hidden. "No" asks again at the next failure.
-                if (history.FailCount >= 3 && history.FailingSince != null && DateTime.Now - history.FailingSince.Value >= TimeSpan.FromDays(1)
+                if (!_userListMode && history.FailCount >= 3 && history.FailingSince != null && DateTime.Now - history.FailingSince.Value >= TimeSpan.FromDays(1)
                     && !HiddenChannels.Contains(channel.Url))
                 {
                     DialogResult answer = MessageBox.Show(this,
@@ -813,7 +838,7 @@ namespace SwewolfMediaPlayer
                 return;
             }
             bool shown = _channelListShown;
-            ToolStripMenuItem toggle = TrackItem(_playlistMode ? "Show Playlist" : "Show Channel List", shown, () => SetChannelListShown(!shown));
+            ToolStripMenuItem toggle = TrackItem(_playlistMode || _userListMode ? "Show Playlist" : "Show Channel List", shown, () => SetChannelListShown(!shown));
             toggle.ShortcutKeyDisplayString = "F8";
             menuVideo.Items.Add(toggle);
         }

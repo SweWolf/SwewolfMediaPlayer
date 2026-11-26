@@ -74,7 +74,7 @@ namespace SwewolfMediaPlayer
         {
             if (_closeListButton != null)
             {
-                toolTip.SetToolTip(_closeListButton, _playlistMode ? "Hide the Playlist (F8)" : "Hide the Channel List (F8)");
+                toolTip.SetToolTip(_closeListButton, _playlistMode || _userListMode ? "Hide the Playlist (F8)" : "Hide the Channel List (F8)");
             }
         }
 
@@ -83,6 +83,7 @@ namespace SwewolfMediaPlayer
         private void ShowPlaylist(List<M3uEntry> entries, string name)
         {
             _playlistName = name;
+            _userListMode = false;
             CancelPlaylistNotice();
             _playlistMode = true;
             _playlistFailsInRow = 0;
