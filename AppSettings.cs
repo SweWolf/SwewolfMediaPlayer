@@ -26,6 +26,7 @@
 //   2026-11-22  FfmpegNoticeShown (false by default): the one-time message that FFmpeg is not installed has been shown.
 //   2026-11-22  BookmarkExplorerNoticeShown (false by default): the one-time message about bookmarks and SweWolf File Explorer has been shown.
 //   2026-11-23  ShowChapterMarks (on by default).
+//   2026-11-26  PlaylistFolder (blank by default): the folder for downloaded IPTV playlists.
 //   2026-11-24  PlayAutomatically (on by default) and AlwaysPlayFromStart (off by default): the two check items at the bottom of the Media menu.
 
 using System.Text.Json;
@@ -95,6 +96,9 @@ namespace SwewolfMediaPlayer
         // The folder the Browse button of the main window starts in (Open a Media File). The Windows Videos folder until the user changes
         // it; blank means the last folder a file was opened from (LastMediaFolder, kept between runs). A folder that does not exist is skipped.
         public string MediaStartFolder { get; set; } = Environment.GetFolderPath(Environment.SpecialFolder.MyVideos);
+
+        // The folder where the user keeps the IPTV playlists (M3U files) he has downloaded. Blank (the default) = none chosen. Not used for anything yet.
+        public string PlaylistFolder { get; set; } = "";
 
         // The folder of the last file chosen with the Browse button: used when MediaStartFolder is blank.
         public string LastMediaFolder { get; set; } = "";

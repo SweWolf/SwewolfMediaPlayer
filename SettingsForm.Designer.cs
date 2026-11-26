@@ -32,6 +32,10 @@ namespace SwewolfMediaPlayer
             txtOpenFolder = new TextBox();
             btnBrowseOpen = new Button();
             lblOpenHint = new Label();
+            lblPlaylistFolder = new Label();
+            txtPlaylistFolder = new TextBox();
+            btnBrowsePlaylists = new Button();
+            lblPlaylistHint = new Label();
             grpResume = new GroupBox();
             lblResumeMode = new Label();
             cboResumeMode = new ComboBox();
@@ -231,9 +235,13 @@ namespace SwewolfMediaPlayer
             grpOpen.Controls.Add(txtOpenFolder);
             grpOpen.Controls.Add(btnBrowseOpen);
             grpOpen.Controls.Add(lblOpenHint);
+            grpOpen.Controls.Add(lblPlaylistFolder);
+            grpOpen.Controls.Add(txtPlaylistFolder);
+            grpOpen.Controls.Add(btnBrowsePlaylists);
+            grpOpen.Controls.Add(lblPlaylistHint);
             grpOpen.Location = new Point(12, 256);
             grpOpen.Name = "grpOpen";
-            grpOpen.Size = new Size(360, 116);
+            grpOpen.Size = new Size(360, 194);
             grpOpen.TabIndex = 1;
             grpOpen.TabStop = false;
             grpOpen.Text = "Open a Media File";
@@ -272,6 +280,41 @@ namespace SwewolfMediaPlayer
             lblOpenHint.Size = new Size(340, 32);
             lblOpenHint.TabIndex = 3;
             lblOpenHint.Text = "Leave this blank to start in the last folder you used.";
+            //
+            // lblPlaylistFolder
+            //
+            lblPlaylistFolder.AutoSize = true;
+            lblPlaylistFolder.Location = new Point(10, 114);
+            lblPlaylistFolder.Name = "lblPlaylistFolder";
+            lblPlaylistFolder.TabIndex = 4;
+            lblPlaylistFolder.Text = "Folder for Saved IPTV &Playlists";
+            //
+            // txtPlaylistFolder
+            //
+            txtPlaylistFolder.Location = new Point(10, 132);
+            txtPlaylistFolder.Name = "txtPlaylistFolder";
+            txtPlaylistFolder.Size = new Size(260, 23);
+            txtPlaylistFolder.TabIndex = 5;
+            toolTip.SetToolTip(txtPlaylistFolder, "The folder where you keep the IPTV playlists (M3U files) that you have downloaded to this computer.\r\nLeave it blank if you have no such folder.");
+            //
+            // btnBrowsePlaylists
+            //
+            btnBrowsePlaylists.Location = new Point(276, 131);
+            btnBrowsePlaylists.Name = "btnBrowsePlaylists";
+            btnBrowsePlaylists.Size = new Size(74, 25);
+            btnBrowsePlaylists.TabIndex = 6;
+            btnBrowsePlaylists.Text = "Brow&se...";
+            btnBrowsePlaylists.UseVisualStyleBackColor = true;
+            btnBrowsePlaylists.Click += btnBrowsePlaylists_Click;
+            //
+            // lblPlaylistHint
+            //
+            lblPlaylistHint.ForeColor = SystemColors.GrayText;
+            lblPlaylistHint.Location = new Point(10, 162);
+            lblPlaylistHint.Name = "lblPlaylistHint";
+            lblPlaylistHint.Size = new Size(340, 28);
+            lblPlaylistHint.TabIndex = 7;
+            lblPlaylistHint.Text = "The M3U playlists you have downloaded.";
             //
             // grpResume
             //
@@ -555,6 +598,10 @@ namespace SwewolfMediaPlayer
         private TextBox txtOpenFolder;
         private Button btnBrowseOpen;
         private Label lblOpenHint;
+        private Label lblPlaylistFolder;
+        private TextBox txtPlaylistFolder;
+        private Button btnBrowsePlaylists;
+        private Label lblPlaylistHint;
         private GroupBox grpResume;
         private Label lblResumeMode;
         private ComboBox cboResumeMode;

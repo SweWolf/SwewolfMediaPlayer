@@ -14,6 +14,7 @@
 //   2026-11-10  Saved Frames group: Default Folder for Saved Frames (text box, Browse, grey hint; blank = the folder of the video).
 //   2026-11-10  Open a Media File group: Default Start Folder for Browsing (text box, Browse, grey hint; blank = the last folder used).
 //   2026-11-12  Side of the Tune and Channel Lists (Right / Left) in the Player group.
+//   2026-11-26  Folder for Saved IPTV Playlists (Open a Media File group); the groups scroll when the window would be taller than the screen.
 //   2026-10-26  "Turn On Subtitles When a Video Opens" (the default for videos with no choice of their own) in the Player group.
 
 namespace SwewolfMediaPlayer
@@ -26,6 +27,17 @@ namespace SwewolfMediaPlayer
             Icon = Program.LoadIcon();
             TextBoxStyle.Apply(txtFramesFolder);
             TextBoxStyle.Apply(txtOpenFolder);
+            TextBoxStyle.Apply(txtPlaylistFolder);
+
+            // The groups sit in a panel that scrolls when they do not fit on the screen; OK and Cancel stay at the bottom.
+            _scroll = new Panel { AutoScroll = true, Location = Point.Empty };
+            SuspendLayout();
+            foreach (Control group in new Control[] { grpPlayer, grpOpen, grpResume, grpFrames, grpUpdate })
+            {
+                _scroll.Controls.Add(group);
+            }
+            Controls.Add(_scroll);
+            ResumeLayout(false);
 
             ApplyLayout();
         }
@@ -39,6 +51,11 @@ namespace SwewolfMediaPlayer
         private void btnBrowseOpen_Click(object? sender, EventArgs e)
         {
             BrowseFolder(txtOpenFolder, "Choose the folder where browsing for a media file starts.");
+        }
+
+        private void btnBrowsePlaylists_Click(object? sender, EventArgs e)
+        {
+            BrowseFolder(txtPlaylistFolder, "Choose the folder where you keep your downloaded IPTV playlists.");
         }
 
         private void BrowseFolder(TextBox box, string description)
@@ -95,9 +112,23 @@ namespace SwewolfMediaPlayer
             grpFrames.Top = grpResume.Bottom + 12;
             grpUpdate.Top = grpFrames.Bottom + 12;
 
-            ClientSize = new Size(grpUpdate.Right + 12, grpUpdate.Bottom + 12 + btnOK.Height + 12);
+            // The window is as tall as the groups, but never taller than the screen: then the panel scrolls.
+            // (k: how much the form is scaled; the numbers above are the 96 dpi ones of the Designer.)
+            float k = grpOpen.Width / 360f;
+            int content = grpUpdate.Bottom + 12;
+            int buttonRow = 12 + btnOK.Height + 12;
+            // The screen in the same units as the layout: before the window is scaled the layout is in 96 dpi units, after it in pixels.
+            int screenHeight = (int)(Screen.FromControl(this).WorkingArea.Height * k / (DeviceDpi / 96f));
+            int titleAndBorders = (int)(90 * k);   // title bar, frame and some air; the exact size is not known before the window is shown
+            int panelHeight = Math.Min(content, Math.Max(buttonRow * 3, screenHeight - titleAndBorders - buttonRow));
+            int bar = panelHeight < content ? SystemInformation.VerticalScrollBarWidth : 0;
+            int width = grpUpdate.Right + 12 + bar;
+            _scroll.Size = new Size(width, panelHeight);
+            ClientSize = new Size(width, panelHeight + buttonRow);
             btnOK.Top = btnCancel.Top = ClientSize.Height - 12 - btnOK.Height;
         }
+
+        private Panel _scroll = null!;
 
         private void SettingsForm_Load(object? sender, EventArgs e)
         {
@@ -110,6 +141,7 @@ namespace SwewolfMediaPlayer
             cboNewVersionCheck.SelectedItem = settings.CheckForUpdatesOnStartup ? "Yes" : "No";
             txtFramesFolder.Text = settings.SaveFramesFolder ?? "";
             txtOpenFolder.Text = settings.MediaStartFolder ?? "";
+            txtPlaylistFolder.Text = settings.PlaylistFolder ?? "";
             cboCoverSize.SelectedIndex = Math.Clamp(settings.CoverPictureSize, 0, 1);
             cboButtonLook.SelectedIndex = settings.ClassicTrackButtons ? 1 : 0;
             cboListSide.SelectedIndex = Math.Clamp(settings.ListSide, 0, 1);
@@ -144,6 +176,7 @@ namespace SwewolfMediaPlayer
             settings.CheckForUpdatesOnStartup = cboNewVersionCheck.SelectedItem?.ToString() != "No";
             settings.SaveFramesFolder = txtFramesFolder.Text.Trim().Trim('"');
             settings.MediaStartFolder = txtOpenFolder.Text.Trim().Trim('"');
+            settings.PlaylistFolder = txtPlaylistFolder.Text.Trim().Trim('"');
             settings.CoverPictureSize = Math.Max(0, cboCoverSize.SelectedIndex);
             settings.ClassicTrackButtons = cboButtonLook.SelectedIndex == 1;
             settings.ListSide = Math.Max(0, cboListSide.SelectedIndex);
