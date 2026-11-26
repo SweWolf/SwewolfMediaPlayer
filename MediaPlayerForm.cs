@@ -678,12 +678,22 @@ namespace SwewolfMediaPlayer
         // frame. The user may have pressed Play already; then nothing is done.
         private async Task PauseOnFirstPictureAsync(MediaPlayer started)
         {
-            started.SetPause(true);
-            await Task.Delay(300);
-            if (ReferenceEquals(started, _player) && !IsDisposed && !started.IsPlaying && _paused)
+            // LibVLC sometimes ignores a pause that comes just as the file starts (seen when the engine was loaded already and the
+            // file opens very fast): the file then plays on. So the pause is repeated until it has taken effect (at most 5 times).
+            for (int attempt = 0; attempt < 5; attempt++)
             {
-                started.NextFrame();
-                ShowPressPlayHint();
+                started.SetPause(true);
+                await Task.Delay(300);
+                if (!ReferenceEquals(started, _player) || IsDisposed)
+                {
+                    return;
+                }
+                if (!started.IsPlaying && _paused)
+                {
+                    started.NextFrame();
+                    ShowPressPlayHint();
+                    return;
+                }
             }
         }
 
