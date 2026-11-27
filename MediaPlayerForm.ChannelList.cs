@@ -752,6 +752,7 @@ namespace SwewolfMediaPlayer
             }
 
             M3uEntry channel = _channels[index];
+            _strayChecks = 0;   // a click on a channel: the safeguard for a stray video window may restart it once (MediaPlayerForm.StrayWindow.cs)
             _channelIndex = index;
             _channelUserAgentFor = channel.Url;
             _channelUserAgent = channel.UserAgent;

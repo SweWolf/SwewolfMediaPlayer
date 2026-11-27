@@ -813,7 +813,12 @@ namespace SwewolfMediaPlayer
             bool paused = quick is { PlayAutomatically: false } || (!restart && _startPausedOnce);
             if (!restart) _startPausedOnce = false;
             _startPausedPending = paused && !_isStream && !IsDvd;
+            EnsureVideoWindow();   // MediaPlayerForm.StrayWindow.cs
             _player.Play(_media);
+            if (_isStream)
+            {
+                WatchForStrayVideoWindow(_player);
+            }
             OpenTimingLog.Write($"StartMedia: Media created and Play called, {stepWatch.ElapsedMilliseconds} ms");
 
             if (!_isStream && Path.GetExtension(_filePath).Equals(".cda", StringComparison.OrdinalIgnoreCase))
