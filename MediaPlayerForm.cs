@@ -555,6 +555,7 @@ namespace SwewolfMediaPlayer
         private void AttachPlayer(LibVLC lib)
         {
             _activeLib = lib;
+            RetireVideoHost();   // MediaPlayerForm.StrayWindow.cs
             _player = new MediaPlayer(lib);
             MediaPlayer mine = _player;   // the handlers below compare with this one (the sender of a LibVLCSharp event is not the player itself)
             // Timing log: when LibVLC reports the first steps of opening (these events come on LibVLC's own threads).
@@ -1442,6 +1443,7 @@ namespace SwewolfMediaPlayer
             }
 
             AttachPlayer(_activeLib);   // the old player is left in the video window by being replaced there
+            UseFreshVideoWindow();   // the stuck one may still hold the video area: the new player gets a window of its own
             _player!.Volume = trkVolume.Value;
             if (!string.IsNullOrEmpty(_filePath))
             {

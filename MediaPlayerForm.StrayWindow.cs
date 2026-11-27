@@ -6,8 +6,15 @@
 //  - A few seconds after a stream starts we look for such a window of this program. If there is one it is written to the log, and the
 //    stream is opened once more the way a click on the channel does (the old window goes away with its player).
 //
+//  - Found in the log on 2026-11-26 (SVT1): every time it happened, "STUCK ... a new player takes over" came first, and the new player
+//    had the right video area (no "had lost" line). So the stuck old player still holds the video area (its own picture window is in
+//    it), and LibVLC cannot put a second picture window there. After a STUCK the new player therefore gets a new native window to draw
+//    in (UseFreshVideoWindow): a panel on top of the video area, with its own Hwnd. The old one is hidden, not destroyed: its player
+//    may still be using it.
+//
 // History:
 //   2026-11-26  First version.
+//   2026-11-26  UseFreshVideoWindow: after a stuck player the new one draws in a new native window.
 
 using System.Runtime.InteropServices;
 using LibVLCSharp.Shared;
@@ -24,6 +31,40 @@ namespace SwewolfMediaPlayer
         [DllImport("user32.dll")] private static extern bool IsWindowVisible(IntPtr hWnd);
         [DllImport("user32.dll", CharSet = CharSet.Unicode)] private static extern int GetWindowText(IntPtr hWnd, StringBuilder text, int max);
 
+        private Panel? _videoHost;                       // the window the player draws in after a stuck player was replaced (null: the video area itself)
+        private readonly List<Panel> _retiredHosts = new();   // earlier ones: hidden, kept until the window closes
+
+        private IntPtr VideoTarget => _videoHost is { IsHandleCreated: true } ? _videoHost.Handle : videoView.Handle;
+
+        // The new player of a replaced stuck player draws in a window of its own (see the header). Runs on the UI thread, after AttachPlayer.
+        private void UseFreshVideoWindow()
+        {
+            if (_player == null || !videoView.IsHandleCreated)
+            {
+                return;
+            }
+            RetireVideoHost();
+            var host = new Panel { Dock = DockStyle.Fill, BackColor = Color.Black, TabStop = false };
+            videoView.Controls.Add(host);
+            host.BringToFront();
+            _ = host.Handle;   // makes the native window now
+            _videoHost = host;
+            _player.Hwnd = host.Handle;
+            OpenTimingLog.Write("VIDEO WINDOW: the new player draws in a new window");
+        }
+
+        // Back to the video area itself (a new player that is attached the ordinary way, see AttachPlayer): the panel is hidden.
+        private void RetireVideoHost()
+        {
+            if (_videoHost == null)
+            {
+                return;
+            }
+            _videoHost.Visible = false;
+            _retiredHosts.Add(_videoHost);
+            _videoHost = null;
+        }
+
         private int _strayChecks;   // how often a stray window made a restart for the file that is open now (reset when a channel is clicked)
 
         // Gives the player the video area again before it plays, if it does not have it (it should always have it).
@@ -35,10 +76,10 @@ namespace SwewolfMediaPlayer
             }
             try
             {
-                if (_player.Hwnd != videoView.Handle)
+                if (_player.Hwnd != VideoTarget)
                 {
                     OpenTimingLog.Write("VIDEO WINDOW: the player had lost the video area, it is given again");
-                    _player.Hwnd = videoView.Handle;
+                    _player.Hwnd = VideoTarget;
                 }
             }
             catch (Exception ex) when (ex is not OutOfMemoryException)
