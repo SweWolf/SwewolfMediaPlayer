@@ -17,7 +17,7 @@
 //   2026-11-13  "Favorites" group (right-click: Add to Favorites / Remove from Favorites), before Recently Watched (FavoriteChannels.cs).
 //   2026-11-13  A gold star on the rows of the favorites (ShowFavoriteStars, a setting later).
 //   2026-11-19  F8 hides / shows the list; the X says "Hide the Channel List" or "Hide the Playlist".
-//   2026-11-26  A list in a file of the user's (streams, or streams and files) is a "Playlist": no group drop-down, Hide Channel only for this window,
+//   2026-11-26  A list in a file of the user's (streams, or streams and files) is a "Playlist": the group drop-down only when there are two or more groups, Hide Channel only for this window,
 //               "When the Media File Ends" = Close Player goes on with the next item. Favorites keep the whole channel, so any channel can be one.
 //   2026-11-19  A .m3u / .m3u8 of local files is a playlist, not a channel list: the same panel without filter, group and favorites (MediaPlayerForm.Playlist.cs).
 
@@ -126,8 +126,8 @@ namespace SwewolfMediaPlayer
             _slowLoadHint = false;
         }
 
-        // userList: the channels come from a file on the user's disk. The panel then says "Playlist", has no group drop-down, and Hide
-        // Channel only hides the row until the file is opened again (nothing is saved). Favorites work as in every list.
+        // userList: the channels come from a file on the user's disk. The panel then says "Playlist", has no Hidden Channels group, and Hide
+        // Channel only hides the row until the file is opened again (nothing is saved). Groups and favorites work as in every list.
         // The entries after _baseCount are favorites from other lists: only the Favorites group shows them.
         private void ShowChannelList(List<M3uEntry> entries, bool userList = false, string name = "")
         {
@@ -135,14 +135,11 @@ namespace SwewolfMediaPlayer
             _userListMode = userList;
             _channelListName = name;
             _baseCount = entries.Count;
-            if (!userList)
+            var have = entries.Select(e => e.Url).ToHashSet(StringComparer.OrdinalIgnoreCase);
+            List<M3uEntry> extras = FavoriteChannels.Entries().Where(f => !have.Contains(f.Url)).ToList();
+            if (extras.Count > 0)
             {
-                var have = entries.Select(e => e.Url).ToHashSet(StringComparer.OrdinalIgnoreCase);
-                List<M3uEntry> extras = FavoriteChannels.Entries().Where(f => !have.Contains(f.Url)).ToList();
-                if (extras.Count > 0)
-                {
-                    entries = entries.Concat(extras).ToList();
-                }
+                entries = entries.Concat(extras).ToList();
             }
             _channels = entries;
             _favoriteUrls = FavoriteChannels.All().ToHashSet(StringComparer.OrdinalIgnoreCase);
@@ -150,13 +147,14 @@ namespace SwewolfMediaPlayer
             _channelIndex = -1;
             _channelListShown = true;
             EnsureChannelList();
-            _cboChannelGroup!.Visible = !userList;
-            _channelGroupGap!.Visible = !userList;
             UpdateListToggleTexts();
 
             _channelGroups = entries.SelectMany(c => GroupsOf(c)).Distinct(StringComparer.OrdinalIgnoreCase)
                 .OrderBy(g => g, StringComparer.CurrentCultureIgnoreCase).ToList();
-            _cboChannelGroup!.BeginUpdate();
+            // The group drop-down is there when the list has more than one group.
+            _cboChannelGroup!.Visible = _channelGroups.Count > 1;
+            _channelGroupGap!.Visible = _channelGroups.Count > 1;
+            _cboChannelGroup.BeginUpdate();
             _cboChannelGroup.Items.Clear();
             _cboChannelGroup.Items.Add("All Groups");
             _cboChannelGroup.Items.Add(FavoritesGroupName);
@@ -789,10 +787,7 @@ namespace SwewolfMediaPlayer
             }
             if (playing >= 2)
             {
-                if (!_userListMode)
-                {
-                    RecentChannels.Add(channel.Url);   // a playlist of the user's is not part of the IPTV lists' recent list
-                }
+                RecentChannels.Add(channel.Url);
                 ChannelHistory.RecordWorked(channel.Url);
                 if (_cboChannelGroup?.SelectedIndex == 2)
                 {
