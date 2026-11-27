@@ -450,7 +450,7 @@ namespace SwewolfMediaPlayer
             _cboChannelGroup = new ComboBox
             {
                 Dock = DockStyle.Right,
-                Width = LogicalToDeviceUnits(120),
+                Width = LogicalToDeviceUnits(155),   // about 5 characters wider than before (120); the filter box takes the rest, so their total is the same
                 DropDownStyle = ComboBoxStyle.DropDownList,
                 FlatStyle = FlatStyle.Flat,
                 BackColor = Color.FromArgb(64, 64, 64),
