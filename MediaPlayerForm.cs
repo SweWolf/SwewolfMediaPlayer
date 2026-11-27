@@ -776,6 +776,10 @@ namespace SwewolfMediaPlayer
             ResetTunes();
             ResetChapters();
             ResetSpeed();
+            if (!restart)
+            {
+                ResetAspectRatio();   // the shape is not remembered: a new file or channel starts with Default
+            }
             ResetTracks();
             _vlcSeekable = true;
             ApplySeekState();
@@ -1118,6 +1122,12 @@ namespace SwewolfMediaPlayer
             if (keyData == Keys.M && !(ActiveControl is TextBoxBase { Visible: true }))
             {
                 btnMute_Click(null, EventArgs.Empty);
+                return true;
+            }
+            // A: the next aspect ratio (Default, 16:9, 4:3, ...), not while typing in a text box.
+            if (keyData == Keys.A && AspectAvailable && !(ActiveControl is TextBoxBase { Visible: true }))
+            {
+                NextAspectRatio();
                 return true;
             }
             if (keyData == Keys.C)
@@ -2550,6 +2560,7 @@ namespace SwewolfMediaPlayer
             RefreshSeekMarks();
             CheckSpeed();
             CheckStreamQuality();
+            CheckAspectRatio();
             CheckTracks();
             TrackLibrary();
 
@@ -2696,6 +2707,7 @@ namespace SwewolfMediaPlayer
             AddTuneMenu();
             AddChapterMenu();
             AddVisualizationMenu();
+            AddAspectRatioMenu();
 
             // WinForms sets Cancel when the menu has no items yet, which is the case here.
             e.Cancel = false;
