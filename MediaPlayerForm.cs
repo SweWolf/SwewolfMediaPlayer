@@ -224,6 +224,7 @@ namespace SwewolfMediaPlayer
             InitChapterControls();
             InitTrimControls();
             InitSpeedBox();
+            InitStreamQuality();
             StyleMenu(menuVideo);
             _filePath = filePath;
             _libraryPath = libraryPath ?? filePath;
@@ -2548,6 +2549,7 @@ namespace SwewolfMediaPlayer
             CheckChapters();
             RefreshSeekMarks();
             CheckSpeed();
+            CheckStreamQuality();
             CheckTracks();
             TrackLibrary();
 
