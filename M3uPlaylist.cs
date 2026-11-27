@@ -15,6 +15,7 @@
 // History:
 //   2026-11-12  First version.
 //   2026-11-19  IsAddress, IsFilePlaylist and ResolvePaths: a list of local files (the explorer's playlist) is played item after item.
+//   2026-11-26  A placeholder instead of a stream ("[NO PUBLIC STREAM]") is not a file: LooksLikeFilePath, WithoutPlaceholders.
 //   2026-11-22  LoadTextAsync adds the channels the owner has removed (ChannelMaster.cs).
 
 using System.Drawing.Drawing2D;
@@ -77,7 +78,20 @@ namespace SwewolfMediaPlayer
         // treat it as a channel list, but plays the items one after the other.
         public static bool IsFilePlaylist(List<M3uEntry> entries)
         {
-            return entries.Any(e => !IsAddress(e.Url));
+            return entries.Any(e => LooksLikeFilePath(e.Url));
+        }
+
+        // A path or file name: rooted, with a folder in it, or with an extension. Placeholders that some lists have instead of a stream
+        // ("[NO PUBLIC STREAM]") are neither an address nor a file.
+        public static bool LooksLikeFilePath(string entry)
+        {
+            return !IsAddress(entry) && !entry.StartsWith('[') && (Path.IsPathRooted(entry) || entry.Contains('\\') || entry.Contains('/') || Path.HasExtension(entry));
+        }
+
+        // The entries that can be played from a list on the web (addresses) or from a list on a disk (addresses and files).
+        public static List<M3uEntry> WithoutPlaceholders(List<M3uEntry> entries, bool filesAllowed)
+        {
+            return entries.Where(e => IsAddress(e.Url) || (filesAllowed && LooksLikeFilePath(e.Url))).ToList();
         }
 
         // The file entries of a playlist file with full paths: a relative path is relative to the folder of the playlist, file:// addresses

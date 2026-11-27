@@ -83,6 +83,9 @@ namespace SwewolfMediaPlayer
             }
 
             // A list of files on a disk (the explorer's playlist) plays item after item. It does not need #EXTINF lines.
+            // A list on the web is never one: its entries that are not addresses (placeholders such as "[NO PUBLIC STREAM]") are left out.
+            bool fromWeb = Uri.TryCreate(pathOrUrl.Trim(), UriKind.Absolute, out Uri? listUri) && (listUri.Scheme == "http" || listUri.Scheme == "https");
+            entries = M3uPlaylist.WithoutPlaceholders(entries, filesAllowed: !fromWeb);
             bool isFileList = M3uPlaylist.IsFilePlaylist(entries);
             if (!isFileList && !M3uPlaylist.LooksLikeChannelList(text))
             {
@@ -95,7 +98,6 @@ namespace SwewolfMediaPlayer
                 MessageBox.Show(this, "The list does not contain any channels.", AppName, MessageBoxButtons.OK, MessageBoxIcon.Information);
                 return true;
             }
-            bool fromWeb = Uri.TryCreate(pathOrUrl.Trim(), UriKind.Absolute, out Uri? listUri) && (listUri.Scheme == "http" || listUri.Scheme == "https");
             bool mixed = isFileList && entries.Any(e => M3uPlaylist.IsAddress(e.Url));   // files and streams in one list
             if (isFileList && !(mixed && !fromWeb))
             {
