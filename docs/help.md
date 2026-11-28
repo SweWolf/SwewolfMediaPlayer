@@ -275,6 +275,8 @@ the channel, its name and its group. Click a row to play it.
   Watched** (the last 10 channels that really played) and **Hidden Channels**.
 - Right-click a channel for **Add to Favorites**, **Hide Channel** and **Copy Stream Address**. A
   gold star marks a favorite.
+- Press **Up** or **Down** to change channel, and **Delete** to hide the channel that plays. Turn
+  on **Scroll Lock** if you want Up and Down to scroll the list without changing channel.
 - Point at a row to see when the channel last worked, or since when it does not.
 - After a channel has failed three times in a row, the player offers to hide it.
 - Choose **Quality** in the right-click menu if a channel offers several. **Auto** is the default;
@@ -410,6 +412,9 @@ SwewolfMediaPlayer.exe --start-paused "C:\Videos\My Video.mp4"
 | Backspace | Normal speed |
 | Page Up / Page Down | Previous / next tune, track or playlist item |
 | F8 | Show or hide the channel list or the playlist |
+| Up / Down (list shown) | Previous / next channel or playlist item. With **Scroll Lock** on, they only scroll the list |
+| Delete (list shown) | Hide the channel that plays (same as **Hide Channel**); press again in the Hidden Channels group to unhide |
+| A | Next aspect ratio (Default, 16:9, 4:3, 16:10, 21:9, 5:4, 1:1) |
 | Ctrl+D | Add a bookmark |
 
 A key that types a letter, such as M or X, does not act while you are typing in a text box.

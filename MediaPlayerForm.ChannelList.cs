@@ -645,18 +645,10 @@ namespace SwewolfMediaPlayer
             var hide = new ToolStripMenuItem("Hide Channel");
             hide.Click += (_, _) =>
             {
-                if (url == null)
+                if (url != null)
                 {
-                    return;
+                    ToggleChannelHidden(url);
                 }
-                if (_userListMode)
-                {
-                    // Only for this window: the row goes until the file is opened again; nothing is saved.
-                    _hiddenUrls.Add(url);
-                    ApplyChannelFilter();
-                    return;
-                }
-                SetChannelHidden(url, !HiddenChannels.Contains(url));
             };
             menu.Items.Add(favorite);
             menu.Items.Add(hide);
@@ -683,6 +675,103 @@ namespace SwewolfMediaPlayer
                 copy.Text = _playlistMode ? "Copy File Path" : "Copy Stream Address";
             };
             return menu;
+        }
+
+        // Hide Channel / Unhide Channel of the right-click menu, and the Delete key.
+        private void ToggleChannelHidden(string url)
+        {
+            if (_userListMode)
+            {
+                // Only for this window: the row goes until the file is opened again; nothing is saved.
+                _hiddenUrls.Add(url);
+                ApplyChannelFilter();
+                return;
+            }
+            SetChannelHidden(url, !HiddenChannels.Contains(url));
+        }
+
+        // Keys for the channel list (or playlist) while it is shown, when no text box, drop-down or volume slider has the focus:
+        //   Up / Down  change channel (the previous / next row of the list, no wrap-around), like a click on it.
+        //   Scroll Lock on: Up / Down only scroll the list by a row, nothing changes channel (like Calc and Excel).
+        //   Delete     the same as right-click > Hide Channel (or Unhide Channel) on the channel that plays; not in a file playlist.
+        private bool HandleChannelListKey(Keys keyData)
+        {
+            if (_lstChannels == null || _channels == null || !_channelListShown || ActiveControl is TextBoxBase or ComboBox || ActiveControl == trkVolume)
+            {
+                return false;
+            }
+
+            if (keyData is Keys.Up or Keys.Down)
+            {
+                int step = keyData == Keys.Down ? 1 : -1;
+                if (Control.IsKeyLocked(Keys.Scroll))
+                {
+                    _lstChannels.TopIndex = Math.Clamp(_lstChannels.TopIndex + step, 0, Math.Max(0, _lstChannels.Items.Count - 1));
+                    return true;
+                }
+
+                int count = _lstChannels.Items.Count;
+                if (count == 0)
+                {
+                    return true;
+                }
+                // The row of the channel that plays. When it is not in the list (hidden, filtered away), the next row after its place.
+                int row = -1;
+                for (int i = 0; i < count; i++)
+                {
+                    if ((int)_lstChannels.Items[i] == _channelIndex)
+                    {
+                        row = i;
+                        break;
+                    }
+                }
+                int target;
+                if (row >= 0)
+                {
+                    target = Math.Clamp(row + step, 0, count - 1);
+                }
+                else
+                {
+                    target = step > 0 ? 0 : count - 1;
+                    for (int i = 0; i < count; i++)
+                    {
+                        int at = (int)_lstChannels.Items[i];
+                        if (step > 0 && at > _channelIndex)
+                        {
+                            target = i;
+                            break;
+                        }
+                        if (step < 0 && at < _channelIndex)
+                        {
+                            target = i;   // the last one before it
+                        }
+                    }
+                }
+                if (target == row)
+                {
+                    return true;
+                }
+
+                int index = (int)_lstChannels.Items[target];
+                int visible = Math.Max(1, _lstChannels.ClientSize.Height / _lstChannels.ItemHeight);
+                if (target < _lstChannels.TopIndex)
+                {
+                    _lstChannels.TopIndex = target;
+                }
+                else if (target >= _lstChannels.TopIndex + visible)
+                {
+                    _lstChannels.TopIndex = target - visible + 1;
+                }
+                _ = _playlistMode ? PlayPlaylistItemAsync(index) : PlayChannelAsync(index);
+                return true;
+            }
+
+            if (keyData == Keys.Delete && !_playlistMode && _channelIndex >= 0 && _channelIndex < _channels.Count)
+            {
+                ToggleChannelHidden(_channels[_channelIndex].Url);
+                return true;
+            }
+            return false;
         }
 
         // Hides a channel (or shows it again). A channel that plays goes on playing: only the list changes.

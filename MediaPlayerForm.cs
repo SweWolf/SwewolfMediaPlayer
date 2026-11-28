@@ -1059,6 +1059,10 @@ namespace SwewolfMediaPlayer
             {
                 return filterKeyHandled || base.ProcessCmdKey(ref msg, keyData);
             }
+            if (HandleChannelListKey(keyData))
+            {
+                return true;
+            }
             if (IsDvd && HandleDvdKey(keyData))
             {
                 return true;
